@@ -1,0 +1,274 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id                  String           @id @default(cuid())
+  name                String?
+  email               String           @unique
+  password            String?
+  role                UserRole         @default(JOBSEEKER)
+  subscriptionTier    SubscriptionTier @default(FREE)
+  subscriptionStart   DateTime?
+  subscriptionEnd     DateTime?
+  onboardingComplete  Boolean          @default(true)
+  emailVerified       DateTime?
+  image               String?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  profile         Profile?
+  cv              CV?
+  employerProfile EmployerProfile?
+  accounts        Account[]
+  sessions        Session[]
+  jobs            Job[]
+  applications    Application[]
+  savedJobs       SavedJob[]
+  notifications   Notification[]
+}
+
+enum SubscriptionTier {
+  FREE
+  PROFESSIONAL
+  PREMIUM
+}
+
+enum UserRole {
+  JOBSEEKER
+  EMPLOYER
+  ADMIN
+}
+
+model Profile {
+  id        String    @id @default(cuid())
+  userId    String    @unique
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bio       String?
+  phone     String?
+  location  String?
+  language  String    @default("ar")
+  cvUrl     String?
+  atsScore  Int?
+
+  dateOfBirth   DateTime?
+  gender        String?
+  nationality   String?
+  jobPreferences Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model EmployerProfile {
+  id          String @id @default(cuid())
+  userId      String @unique
+  user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  companyName                   String?
+  companyNameAr                 String?
+  logoUrl                       String?
+  industry                      String?
+  companySize                   String?
+  foundedYear                   Int?
+  websiteUrl                    String?
+  linkedinUrl                   String?
+  description                   String?
+  descriptionAr                 String?
+  contactName                   String?
+  contactEmail                  String?
+  contactPhone                  String?
+  officeLocation                String?
+  crNumber                      String?
+  twitterUrl                    String?
+  instagramUrl                  String?
+  hiringCategories              Json?
+  preferredCandidateLocations   Json?
+  activeHiring                  Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model CV {
+  id                  String    @id @default(cuid())
+  userId              String    @unique
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fullName            String?
+  fullNameAr          String?
+  professionalTitle   String?
+  professionalTitleAr String?
+  email               String?
+  phone               String?
+  location            String?
+  locationAr          String?
+  linkedinUrl         String?
+  portfolioUrl        String?
+  summary             String?
+  summaryAr           String?
+  experience          Json?
+  education           Json?
+  skills              Json?
+  languages           Json?
+  certifications      Json?
+
+  atsScore       Int?
+  atsAnalysis    Json?
+  atsKeywords    Json?
+  atsSuggestions Json?
+
+  uploadedCvUrl  String?
+  generatedCvUrl String?
+  template       String   @default("modern")
+
+  isComplete    Boolean  @default(false)
+  completionPct Int      @default(0)
+  lastParsed    DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Job {
+  id                String       @id @default(cuid())
+  employerId        String
+  employer          User         @relation(fields: [employerId], references: [id])
+
+  title             String
+  titleAr           String?
+  description       String
+  descriptionAr     String?
+  category          String
+  type              JobType      @default(FULLTIME)
+  location          String?
+  locationAr        String?
+  isRemote          Boolean      @default(false)
+  salaryMin         Int?
+  salaryMax         Int?
+  currency          String       @default("SAR")
+
+  requirements   Json?
+  benefits       Json?
+  skills         Json?
+
+  /** Extra structured fields from post-job wizard (education, experience level, years, etc.) */
+  hiringMeta Json?
+
+  isActive           Boolean @default(true)
+  isFeatured         Boolean @default(false)
+  viewCount          Int     @default(0)
+  applicationCount   Int     @default(0)
+  expiresAt          DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  applications Application[]
+  savedBy      SavedJob[]
+}
+
+enum JobType {
+  FULLTIME
+  PARTTIME
+  CONTRACT
+  INTERNSHIP
+  REMOTE
+  FREELANCE
+}
+
+model Application {
+  id            String             @id @default(cuid())
+  jobId         String
+  job           Job                @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  jobSeekerId   String
+  jobSeeker     User               @relation(fields: [jobSeekerId], references: [id], onDelete: Cascade)
+
+  status        ApplicationStatus  @default(PENDING)
+  coverLetter   String?
+  cvSnapshot    Json?
+  matchScore    Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([jobId, jobSeekerId])
+}
+
+model SavedJob {
+  id        String   @id @default(cuid())
+  userId    String
+  jobId     String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, jobId])
+}
+
+enum ApplicationStatus {
+  PENDING
+  REVIEWED
+  SHORTLISTED
+  REJECTED
+  HIRED
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  titleAr   String?
+  message   String
+  messageAr String?
+  type      NotificationType
+  isRead    Boolean          @default(false)
+  link      String?
+  createdAt DateTime         @default(now())
+}
+
+enum NotificationType {
+  JOB_MATCH
+  APPLICATION_UPDATE
+  ASSESSMENT_READY
+  SESSION_REMINDER
+  SYSTEM
+  NEW_APPLICATION
+}
+
+model Contact {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  subject   String
+  message   String
+  createdAt DateTime @default(now())
+}
