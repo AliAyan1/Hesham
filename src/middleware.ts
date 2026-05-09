@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { LOCALES, DEFAULT_LOCALE, RTL_LOCALES, DASHBOARD_ROUTES } from "@/lib/constants";
-import { UserRole } from "@/types";
-import type { Locale } from "@/lib/constants";
+import type { Locale } from "@/lib/locale-settings";
+import { DEFAULT_LOCALE, LOCALES, RTL_LOCALES } from "@/lib/locale-settings";
+import {
+  type MiddlewareUserRole,
+  MIDDLEWARE_DASHBOARD_ROUTES,
+} from "@/lib/middleware-routes";
 import { getToken } from "next-auth/jwt";
 import { isLocale, LOCALE_STORAGE_KEY } from "@/lib/locale-preference";
 import { getAuthSecret } from "@/lib/auth-secret";
@@ -137,17 +140,19 @@ export default async function middleware(request: NextRequest) {
         return NextResponse.redirect(new URL(`/${pathnameLocale}/onboarding`, request.url));
       }
 
-      const userRole = (token.role as UserRole | undefined) ?? UserRole.JOBSEEKER;
-      const expectedBase = DASHBOARD_ROUTES[userRole];
+      const rawRole = token.role as MiddlewareUserRole | undefined;
+      const userRole: MiddlewareUserRole =
+        rawRole && rawRole in MIDDLEWARE_DASHBOARD_ROUTES ? rawRole : "JOBSEEKER";
+      const expectedBase = MIDDLEWARE_DASHBOARD_ROUTES[userRole];
 
       if (pathWithoutLocale === "/dashboard") {
         return NextResponse.redirect(new URL(`/${pathnameLocale}${expectedBase}`, request.url));
       }
 
-      const allowedPrefixes: Record<UserRole, string> = {
-        [UserRole.JOBSEEKER]: "/dashboard/job-seeker",
-        [UserRole.EMPLOYER]: "/dashboard/employer",
-        [UserRole.ADMIN]: "/dashboard/admin",
+      const allowedPrefixes: Record<MiddlewareUserRole, string> = {
+        JOBSEEKER: MIDDLEWARE_DASHBOARD_ROUTES.JOBSEEKER,
+        EMPLOYER: MIDDLEWARE_DASHBOARD_ROUTES.EMPLOYER,
+        ADMIN: MIDDLEWARE_DASHBOARD_ROUTES.ADMIN,
       };
 
       if (!pathWithoutLocale.startsWith(allowedPrefixes[userRole])) {

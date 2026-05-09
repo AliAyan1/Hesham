@@ -1,14 +1,13 @@
+import { DEFAULT_LOCALE, LOCALES, RTL_LOCALES } from "./locale-settings";
 import { UserRole } from "@/types";
+
+export type { Locale } from "./locale-settings";
+export { DEFAULT_LOCALE, LOCALES, RTL_LOCALES };
 
 export const APP_NAME = "QudrahTech";
 export const APP_NAME_AR = "قدرتك";
 export const SLOGAN = "Know Your Potential. Shape Your Future.";
 export const SLOGAN_AR = "اعرف إمكاناتك. شكّل مستقبلك.";
-
-export const LOCALES = ["ar", "en", "fr", "es", "ur", "tr"] as const;
-export type Locale = (typeof LOCALES)[number];
-export const DEFAULT_LOCALE: Locale = "ar";
-export const RTL_LOCALES: Locale[] = ["ar", "ur"];
 
 export const USER_ROLES: Record<UserRole, { label: string; labelAr: string }> =
   {

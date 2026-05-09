@@ -1,4 +1,4 @@
-import { LOCALES, type Locale } from "@/lib/constants";
+import { LOCALES, type Locale } from "@/lib/locale-settings";
 
 export const LOCALE_STORAGE_KEY = "qudrahtech-locale";
 export const LEGACY_LOCALE_STORAGE_KEY = "qudrahtech-preferred-locale";
