@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { getPrisma } from "@/lib/db";
+import type { ZodIssue } from "zod";
 import { registerWithPlanSchema } from "@/lib/validations";
 import type { ApiResponse, IUser } from "@/types";
 import jwt from "jsonwebtoken";
@@ -35,7 +36,7 @@ export async function POST(
         {
           success: false,
           error: "Validation failed",
-          message: parsed.error.issues.map((e) => e.message).join(", "),
+          message: parsed.error.issues.map((e: ZodIssue) => e.message).join(", "),
         },
         { status: 400 }
       );

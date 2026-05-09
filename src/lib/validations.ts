@@ -3,29 +3,38 @@ import { UserRole } from "@/types";
 
 export const planParamSchema = z.enum(["professional", "premium"]);
 
-export const registerSchema = z
-  .object({
-    name: z
-      .string()
-      .min(2, "Name must be at least 2 characters")
-      .max(100, "Name must be under 100 characters"),
-    email: z.string().email("Invalid email address"),
-    password: z
-      .string()
-      .min(8, "Password must be at least 8 characters")
-      .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
-      .regex(/[0-9]/, "Password must contain at least one number"),
-    confirmPassword: z.string(),
-    role: z.nativeEnum(UserRole).default(UserRole.JOBSEEKER),
+const registerObjectSchema = z.object({
+  name: z
+    .string()
+    .min(2, "Name must be at least 2 characters")
+    .max(100, "Name must be under 100 characters"),
+  email: z.string().email("Invalid email address"),
+  password: z
+    .string()
+    .min(8, "Password must be at least 8 characters")
+    .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
+    .regex(/[0-9]/, "Password must contain at least one number"),
+  confirmPassword: z.string(),
+  role: z.nativeEnum(UserRole).default(UserRole.JOBSEEKER),
+});
+
+/** Extend the object before `.refine` — Zod 3 does not expose `.extend` on `ZodEffects`. */
+export const registerSchema = registerObjectSchema.refine(
+  (data) => data.password === data.confirmPassword,
+  {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
+  },
+);
+
+export const registerWithPlanSchema = registerObjectSchema
+  .extend({
+    plan: planParamSchema.optional(),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords do not match",
     path: ["confirmPassword"],
   });
-
-export const registerWithPlanSchema = registerSchema.extend({
-  plan: planParamSchema.optional(),
-});
 
 export const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
