@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { ApplicationStatus, Prisma, UserRole } from "@prisma/client";
+import { ApplicationStatus, AssessmentStatus, InterviewStatus, Prisma, UserRole } from "@prisma/client";
 import { z } from "zod";
 import { getServerSession } from "@/lib/get-server-session";
 import { getPrisma } from "@/lib/db";
@@ -10,6 +10,10 @@ const qpSchema = z.object({
   page: z.coerce.number().int().min(1).optional().default(1),
   pageSize: z.coerce.number().int().min(1).max(50).optional().default(10),
   sort: z.enum(["newest", "oldest", "match"]).optional().default("newest"),
+  hasAssessment: z.enum(["true", "false"]).optional(),
+  hasInterview: z.enum(["true", "false"]).optional(),
+  minScore: z.coerce.number().int().min(0).max(100).optional(),
+  maxScore: z.coerce.number().int().min(0).max(100).optional(),
 });
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
@@ -25,6 +29,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     page: url.searchParams.get("page") ?? undefined,
     pageSize: url.searchParams.get("pageSize") ?? undefined,
     sort: url.searchParams.get("sort") ?? undefined,
+    hasAssessment: url.searchParams.get("hasAssessment") ?? undefined,
+    hasInterview: url.searchParams.get("hasInterview") ?? undefined,
+    minScore: url.searchParams.get("minScore") ?? undefined,
+    maxScore: url.searchParams.get("maxScore") ?? undefined,
   });
 
   const jobIdFilter = parsed.success ? parsed.data.jobId : undefined;
@@ -32,14 +40,55 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const page = parsed.success ? parsed.data.page : 1;
   const pageSize = parsed.success ? parsed.data.pageSize : 10;
   const sort = parsed.success ? parsed.data.sort : "newest";
+  const hasAssessment = parsed.success ? parsed.data.hasAssessment : undefined;
+  const hasInterview = parsed.success ? parsed.data.hasInterview : undefined;
+  const minScore = parsed.success ? parsed.data.minScore : undefined;
+  const maxScore = parsed.success ? parsed.data.maxScore : undefined;
 
   const prisma = getPrisma();
   const employerId = session.user.id;
 
-  const baseWhere = {
+  const jobSeekerAnd: Prisma.UserWhereInput[] = [];
+  if (hasAssessment === "true") {
+    jobSeekerAnd.push({
+      assessments: {
+        some: {
+          status: AssessmentStatus.COMPLETED,
+          shareWithEmployers: true,
+        },
+      },
+    });
+  }
+  if (hasInterview === "true") {
+    jobSeekerAnd.push({
+      videoInterviews: {
+        some: {
+          status: InterviewStatus.COMPLETED,
+          shareWithEmployers: true,
+        },
+      },
+    });
+  }
+  if (minScore != null || maxScore != null) {
+    jobSeekerAnd.push({
+      assessments: {
+        some: {
+          status: AssessmentStatus.COMPLETED,
+          shareWithEmployers: true,
+          totalScore: {
+            ...(minScore != null ? { gte: minScore } : {}),
+            ...(maxScore != null ? { lte: maxScore } : {}),
+          },
+        },
+      },
+    });
+  }
+
+  const baseWhere: Prisma.ApplicationWhereInput = {
     job: { employerId },
     ...(jobIdFilter ? { jobId: jobIdFilter } : {}),
     ...(statusFilter ? { status: statusFilter } : {}),
+    ...(jobSeekerAnd.length ? { jobSeeker: { AND: jobSeekerAnd } } : {}),
   };
 
   const orderBy: Prisma.ApplicationOrderByWithRelationInput | Prisma.ApplicationOrderByWithRelationInput[] =
@@ -59,11 +108,27 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       select: {
         id: true,
         status: true,
+        offerAcceptedAt: true,
         createdAt: true,
         matchScore: true,
         job: { select: { id: true, title: true } },
         jobSeeker: {
-          select: { id: true, name: true, email: true, image: true },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            image: true,
+            assessments: {
+              where: { status: AssessmentStatus.COMPLETED, shareWithEmployers: true },
+              take: 1,
+              select: { id: true, totalScore: true },
+            },
+            videoInterviews: {
+              where: { status: InterviewStatus.COMPLETED, shareWithEmployers: true },
+              take: 1,
+              select: { id: true, overallScore: true },
+            },
+          },
         },
       },
     }),
@@ -74,18 +139,26 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   return NextResponse.json({
     success: true,
     data: {
-      items: rows.map((r) => ({
-        id: r.id,
-        status: r.status,
-        matchScore: r.matchScore,
-        createdAt: r.createdAt.toISOString(),
-        jobId: r.job.id,
-        jobTitle: r.job.title,
-        candidateName: r.jobSeeker.name,
-        candidateEmail: r.jobSeeker.email,
-        candidateImage: r.jobSeeker.image,
-        candidateId: r.jobSeeker.id,
-      })),
+      items: rows.map((r) => {
+        const contactHidden =
+          r.status !== ApplicationStatus.HIRED && r.offerAcceptedAt == null;
+        return {
+          id: r.id,
+          status: r.status,
+          matchScore: r.matchScore,
+          createdAt: r.createdAt.toISOString(),
+          jobId: r.job.id,
+          jobTitle: r.job.title,
+          candidateName: r.jobSeeker.name,
+          candidateEmail: contactHidden ? "" : r.jobSeeker.email,
+          contactHidden,
+          candidateImage: r.jobSeeker.image,
+          candidateId: r.jobSeeker.id,
+          hasSharedAssessment: r.jobSeeker.assessments.length > 0,
+          hasSharedInterview: r.jobSeeker.videoInterviews.length > 0,
+          sharedAssessmentScore: r.jobSeeker.assessments[0]?.totalScore ?? null,
+        };
+      }),
       page,
       pageSize,
       total,

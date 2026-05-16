@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import { Link, usePathname } from "@/i18n/navigation";
 import { cn } from "@/lib/cn";
+import { hrefRegisterFree } from "@/lib/i18n-hrefs";
 import { Logo } from "@/components/ui/Logo";
 import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
 import { Button } from "@/components/ui/Button";
@@ -103,7 +104,7 @@ export function PublicNavbar({ locale }: PublicNavbarProps): ReactNode {
                 {t("login")}
               </Button>
             </Link>
-            <Link href="/auth/register">
+            <Link href={hrefRegisterFree}>
               <Button
                 variant="primary"
                 size="sm"
@@ -187,7 +188,7 @@ function PublicMobileMenu({
                   {t("login")}
                 </Button>
               </Link>
-              <Link href="/auth/register" onClick={() => setOpen(false)}>
+              <Link href={hrefRegisterFree} onClick={() => setOpen(false)}>
                 <Button
                   variant="primary"
                   className="h-9 min-h-0 w-full bg-[#0F4C75] py-2 text-sm hover:bg-[#0D2137]"

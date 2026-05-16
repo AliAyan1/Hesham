@@ -16,6 +16,7 @@ export async function GET(): Promise<NextResponse> {
     select: {
       id: true,
       status: true,
+      offerAcceptedAt: true,
       createdAt: true,
       job: {
         select: {
@@ -45,6 +46,7 @@ export async function GET(): Promise<NextResponse> {
           r.job.employer.name ||
           r.job.employer.email,
         status: r.status,
+        offerAcceptedAt: r.offerAcceptedAt?.toISOString() ?? null,
         createdAt: r.createdAt.toISOString(),
       })),
     },

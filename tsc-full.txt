@@ -1,0 +1,1 @@
+src/app/[locale]/auth/login/page.tsx(138,13): error TS17002: Expected corresponding JSX closing tag for 'div'.

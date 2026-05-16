@@ -4,10 +4,12 @@ import axios from "axios";
 import { useTranslations } from "next-intl";
 import { useEffect, useMemo, useState } from "react";
 import type { EmployerCandidatePayload } from "@/types";
+import { ApplicationStatus } from "@/types";
 import { Link } from "@/i18n/navigation";
 import { mergeExperienceDescriptionFromRecord } from "@/lib/cv/experience-description";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { Button } from "@/components/ui/Button";
 
 function pickStr(obj: Record<string, unknown>, ...keys: string[]): string | undefined {
   for (const k of keys) {
@@ -85,9 +87,13 @@ export function CandidateViewClient({ applicationId }: { applicationId: string }
   const tCv = useTranslations("cv");
   const dash = useTranslations("dashboard");
   const tc = useTranslations("common");
+  const tj = useTranslations("jobs");
 
   const [data, setData] = useState<EmployerCandidatePayload | null>(null);
   const [err, setErr] = useState(false);
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [declineReason, setDeclineReason] = useState("");
+  const [statusSaving, setStatusSaving] = useState(false);
 
   useEffect(() => {
     let cancel = false;
@@ -120,9 +126,74 @@ export function CandidateViewClient({ applicationId }: { applicationId: string }
   const c = data.candidate;
   const cv = c.cv;
   const summaryText = cv?.summary ?? c.profile?.bio ?? tc("emDash");
+  const unlocked = data.contactUnlocked;
+
+  async function applyStatus(next: ApplicationStatus, reason?: string) {
+    setStatusSaving(true);
+    try {
+      await axios.patch(`/api/employer/applications/${encodeURIComponent(applicationId)}`, {
+        status: next,
+        ...(next === ApplicationStatus.REJECTED && reason ? { declineReason: reason } : {}),
+      });
+      const res = await axios.get<{ success: boolean; data: EmployerCandidatePayload }>(
+        `/api/employer/applications/${encodeURIComponent(applicationId)}/candidate`,
+      );
+      if (res.data.success) setData(res.data.data);
+    } finally {
+      setStatusSaving(false);
+    }
+  }
+
+  function onStatusPick(next: ApplicationStatus) {
+    if (next === ApplicationStatus.REJECTED) {
+      setDeclineReason("");
+      setRejectOpen(true);
+      return;
+    }
+    void applyStatus(next);
+  }
+
+  async function confirmReject() {
+    if (!declineReason.trim()) return;
+    await applyStatus(ApplicationStatus.REJECTED, declineReason.trim());
+    setRejectOpen(false);
+  }
 
   return (
     <div className="space-y-6">
+      {rejectOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          role="dialog"
+          aria-modal
+        >
+          <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
+            <h3 className="text-lg font-bold text-[#0D2137]">{tec("declineModalTitle")}</h3>
+            <label className="mt-4 block text-sm font-medium text-[#374151]">{tec("declineReasonLabel")}</label>
+            <textarea
+              className="mt-2 w-full rounded-lg border p-3 text-sm"
+              rows={5}
+              value={declineReason}
+              onChange={(e) => setDeclineReason(e.target.value)}
+              placeholder={tec("declineReasonPlaceholder")}
+            />
+            <div className="mt-4 flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setRejectOpen(false)}>
+                {tec("declineCancel")}
+              </Button>
+              <Button
+                type="button"
+                loading={statusSaving}
+                disabled={!declineReason.trim()}
+                onClick={() => void confirmReject()}
+              >
+                {tec("declineSubmit")}
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Link href="/dashboard/employer/candidates" className={outlineLinkClass}>
           {tec("backToList")}
@@ -134,10 +205,15 @@ export function CandidateViewClient({ applicationId }: { applicationId: string }
       </div>
 
       <header className="rounded-xl border bg-white p-6 shadow-sm">
-        <h1 className="text-2xl font-bold text-[#0D2137]">{c.name?.trim() || c.email}</h1>
-        <p className="text-sm text-[#6B7280]">{c.email}</p>
+        {!unlocked ? (
+          <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            {tec("contactLockedBanner")}
+          </p>
+        ) : null}
+        <h1 className="text-2xl font-bold text-[#0D2137]">{c.name?.trim() || c.email || "—"}</h1>
+        <p className="text-sm text-[#6B7280]">{unlocked ? c.email : tec("contactHiddenHint")}</p>
         <div className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
-          {c.profile?.phone ? (
+          {c.profile?.phone && unlocked ? (
             <p>
               <span className="font-medium text-[#374151]">{tCv("fields.phone")}: </span>
               {c.profile.phone}
@@ -158,6 +234,152 @@ export function CandidateViewClient({ applicationId }: { applicationId: string }
         </div>
       </header>
 
+      <div className="flex flex-wrap gap-3">
+        <a
+          href={`/api/employer/applications/${encodeURIComponent(applicationId)}/cv-pdf`}
+          className={outlineLinkClass}
+          target="_blank"
+          rel="noreferrer"
+        >
+          {tec("downloadCv")}
+        </a>
+        <Link
+          href={`/dashboard/employer/messages?to=${encodeURIComponent(c.id)}`}
+          className={outlineLinkClass}
+        >
+          {tec("messageCandidate")}
+        </Link>
+      </div>
+
+      <section className="rounded-xl border bg-white p-6 shadow-sm">
+        <h2 className="font-bold text-[#0D2137]">{tec("applicationStatus")}</h2>
+        <select
+          className="mt-3 min-h-11 rounded-lg border bg-white px-3 text-sm"
+          value={data.applicationStatus}
+          disabled={statusSaving}
+          onChange={(e) => {
+            const v = e.target.value as ApplicationStatus;
+            void onStatusPick(v);
+          }}
+        >
+          {(Object.values(ApplicationStatus) as ApplicationStatus[]).map((s) => (
+            <option key={s} value={s}>
+              {tj(`status.${s.toLowerCase()}` as never)}
+            </option>
+          ))}
+        </select>
+      </section>
+
+      <section className="rounded-xl border bg-white p-6 shadow-sm">
+        <h2 className="font-bold text-[#0D2137]">{tec("assessmentSection")}</h2>
+        {data.sharedAssessment && data.sharedAssessment.totalScore != null ? (
+          <div className="mt-3 space-y-3 text-sm">
+            <p className="text-2xl font-bold text-brand-teal">{data.sharedAssessment.totalScore}/100</p>
+            <p className="text-xs text-[#6B7280]">
+              Skills {data.sharedAssessment.skillsScore ?? "—"} · Comm {data.sharedAssessment.communicationScore ?? "—"}{" "}
+              · Beh {data.sharedAssessment.behavioralScore ?? "—"} · Industry {data.sharedAssessment.industryFitScore ?? "—"}
+            </p>
+            <p className="inline-flex rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800">
+              {tec("verifiedAssessment")}
+            </p>
+            <ul className="mt-2 list-inside list-disc space-y-1 text-[#374151]">
+              {Array.isArray(data.sharedAssessment.strengths)
+                ? (data.sharedAssessment.strengths as { title?: string; description?: string }[])
+                    .slice(0, 5)
+                    .map((s, i) => (
+                      <li key={`${s.title ?? i}`}>
+                        {(s.title ?? "").trim()}: {(s.description ?? "").trim()}
+                      </li>
+                    ))
+                : null}
+            </ul>
+          </div>
+        ) : (
+          <p className="mt-2 text-sm text-[#6B7280]">{tec("noSharedAssessment")}</p>
+        )}
+      </section>
+
+      <section className="rounded-xl border bg-white p-6 shadow-sm">
+        <h2 className="font-bold text-[#0D2137]">{tec("interviewSection")}</h2>
+        {data.sharedInterview && data.sharedInterview.overallScore != null ? (
+          <div className="mt-3 space-y-4 text-sm">
+            <p className="text-xl font-bold text-brand-teal">{data.sharedInterview.overallScore}/100</p>
+            <p className="text-xs text-[#6B7280]">
+              Comm {data.sharedInterview.communicationScore ?? "—"} · Conf {data.sharedInterview.confidenceScore ?? "—"} ·
+              Clarity {data.sharedInterview.clarityScore ?? "—"} · Rel {data.sharedInterview.relevanceScore ?? "—"}
+            </p>
+            {(() => {
+              const ai = data.sharedInterview.aiAnalysis;
+              const feedback =
+                ai && typeof ai === "object" && "overallFeedback" in ai && typeof (ai as { overallFeedback: unknown }).overallFeedback === "string"
+                  ? (ai as { overallFeedback: string }).overallFeedback.trim()
+                  : "";
+              return feedback ? (
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#6B7280]">{tec("interviewOverallFeedback")}</p>
+                  <p className="mt-1 whitespace-pre-wrap text-[#374151]">{feedback}</p>
+                </div>
+              ) : null;
+            })()}
+            {Array.isArray(data.sharedInterview.transcripts) && data.sharedInterview.transcripts.length > 0 ? (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-[#6B7280]">{tec("interviewTranscripts")}</p>
+                <ul className="mt-2 list-inside list-decimal space-y-2 text-[#374151]">
+                  {(data.sharedInterview.transcripts as { questionId?: string; transcript?: string }[]).map((row, i) => (
+                    <li key={row.questionId ?? i} className="whitespace-pre-wrap">
+                      {(row.transcript ?? "").trim() || "—"}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            <Button
+              type="button"
+              variant="outline"
+              className="border-brand-teal text-brand-teal hover:bg-brand-lightTeal/30"
+              disabled={!data.sharedInterview.hasRecording}
+              onClick={() => {
+                const url = `/api/employer/applications/${encodeURIComponent(applicationId)}/interview-recording?interviewId=${encodeURIComponent(data.sharedInterview!.id)}`;
+                void (async () => {
+                  try {
+                    const res = await fetch(url, { credentials: "include" });
+                    if (!res.ok) return;
+                    const blob = await res.blob();
+                    const dl = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = dl;
+                    a.download = "candidate-interview.webm";
+                    a.click();
+                    URL.revokeObjectURL(dl);
+                  } catch {
+                    /* ignore */
+                  }
+                })();
+              }}
+            >
+              {tec("downloadInterviewRecording")}
+            </Button>
+            <p className="text-xs text-[#6B7280]">{tec("downloadInterviewRecordingHint")}</p>
+          </div>
+        ) : (
+          <p className="mt-2 text-sm text-[#6B7280]">{tec("noSharedInterview")}</p>
+        )}
+      </section>
+
+      <section className="rounded-xl border bg-white p-6 shadow-sm">
+        <h2 className="font-bold text-[#0D2137]">{tec("proctoringSection")}</h2>
+        {(() => {
+          const p = data.proctoringSummary;
+          const n =
+            p.tabSwitches + p.faceNotVisible + p.multipleFaces + p.copyPasteAttempts + p.aiToolDetected + p.sessionsFlagged;
+          return n === 0 ? (
+            <p className="mt-2 text-sm text-emerald-700">{tec("proctoringNoFlags")}</p>
+          ) : (
+            <p className="mt-2 text-sm text-amber-800">{tec("proctoringFlags", { count: String(n) })}</p>
+          );
+        })()}
+      </section>
+
       {cv ? (
         <div className="space-y-4">
           <section className="rounded-xl border bg-white p-6 shadow-sm">
@@ -167,7 +389,7 @@ export function CandidateViewClient({ applicationId }: { applicationId: string }
             <p className="mt-2 whitespace-pre-wrap text-sm text-[#374151]">{summaryText}</p>
           </section>
 
-          {cv.linkedinUrl ? (
+          {cv.linkedinUrl && unlocked ? (
             <p className="text-sm">
               <span className="font-medium text-[#374151]">{tCv("fields.linkedin")}: </span>
               <a href={cv.linkedinUrl} className="text-brand-teal underline" target="_blank" rel="noreferrer">
@@ -175,7 +397,7 @@ export function CandidateViewClient({ applicationId }: { applicationId: string }
               </a>
             </p>
           ) : null}
-          {cv.portfolioUrl ? (
+          {cv.portfolioUrl && unlocked ? (
             <p className="text-sm">
               <span className="font-medium text-[#374151]">{tCv("fields.portfolio")}: </span>
               <a href={cv.portfolioUrl} className="text-brand-teal underline" target="_blank" rel="noreferrer">

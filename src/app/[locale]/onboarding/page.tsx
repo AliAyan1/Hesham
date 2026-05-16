@@ -20,10 +20,11 @@ export default async function OnboardingPage({
   }
 
   if (session.user.onboardingComplete) {
+    const role = String(session.user.role ?? "").toUpperCase();
     const next =
-      session.user.role === UserRole.EMPLOYER
+      role === UserRole.EMPLOYER
         ? `/${locale}/dashboard/employer`
-        : session.user.role === UserRole.ADMIN
+        : role === UserRole.ADMIN
           ? `/${locale}/dashboard/admin`
           : `/${locale}/dashboard/job-seeker`;
     redirect(next);

@@ -7,6 +7,7 @@ import { UserRole, type SubscriptionTier } from "@/types";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import type { BreadcrumbItem } from "@/components/layout/Breadcrumbs";
 import EmployerDashboardClient from "./EmployerDashboardClient";
+import { resolveEmployerDbUserForDashboard } from "@/lib/resolve-session-user";
 
 export default async function EmployerDashboardPage({
   params,
@@ -29,9 +30,12 @@ export default async function EmployerDashboardPage({
 
   const userName = session.user.name ?? session.user.email ?? "";
 
+  const resolved = await resolveEmployerDbUserForDashboard(session);
+  if (!resolved) redirect(`/${locale}/auth/login`);
+
   const prisma = getPrisma();
   const row = await prisma.user.findUnique({
-    where: { id: session.user.id },
+    where: { id: resolved.id },
     select: { subscriptionTier: true },
   });
   const subscriptionTier = (row?.subscriptionTier ?? "FREE") as SubscriptionTier;

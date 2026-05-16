@@ -11,6 +11,7 @@ import { SubscriptionTier } from "@/types";
 import { hasAccess } from "@/lib/subscription";
 import { ATS_PASS_THRESHOLD } from "@/lib/cv/ats-threshold";
 import { mergeExperienceDescriptionFromRecord } from "@/lib/cv/experience-description";
+import { handleProseTextareaPaste, insertNormalizedPaste } from "@/lib/normalize-pasted-text";
 
 function pickStr(obj: Record<string, unknown>, ...keys: string[]): string | undefined {
   for (const k of keys) {
@@ -591,6 +592,7 @@ export function CvBuilderClient({
                 rows={6}
                 value={draft.summary}
                 onChange={(e) => setDraft((d) => ({ ...d, summary: e.target.value }))}
+                onPaste={(e) => handleProseTextareaPaste(e, draft.summary, (summary) => setDraft((d) => ({ ...d, summary })))}
               />
               <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-[#6B7280]">
                 <span>{t("summaryHint")}</span>
@@ -664,6 +666,24 @@ export function CvBuilderClient({
                           ),
                         }))
                       }
+                      onPaste={(e) => {
+                        const plain = e.clipboardData.getData("text/plain");
+                        if (!plain || !/[\r\n]/.test(plain)) return;
+                        e.preventDefault();
+                        const el = e.currentTarget;
+                        const start = el.selectionStart ?? ex.description.length;
+                        const end = el.selectionEnd ?? ex.description.length;
+                        const { nextValue, caret } = insertNormalizedPaste(ex.description, plain, start, end);
+                        setDraft((d) => ({
+                          ...d,
+                          experience: d.experience.map((x, i) =>
+                            i === idx ? { ...x, description: nextValue } : x,
+                          ),
+                        }));
+                        requestAnimationFrame(() => {
+                          el.setSelectionRange(caret, caret);
+                        });
+                      }}
                     />
                   </div>
                 </div>

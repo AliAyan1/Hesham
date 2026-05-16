@@ -1,18 +1,20 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { UserRole } from "@prisma/client";
+import { AssessmentStatus, InterviewStatus, UserRole } from "@prisma/client";
 import { getServerSession } from "@/lib/get-server-session";
 import { getPrisma } from "@/lib/db";
-import { computeProfileCompletionPercent } from "@/lib/profile-completion";
 import type { JobSeekerDashboardPayload } from "@/types/dashboard";
-import { computeCvCompletionPercent } from "@/lib/cv/completion";
+import { computeProfilePageCompletionFromRecords } from "@/lib/profile-page-completion";
 import { resolveJobSeekerDbUserForUpload } from "@/lib/resolve-session-user";
+import { getJobSeekerTalentPoolStatus } from "@/lib/talent-pool/talent-pool-server";
+import { evaluateTalentPoolEntry } from "@/lib/talent-pool/evaluate-talent-pool-entry";
+import { evaluateTalentPoolExit } from "@/lib/talent-pool/evaluate-talent-pool-exit";
 
 export async function GET(
   request: NextRequest,
 ): Promise<NextResponse<JobSeekerDashboardPayload | { error: string }>> {
   try {
     const session = await getServerSession();
-    if (!session?.user?.id) {
+    if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     const roleJs =
@@ -22,7 +24,7 @@ export async function GET(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const resolved = await resolveJobSeekerDbUserForUpload(request, session);
+    const resolved = await resolveJobSeekerDbUserForUpload(session, request);
     if (!resolved) {
       return NextResponse.json(
         { error: "SESSION_STALE_SIGN_IN_AGAIN" },
@@ -40,12 +42,14 @@ export async function GET(
       applicationsCount,
       jobsAvailableCount,
       recentApps,
+      bestAssessment,
+      latestInterview,
     ] = await Promise.all([
       prisma.profile.findUnique({ where: { userId } }),
       prisma.cV.findUnique({ where: { userId } }),
       prisma.user.findUnique({
         where: { id: userId },
-        select: { image: true, subscriptionTier: true },
+        select: { name: true, image: true, subscriptionTier: true },
       }),
       prisma.application.count({ where: { jobSeekerId: userId } }),
       prisma.job.count({ where: { isActive: true } }),
@@ -68,7 +72,33 @@ export async function GET(
           },
         },
       }),
+      prisma.assessment.findFirst({
+        where: {
+          userId,
+          status: AssessmentStatus.COMPLETED,
+          isFlagged: false,
+        },
+        orderBy: { totalScore: "desc" },
+        select: { totalScore: true },
+      }),
+      prisma.videoInterview.findFirst({
+        where: { userId, status: InterviewStatus.COMPLETED },
+        orderBy: { completedAt: "desc" },
+        select: { overallScore: true },
+      }),
     ]);
+
+    const fallbackAssessment = bestAssessment
+      ? null
+      : await prisma.assessment.findFirst({
+          where: { userId, status: { in: [AssessmentStatus.COMPLETED, AssessmentStatus.FLAGGED] } },
+          orderBy: { completedAt: "desc" },
+          select: { totalScore: true },
+        });
+
+    const assessmentScore = bestAssessment?.totalScore ?? fallbackAssessment?.totalScore ?? null;
+    const showTopPercentileBand = assessmentScore != null && assessmentScore >= 85;
+    const interviewScore = latestInterview?.overallScore ?? null;
 
     const jobMatchesCount = jobsAvailableCount;
 
@@ -87,18 +117,29 @@ export async function GET(
 
     const atsScore = cv?.atsScore ?? profile?.atsScore ?? null;
 
+    await evaluateTalentPoolEntry(userId);
+    await evaluateTalentPoolExit(userId);
+    const talentPool = await getJobSeekerTalentPoolStatus(userId);
+
     const payload: JobSeekerDashboardPayload = {
-      profileCompletion: cv
-        ? computeCvCompletionPercent({ cv, hasProfilePhoto: Boolean(user?.image) })
-        : computeProfileCompletionPercent(profile),
+      profileCompletion:
+        cv?.completionPct ??
+        computeProfilePageCompletionFromRecords({
+          hasProfilePhoto: Boolean(user?.image),
+          name: user?.name ?? null,
+          profile,
+          cv,
+        }),
       applicationsCount,
       jobsAvailableCount,
       jobMatchesCount,
-      /** Reserved until standalone assessment scoring is persisted. */
-      assessmentScore: null,
+      assessmentScore,
+      interviewScore,
+      showTopPercentileBand,
       atsScore,
       subscriptionTier: user?.subscriptionTier ?? "FREE",
       recentApplications,
+      talentPool,
     };
 
     return NextResponse.json(payload, { status: 200 });

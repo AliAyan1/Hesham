@@ -7,8 +7,6 @@ import {
   hrefRegisterFree,
   hrefRegisterPremium,
   hrefRegisterProfessional,
-  hrefUpgradePremium,
-  hrefUpgradeProfessional,
 } from "@/lib/i18n-hrefs";
 import { getServerSession } from "@/lib/get-server-session";
 import { getPrisma } from "@/lib/db";
@@ -58,7 +56,7 @@ export default async function PricingPage({
             price={tl("priceFreeValue")}
             variant="free"
             ctaLabel={tl("finalCtaPrimary")}
-            ctaHref={isLoggedIn ? "/dashboard" : hrefRegisterFree}
+            ctaHref={hrefRegisterFree as AppLinkHref}
             current={currentTier === "FREE"}
             currentBadge={ts("currentPlan")}
             features={[
@@ -74,7 +72,7 @@ export default async function PricingPage({
             variant="pro"
             badge={tl("priceProBadge")}
             ctaLabel={t("ctaProfessional")}
-            ctaHref={isLoggedIn ? hrefUpgradeProfessional : hrefRegisterProfessional}
+            ctaHref={hrefRegisterProfessional as AppLinkHref}
             current={currentTier === "PROFESSIONAL"}
             currentBadge={ts("currentPlan")}
             features={[
@@ -99,7 +97,7 @@ export default async function PricingPage({
             variant="premium"
             badge={tl("pricePremiumBadge")}
             ctaLabel={t("ctaPremium")}
-            ctaHref={isLoggedIn ? hrefUpgradePremium : hrefRegisterPremium}
+            ctaHref={hrefRegisterPremium as AppLinkHref}
             current={currentTier === "PREMIUM"}
             currentBadge={ts("currentPlan")}
             features={[
@@ -166,8 +164,8 @@ export default async function PricingPage({
           <p className="mt-3 text-sm text-white/80">{t("faqTitle")}</p>
           <div className="mt-6">
             <Link
-              href={isLoggedIn ? "/dashboard" : hrefRegisterFree}
-              prefetch={isLoggedIn ? undefined : false}
+              href={hrefRegisterFree as AppLinkHref}
+              prefetch={false}
               className="inline-flex min-h-11 items-center justify-center rounded-xl bg-white px-6 py-3 text-sm font-semibold text-[#0D2137] transition-colors hover:bg-white/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal"
             >
               {tl("finalCtaPrimary")}

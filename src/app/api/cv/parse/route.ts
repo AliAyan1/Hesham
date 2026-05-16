@@ -7,7 +7,7 @@ import { extractTextFromFile, isSupportedCvMime } from "@/lib/cv/extract-text";
 import { getOpenAI } from "@/lib/ai/openai";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
-import { computeCvCompletionPercent } from "@/lib/cv/completion";
+import { refreshJobSeekerCvCompletionPct } from "@/lib/cv/refresh-jobseeker-completion";
 import { parseJsonFromModel } from "@/lib/ai/parse-model-json";
 import {
   sanitizeParsedCvPayload,
@@ -165,17 +165,14 @@ export async function POST(
     select: { subscriptionTier: true },
   });
   const tier = (user?.subscriptionTier ?? "FREE") as SubscriptionTier;
-  if (!hasAccess(tier, "cv_ai_parse")) {
-    return NextResponse.json(
-      { success: false, error: "Upgrade required" },
-      { status: 403 },
-    );
-  }
 
   const form = await request.formData().catch(() => null);
   if (!form) {
     return NextResponse.json({ success: false, error: "Invalid form data" }, { status: 400 });
   }
+
+  const uploadContext = String(form.get("context") ?? "").trim().toLowerCase();
+  const isProfileUpload = uploadContext === "profile";
 
   const file = form.get("file");
   if (!(file instanceof File)) {
@@ -192,6 +189,17 @@ export async function POST(
     return NextResponse.json(
       { success: false, error: "File too large (max 5MB)" },
       { status: 400 },
+    );
+  }
+
+  if (!isProfileUpload && !hasAccess(tier, "cv_ai_parse")) {
+    return NextResponse.json(
+      {
+        success: false,
+        error:
+          "CV AI parsing is not available on your plan. Upgrade your subscription to use this feature.",
+      },
+      { status: 403 },
     );
   }
 
@@ -333,22 +341,31 @@ export async function POST(
       select: { id: true },
     });
 
-    const [cv, userWithPhoto] = await Promise.all([
-      prisma.cV.findUnique({ where: { userId: session.user.id } }),
-      prisma.user.findUnique({
-        where: { id: session.user.id },
-        select: { image: true },
-      }),
-    ]);
-    const completionPct = computeCvCompletionPercent({
-      cv,
-      hasProfilePhoto: Boolean(userWithPhoto?.image),
-    });
-    await prisma.cV.update({
-      where: { userId: session.user.id },
-      data: { completionPct, isComplete: completionPct >= 100 },
-      select: { id: true },
-    });
+    if (isProfileUpload) {
+      if (sanitized.fullName?.trim()) {
+        await prisma.user.update({
+          where: { id: session.user.id },
+          data: { name: sanitized.fullName.trim() },
+        });
+      }
+      await prisma.profile.upsert({
+        where: { userId: session.user.id },
+        create: {
+          userId: session.user.id,
+          language: "ar",
+          phone: sanitized.phone ?? null,
+          location: sanitized.location ?? null,
+          bio: sanitized.summary ?? null,
+        },
+        update: {
+          ...(sanitized.phone ? { phone: sanitized.phone } : {}),
+          ...(sanitized.location ? { location: sanitized.location } : {}),
+          ...(sanitized.summary ? { bio: sanitized.summary } : {}),
+        },
+      });
+    }
+
+    await refreshJobSeekerCvCompletionPct(session.user.id);
 
     return NextResponse.json({ success: true, data: { parsed: sanitized } });
   } catch (e) {

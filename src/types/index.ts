@@ -81,7 +81,10 @@ export interface ApiResponse<T = unknown> {
 /** Employer-only view of a candidate tied to one application (see GET …/applications/[id]/candidate). */
 export type EmployerCandidatePayload = {
   applicationId: string;
+  applicationStatus: string;
   appliedForJobTitle: string;
+  /** Email/phone/external links visible only after hire or candidate accepted offer. */
+  contactUnlocked: boolean;
   candidate: {
     id: string;
     name: string | null;
@@ -105,6 +108,42 @@ export type EmployerCandidatePayload = {
       portfolioUrl: string | null;
       linkedinUrl: string | null;
     } | null;
+  };
+  sharedAssessment: {
+    id: string;
+    totalScore: number | null;
+    skillsScore: number | null;
+    communicationScore: number | null;
+    behavioralScore: number | null;
+    industryFitScore: number | null;
+    strengths: unknown;
+    weaknesses: unknown;
+    isFlagged: boolean;
+  } | null;
+  sharedInterview: {
+    id: string;
+    overallScore: number | null;
+    communicationScore: number | null;
+    confidenceScore: number | null;
+    clarityScore: number | null;
+    relevanceScore: number | null;
+    transcripts: unknown;
+    questions: unknown;
+    aiAnalysis: unknown;
+    strengths: unknown;
+    improvements: unknown;
+    recordingUrl: string | null;
+    isFlagged: boolean;
+    hasRecording?: boolean;
+  } | null;
+  proctoringSummary: {
+    flagCount: number;
+    tabSwitches: number;
+    faceNotVisible: number;
+    multipleFaces: number;
+    copyPasteAttempts: number;
+    aiToolDetected: number;
+    sessionsFlagged: number;
   };
 };
 

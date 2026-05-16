@@ -10,6 +10,11 @@ import { Button } from "@/components/ui/Button";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { InitialsAvatar } from "@/components/dashboard/InitialsAvatar";
+import {
+  experienceLevelLabel,
+  formatJobSalaryLine,
+  parseHiringMeta,
+} from "@/lib/jobs/job-detail-display";
 
 type JobEnvelope = {
   success: boolean;
@@ -20,6 +25,16 @@ type JobEnvelope = {
 function asStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value.filter((x): x is string => typeof x === "string");
+}
+
+function DetailFact({ label, value }: { label: string; value: string }) {
+  if (!value.trim()) return null;
+  return (
+    <div>
+      <dt className="text-xs font-semibold uppercase tracking-wide text-[#6B7280]">{label}</dt>
+      <dd className="mt-1 text-sm font-medium text-[#0D2137]">{value}</dd>
+    </div>
+  );
 }
 
 export function JobDetailClient({ jobId }: { jobId: string }) {
@@ -38,7 +53,11 @@ export function JobDetailClient({ jobId }: { jobId: string }) {
   const [status, setStatus] = useState<"loading" | "error" | "ready">("loading");
   const [applyOpen, setApplyOpen] = useState(false);
   const [cover, setCover] = useState("");
-  const [applyState, setApplyState] = useState<"idle" | "pending" | "success" | "dup" | "fail">("idle");
+  const [applyState, setApplyState] = useState<
+    "idle" | "pending" | "success" | "dup" | "fail" | "needAssessment" | "talentPoolBlocked"
+  >(
+    "idle",
+  );
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
@@ -91,6 +110,14 @@ export function JobDetailClient({ jobId }: { jobId: string }) {
         setApplyState("dup");
         return;
       }
+      if (res.status === 403 && json.error === "assessment_required") {
+        setApplyState("needAssessment");
+        return;
+      }
+      if (res.status === 403 && json.error === "talent_pool_blocked") {
+        setApplyState("talentPoolBlocked");
+        return;
+      }
       if (!res.ok || !json.success) {
         setApplyState("fail");
         return;
@@ -128,12 +155,70 @@ export function JobDetailClient({ jobId }: { jobId: string }) {
     return <ErrorState title={dash("dashboardLoadError")} retryLabel={tc("retry")} onRetry={() => router.refresh()} />;
   }
 
-  const title = String(job.title ?? "");
-  const description = String(job.description ?? "");
+  const title =
+    isRtl && typeof job.titleAr === "string" && job.titleAr.trim()
+      ? job.titleAr
+      : String(job.title ?? "");
+  const description =
+    isRtl && typeof job.descriptionAr === "string" && job.descriptionAr.trim()
+      ? job.descriptionAr
+      : String(job.description ?? "");
   const companyName = String(job.companyName ?? "");
   const category = String(job.category ?? "");
-  const location = job.location == null ? "" : String(job.location);
+  const categoryLabel = category
+    ? t(`marketplaceCategories.${category}` as never)
+    : "";
+  const locationRaw =
+    isRtl && typeof job.locationAr === "string" && job.locationAr.trim()
+      ? job.locationAr
+      : job.location == null
+        ? ""
+        : String(job.location);
   const isRemote = Boolean(job.isRemote);
+  const jobType = String(job.type ?? "FULLTIME");
+  const typeLabel = t(`jobTypes.${jobType.toLowerCase()}` as never);
+  const currency = String(job.currency ?? "SAR");
+  const salaryMin = typeof job.salaryMin === "number" ? job.salaryMin : null;
+  const salaryMax = typeof job.salaryMax === "number" ? job.salaryMax : null;
+  const salaryLine = formatJobSalaryLine({
+    salaryMin,
+    salaryMax,
+    currency,
+    notListed: t("salaryNotListed"),
+    range: (min, max, cur) => t("publicSalary", { min, max, currency: cur }),
+    upTo: (max, cur) => t("publicSalarySingle", { max, currency: cur }),
+    from: (min, cur) => t("salaryFrom", { min, currency: cur }),
+  });
+  const locationDisplay =
+    isRemote || !locationRaw.trim()
+      ? locationRaw.trim()
+        ? `${t("jobTypes.remote")} · ${locationRaw}`
+        : t("jobTypes.remote")
+      : locationRaw;
+  const hiringMeta = parseHiringMeta(job.hiringMeta);
+  const expLabels: Record<string, string> = {
+    ENTRY: t("postWizard.expEntry"),
+    MID: t("postWizard.expMid"),
+    SENIOR: t("postWizard.expSenior"),
+    LEAD: t("postWizard.expLead"),
+  };
+  const experienceLine = hiringMeta?.experienceLevel
+    ? experienceLevelLabel(hiringMeta.experienceLevel, expLabels)
+    : "";
+  const yearsLine =
+    hiringMeta?.yearsExperience != null
+      ? t("yearsRequired", { count: hiringMeta.yearsExperience })
+      : "";
+  const educationLine = hiringMeta?.educationRequirement ?? "";
+  const employer = job.employer as Record<string, unknown> | undefined;
+  const employerProfile = employer?.employerProfile as Record<string, unknown> | undefined;
+  const industry =
+    typeof employerProfile?.industry === "string" ? employerProfile.industry.trim() : "";
+  const logoUrl = typeof employerProfile?.logoUrl === "string" ? employerProfile.logoUrl : null;
+  const postedAt =
+    typeof job.createdAt === "string"
+      ? new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(new Date(job.createdAt))
+      : "";
   const requirements = asStringArray(job.requirements);
   const benefits = asStringArray(job.benefits);
   const skills = asStringArray(job.skills);
@@ -143,16 +228,34 @@ export function JobDetailClient({ jobId }: { jobId: string }) {
       <div className="space-y-8">
         <header className="rounded-[14px] border border-[#EEF2F7] bg-white p-6 shadow-sm">
           <div className="flex flex-wrap items-start gap-4">
-            <InitialsAvatar name={companyName} email={companyName || "co"} />
+            {logoUrl ? (
+              <img
+                src={logoUrl}
+                alt=""
+                className="h-12 w-12 shrink-0 rounded-full border border-[#EEF2F7] object-cover"
+              />
+            ) : (
+              <InitialsAvatar name={companyName} email={companyName || "co"} size="md" className="!h-12 !w-12" />
+            )}
             <div className="min-w-0 flex-1">
-              <Badge size="sm" variant="teal" className="mb-2">
-                {category}
-              </Badge>
+              {categoryLabel ? (
+                <Badge size="sm" variant="teal" className="mb-2">
+                  {categoryLabel}
+                </Badge>
+              ) : null}
               <h1 className="text-2xl font-extrabold text-[#0D2137] md:text-3xl">{title}</h1>
-              <p className="mt-2 text-[#6B7280]">
-                {companyName}
-                {location || isRemote ? ` · ${isRemote ? t("jobTypes.remote") : location}` : null}
+              <p className="mt-2 text-sm text-[#6B7280]">
+                {companyName ? (
+                  <span className="font-medium text-[#374151]">
+                    {t("companyLabel")}: {companyName}
+                  </span>
+                ) : null}
+                {companyName && (typeLabel || locationDisplay) ? <span className="mx-2">·</span> : null}
+                {[typeLabel, locationDisplay].filter(Boolean).join(" · ")}
               </p>
+              {salaryLine ? (
+                <p className="mt-1 text-sm font-semibold text-[#0D2137]">{salaryLine}</p>
+              ) : null}
             </div>
           </div>
 
@@ -174,6 +277,26 @@ export function JobDetailClient({ jobId }: { jobId: string }) {
             </Button>
           </div>
         </header>
+
+        <section
+          aria-labelledby="jd-overview"
+          className="rounded-[14px] border border-[#EEF2F7] bg-white p-6 shadow-sm"
+        >
+          <h2 id="jd-overview" className="text-lg font-bold text-[#0D2137]">
+            {t("detailOverview")}
+          </h2>
+          <dl className="mt-4 grid gap-4 sm:grid-cols-2">
+            <DetailFact label={t("companyLabel")} value={companyName} />
+            <DetailFact label={t("detailJobType")} value={typeLabel} />
+            <DetailFact label={t("detailLocation")} value={locationDisplay} />
+            <DetailFact label={t("detailSalary")} value={salaryLine} />
+            <DetailFact label={t("detailExperience")} value={experienceLine} />
+            <DetailFact label={t("detailYears")} value={yearsLine} />
+            <DetailFact label={t("detailEducation")} value={educationLine} />
+            <DetailFact label={t("detailIndustry")} value={industry} />
+            <DetailFact label={t("detailPosted")} value={postedAt} />
+          </dl>
+        </section>
 
         <section aria-labelledby="jd-desc" className="rounded-[14px] border border-[#EEF2F7] bg-white p-6 shadow-sm">
           <h2 id="jd-desc" className="text-lg font-bold text-[#0D2137]">
@@ -258,7 +381,22 @@ export function JobDetailClient({ jobId }: { jobId: string }) {
             {applyState === "dup" ? (
               <p className="mt-3 text-sm font-semibold text-amber-700">{t("alreadyApplied")}</p>
             ) : null}
-            {applyState === "fail" ? <p className="mt-3 text-sm font-semibold text-red-600">{tc("error")}</p> : null}
+            {applyState === "needAssessment" ? (
+              <p className="mt-3 text-sm font-semibold text-amber-800">
+                {t("applyNeedAssessment")}{" "}
+                <Link href="/dashboard/job-seeker/assessment" className="text-brand-teal underline">
+                  {t("goToAssessment")}
+                </Link>
+              </p>
+            ) : null}
+            {applyState === "talentPoolBlocked" ? (
+              <p className="mt-3 text-sm font-semibold text-amber-800">
+                {t("applyTalentPoolBlocked")}{" "}
+                <Link href="/dashboard/job-seeker/invites" className="text-brand-teal underline">
+                  {t("viewInvites")}
+                </Link>
+              </p>
+            ) : null}
 
             <div className="mt-5 flex justify-end gap-3">
               <Button variant="outline" type="button" className="min-h-11" onClick={() => setApplyOpen(false)}>

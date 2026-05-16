@@ -58,7 +58,7 @@ export async function POST(request: NextRequest): Promise<
   const roleOk =
     session?.user?.role === UserRole.JOBSEEKER ||
     String(session?.user?.role ?? "").toUpperCase() === "JOBSEEKER";
-  if (!session?.user?.id || !roleOk) {
+  if (!session?.user || !roleOk) {
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
   }
 
@@ -84,7 +84,7 @@ export async function POST(request: NextRequest): Promise<
 
   const prisma = getPrisma();
   /** Id + JWT email + insensitive match (fixes stale JWTs / missing session.email). */
-  const resolved = await resolveJobSeekerDbUserForUpload(request, session);
+  const resolved = await resolveJobSeekerDbUserForUpload(session, request);
 
   if (!resolved) {
     return NextResponse.json(
@@ -134,13 +134,13 @@ export async function DELETE(request: NextRequest): Promise<
   const roleOkDel =
     session?.user?.role === UserRole.JOBSEEKER ||
     String(session?.user?.role ?? "").toUpperCase() === "JOBSEEKER";
-  if (!session?.user?.id || !roleOkDel) {
+  if (!session?.user || !roleOkDel) {
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
   }
 
   const prisma = getPrisma();
 
-  const existing = await resolveJobSeekerDbUserForUpload(request, session);
+  const existing = await resolveJobSeekerDbUserForUpload(session, request);
 
   if (!existing) {
     return NextResponse.json(

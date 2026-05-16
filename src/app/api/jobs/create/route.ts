@@ -5,6 +5,7 @@ import { getServerSession } from "@/lib/get-server-session";
 import { getPrisma } from "@/lib/db";
 import type { ApiResponse } from "@/types";
 import { jobCategorySchema, jobTypeSchema, hiringMetaSchema } from "@/lib/jobs/constants";
+import { runAutoShortlistForJob } from "@/lib/jobs/run-auto-shortlist";
 
 function toInputJson(value: unknown): Prisma.InputJsonValue {
   return value as Prisma.InputJsonValue;
@@ -72,6 +73,8 @@ export async function POST(
     },
     select: { id: true },
   });
+
+  void runAutoShortlistForJob(job.id, session.user.id);
 
   return NextResponse.json({ success: true, data: { id: job.id } }, { status: 201 });
 }

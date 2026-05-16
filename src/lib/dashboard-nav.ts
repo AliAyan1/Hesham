@@ -6,7 +6,7 @@ export function dashboardProfilePath(role: UserRole): string {
     case "JOBSEEKER":
       return "/dashboard/job-seeker/profile";
     case "EMPLOYER":
-      return "/dashboard/employer";
+      return "/dashboard/employer/profile";
     case "ADMIN":
       return "/dashboard/admin";
     default:

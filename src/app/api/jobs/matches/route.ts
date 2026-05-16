@@ -7,6 +7,10 @@ import { getPrisma } from "@/lib/db";
 import { hasAccess } from "@/lib/subscription";
 import { getOpenAI } from "@/lib/ai/openai";
 import { parseJsonFromModel } from "@/lib/ai/parse-model-json";
+import {
+  computeProfilePageCompletionFromRecords,
+  MIN_PROFILE_COMPLETION_FOR_AI_JOB_MATCH,
+} from "@/lib/profile-page-completion";
 
 const qpSchema = z.object({
   limit: z.coerce.number().int().min(1).max(10).optional().default(5),
@@ -43,11 +47,18 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const [userRow, cv, profile] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
-      select: { subscriptionTier: true },
+      select: { subscriptionTier: true, name: true, image: true },
     }),
     prisma.cV.findUnique({ where: { userId } }),
     prisma.profile.findUnique({ where: { userId } }),
   ]);
+
+  const profileCompletionPct = computeProfilePageCompletionFromRecords({
+    hasProfilePhoto: Boolean(userRow?.image),
+    name: userRow?.name ?? null,
+    profile,
+    cv,
+  });
 
   const tier = (userRow?.subscriptionTier ?? "FREE") as Tier;
   const prefs = (profile?.jobPreferences ?? null) as PrefsShape | null;
@@ -76,37 +87,44 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     aiPowered: boolean;
   };
 
+  function itemsWithoutScores(source: typeof jobs): Item[] {
+    return source.slice(0, limit).map((j) => ({
+      jobId: j.id,
+      title: j.title,
+      category: j.category,
+      matchScore: null,
+      reason: null,
+      aiPowered: false,
+    }));
+  }
+
   if (!hasAccess(tier, "job_matching_ai")) {
     const filtered =
       categories.length === 0
         ? jobs
         : jobs.filter((j) => categories.includes(j.category));
 
-    const items: Item[] = filtered.slice(0, limit).map((j) => ({
-      jobId: j.id,
-      title: j.title,
-      category: j.category,
-      matchScore: null,
-      reason: null,
-      aiPowered: false,
-    }));
+    return NextResponse.json(
+      { success: true, data: { items: itemsWithoutScores(filtered) } },
+      { status: 200 },
+    );
+  }
 
-    return NextResponse.json({ success: true, data: { items } }, { status: 200 });
+  if (profileCompletionPct < MIN_PROFILE_COMPLETION_FOR_AI_JOB_MATCH) {
+    return NextResponse.json(
+      { success: true, data: { items: itemsWithoutScores(jobs) } },
+      { status: 200 },
+    );
   }
 
   let openai: ReturnType<typeof getOpenAI>;
   try {
     openai = getOpenAI();
   } catch {
-    const items: Item[] = jobs.slice(0, limit).map((j) => ({
-      jobId: j.id,
-      title: j.title,
-      category: j.category,
-      matchScore: null,
-      reason: null,
-      aiPowered: false,
-    }));
-    return NextResponse.json({ success: true, data: { items } }, { status: 200 });
+    return NextResponse.json(
+      { success: true, data: { items: itemsWithoutScores(jobs) } },
+      { status: 200 },
+    );
   }
 
   const profileBlob = {
@@ -182,26 +200,14 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
 
     if (!items.length) {
-      items = jobs.slice(0, limit).map((j) => ({
-        jobId: j.id,
-        title: j.title,
-        category: j.category,
-        matchScore: null,
-        reason: null,
-        aiPowered: true,
-      }));
+      items = itemsWithoutScores(jobs);
     }
 
     return NextResponse.json({ success: true, data: { items } }, { status: 200 });
   } catch {
-    const items: Item[] = jobs.slice(0, limit).map((j) => ({
-      jobId: j.id,
-      title: j.title,
-      category: j.category,
-      matchScore: null,
-      reason: null,
-      aiPowered: false,
-    }));
-    return NextResponse.json({ success: true, data: { items } }, { status: 200 });
+    return NextResponse.json(
+      { success: true, data: { items: itemsWithoutScores(jobs) } },
+      { status: 200 },
+    );
   }
 }

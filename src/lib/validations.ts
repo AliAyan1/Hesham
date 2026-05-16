@@ -1,14 +1,17 @@
 import { z } from "zod";
 import { UserRole } from "@/types";
 
-export const planParamSchema = z.enum(["professional", "premium"]);
+export const planParamSchema = z.enum(["free", "professional", "premium"]);
 
 const registerObjectSchema = z.object({
   name: z
     .string()
     .min(2, "Name must be at least 2 characters")
     .max(100, "Name must be under 100 characters"),
-  email: z.string().email("Invalid email address"),
+  email: z
+    .string()
+    .email("Invalid email address")
+    .transform((s) => s.trim().toLowerCase()),
   password: z
     .string()
     .min(8, "Password must be at least 8 characters")
@@ -37,7 +40,10 @@ export const registerWithPlanSchema = registerObjectSchema
   });
 
 export const loginSchema = z.object({
-  email: z.string().email("Invalid email address"),
+  email: z
+    .string()
+    .email("Invalid email address")
+    .transform((s) => s.trim().toLowerCase()),
   password: z.string().min(1, "Password is required"),
 });
 

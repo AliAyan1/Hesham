@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { UserRole } from "@prisma/client";
+import { AssessmentStatus, InterviewStatus, UserRole } from "@prisma/client";
 import { getServerSession } from "@/lib/get-server-session";
 import { getPrisma } from "@/lib/db";
 import type { EmployerDashboardPayload } from "@/types/dashboard";
@@ -10,7 +10,7 @@ export async function GET(
 ): Promise<NextResponse<EmployerDashboardPayload | { error: string }>> {
   try {
     const session = await getServerSession();
-    if (!session?.user?.id) {
+    if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     const roleEm =
@@ -20,7 +20,7 @@ export async function GET(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const resolved = await resolveEmployerDbUserForDashboard(request, session);
+    const resolved = await resolveEmployerDbUserForDashboard(session, request);
     if (!resolved) {
       return NextResponse.json(
         { error: "SESSION_STALE_SIGN_IN_AGAIN" },
@@ -41,6 +41,7 @@ export async function GET(
       applicationsTodayCount,
       pendingReviewCount,
       recent,
+      aiInterviewAgg,
     ] = await Promise.all([
       prisma.job.count({
         where: { employerId, isActive: true },
@@ -77,6 +78,10 @@ export async function GET(
           },
         },
       }),
+      prisma.job.findMany({
+        where: { employerId },
+        select: { id: true },
+      }),
     ]);
 
     const recentApplications: EmployerDashboardPayload["recentApplications"] =
@@ -91,11 +96,64 @@ export async function GET(
         matchScore: null,
       }));
 
+    const seekerRows = await prisma.application.findMany({
+      where: { job: { employerId } },
+      select: { jobSeekerId: true },
+    });
+    const seekerIds = [...new Set(seekerRows.map((r) => r.jobSeekerId))];
+
+    let candidatesWithSharedAssessment = 0;
+    let applicantsWithSharedInterview = 0;
+    if (seekerIds.length > 0) {
+      const ag = await prisma.assessment.groupBy({
+        by: ["userId"],
+        where: {
+          userId: { in: seekerIds },
+          status: AssessmentStatus.COMPLETED,
+          shareWithEmployers: true,
+        },
+      });
+      candidatesWithSharedAssessment = ag.length;
+
+      const ig = await prisma.videoInterview.groupBy({
+        by: ["userId"],
+        where: {
+          userId: { in: seekerIds },
+          status: InterviewStatus.COMPLETED,
+          shareWithEmployers: true,
+        },
+      });
+      applicantsWithSharedInterview = ig.length;
+    }
+
+    const jobIds = aiInterviewAgg.map((j) => j.id);
+    let aiInterviewsTotal = 0;
+    let aiInterviewsPendingReview = 0;
+    if (jobIds.length > 0) {
+      const [total, pending] = await Promise.all([
+        prisma.videoInterview.count({
+          where: { jobId: { in: jobIds } },
+        }),
+        prisma.videoInterview.count({
+          where: {
+            jobId: { in: jobIds },
+            status: { in: [InterviewStatus.PENDING, InterviewStatus.IN_PROGRESS] },
+          },
+        }),
+      ]);
+      aiInterviewsTotal = total;
+      aiInterviewsPendingReview = pending;
+    }
+
     const payload: EmployerDashboardPayload = {
       activeJobsCount,
       totalApplicationsCount,
       shortlistedCount,
-      interviewsCount: 0,
+      interviewsCount: applicantsWithSharedInterview,
+      candidatesWithSharedAssessment,
+      applicantsWithSharedInterview,
+      aiInterviewsTotal,
+      aiInterviewsPendingReview,
       applicationsTodayCount,
       pendingReviewCount,
       jobsExpiringSoonCount: 0,

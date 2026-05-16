@@ -18,6 +18,16 @@ model User {
   onboardingComplete  Boolean          @default(true)
   emailVerified       DateTime?
   image               String?
+  /// Platform consent before AI assessment (recording / sharing with employers).
+  dataConsentAssessmentAt DateTime?
+  /// Platform consent before AI interview.
+  dataConsentInterviewAt  DateTime?
+  /// After 3 proctoring strikes — block assessments/interviews until this time (24h cooldown).
+  proctoringSuspendedUntil DateTime?
+  /// Cached talent pool membership (synced from TalentPoolEntry + exit rules).
+  inTalentPool        Boolean          @default(false)
+  talentPoolReason    String?
+  talentPoolDate      DateTime?
   createdAt           DateTime         @default(now())
   updatedAt           DateTime         @updatedAt
 
@@ -30,6 +40,15 @@ model User {
   applications    Application[]
   savedJobs       SavedJob[]
   notifications   Notification[]
+  assessments     Assessment[]
+  videoInterviews VideoInterview[]
+  proctoringSessions ProctoringSession[]
+  talentPoolEntries TalentPoolEntry[]
+  candidateTalentPoolInvites TalentPoolInvite[] @relation("CandidateInvites")
+  employerTalentPoolInvites  TalentPoolInvite[] @relation("EmployerInvites")
+  messageThreadsAsEmployer MessageThread[] @relation("EmployerThreads")
+  messageThreadsAsSeeker   MessageThread[] @relation("SeekerThreads")
+  messagesSent             Message[]       @relation("MessageSender")
 }
 
 enum SubscriptionTier {
@@ -157,6 +176,9 @@ model Job {
   /** Extra structured fields from post-job wizard (education, experience level, years, etc.) */
   hiringMeta Json?
 
+  /// Employer-defined AI interview template (mode, questions, settings).
+  interviewTemplate InterviewTemplate?
+
   isActive           Boolean @default(true)
   isFeatured         Boolean @default(false)
   viewCount          Int     @default(0)
@@ -168,6 +190,17 @@ model Job {
 
   applications Application[]
   savedBy      SavedJob[]
+  autoShortlist JobAutoShortlist?
+  talentPoolInvites TalentPoolInvite[]
+}
+
+model InterviewTemplate {
+  id        String   @id @default(cuid())
+  jobId     String   @unique
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  template  Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 enum JobType {
@@ -190,6 +223,13 @@ model Application {
   coverLetter   String?
   cvSnapshot    Json?
   matchScore    Int?
+
+  /// Required when status becomes REJECTED (employer must submit).
+  declineReason      String?
+  declineReasonCode String?
+  declinedAt        DateTime?
+  /// Candidate accepted offer — unlocks contact info for employer before HIRED if needed.
+  offerAcceptedAt   DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -259,9 +299,235 @@ enum NotificationType {
   JOB_MATCH
   APPLICATION_UPDATE
   ASSESSMENT_READY
+  ASSESSMENT_FLAGGED
+  INTERVIEW_READY
+  EMPLOYER_CANDIDATE_INSIGHT
   SESSION_REMINDER
   SYSTEM
   NEW_APPLICATION
+  ASSESSMENT_INVITE
+  SHORTLIST_READY
+  MESSAGE_RECEIVED
+  TALENT_POOL_INVITE
+  TALENT_POOL_ACTIVE
+  TALENT_POOL_INVITE_UPDATE
+}
+
+enum TalentPoolReason {
+  INTERVIEW_LOW_SCORE
+  EMPLOYER_DECLINED
+  PROCTORING_VIOLATION
+  ASSESSMENT_LOW_SCORE
+  NO_ASSESSMENT
+  NOT_SELECTED_30_DAYS
+}
+
+enum TalentPoolInviteStatus {
+  PENDING_ASSESSMENT
+  ASSESSMENT_COMPLETE
+  ACCEPTED
+  DECLINED
+  EXPIRED
+}
+
+model TalentPoolInvite {
+  id          String                 @id @default(cuid())
+  candidateId String
+  employerId  String
+  jobId       String
+  status      TalentPoolInviteStatus @default(PENDING_ASSESSMENT)
+  expiresAt   DateTime
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+
+  candidate User @relation("CandidateInvites", fields: [candidateId], references: [id], onDelete: Cascade)
+  employer  User @relation("EmployerInvites", fields: [employerId], references: [id], onDelete: Cascade)
+  job       Job  @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@unique([candidateId, jobId])
+  @@index([employerId])
+  @@index([candidateId, status])
+}
+
+model TalentPoolEntry {
+  id                   String           @id @default(cuid())
+  userId               String
+  user                 User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reason               TalentPoolReason
+  sourceInterviewId    String?
+  sourceApplicationId  String?
+  /// Tags for admin training routing, e.g. ["interview_soft_skills","declined_role_fit"].
+  trainingTags         Json?
+  createdAt            DateTime         @default(now())
+
+  @@index([userId, reason])
+  @@index([createdAt])
+}
+
+model JobAutoShortlist {
+  id        String   @id @default(cuid())
+  jobId     String   @unique
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  /// JSON: [{ "userId", "name", "totalScore", "matchNote", "recommendation" }]
+  entries   Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model MessageThread {
+  id           String    @id @default(cuid())
+  employerId   String
+  employer     User      @relation("EmployerThreads", fields: [employerId], references: [id], onDelete: Cascade)
+  jobSeekerId  String
+  jobSeeker    User      @relation("SeekerThreads", fields: [jobSeekerId], references: [id], onDelete: Cascade)
+  messages     Message[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([employerId, jobSeekerId])
+  @@index([employerId])
+  @@index([jobSeekerId])
+}
+
+model Message {
+  id        String        @id @default(cuid())
+  threadId  String
+  thread    MessageThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  senderId  String
+  sender    User          @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  body      String
+  readAt    DateTime?
+  createdAt DateTime      @default(now())
+
+  @@index([threadId, createdAt])
+}
+
+enum AssessmentType {
+  GENERAL
+  TECHNICAL
+  BEHAVIORAL
+  COMMUNICATION
+  INDUSTRY_SPECIFIC
+}
+
+enum AssessmentStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  FLAGGED
+  EXPIRED
+}
+
+enum InterviewStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FLAGGED
+  EXPIRED
+}
+
+model Assessment {
+  id                   String            @id @default(cuid())
+  userId               String
+  user                 User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type                 AssessmentType    @default(GENERAL)
+  status               AssessmentStatus  @default(NOT_STARTED)
+  totalScore           Int?
+  skillsScore          Int?
+  communicationScore   Int?
+  behavioralScore      Int?
+  industryFitScore     Int?
+  strengths            Json?
+  weaknesses           Json?
+  recommendations      Json?
+  detailedReport       Json?
+  questions            Json?
+  answers              Json?
+  startedAt            DateTime?
+  completedAt          DateTime?
+  duration             Int?
+  proctoringFlags      Json?
+  isFlagged            Boolean           @default(false)
+  flagReason           String?
+  shareWithEmployers   Boolean           @default(false)
+  /// Per-step scores: { step1: { score, completedAt }, ... step5 }
+  stepScores           Json?
+  /// Active step (1–5) when status is IN_PROGRESS
+  currentStep          Int?
+  /// Count of completed steps (0–5)
+  stepsCompleted       Int               @default(0)
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+  videoInterview       VideoInterview?
+  proctoringSessions   ProctoringSession[]
+
+  @@index([userId, type, status])
+  @@index([userId, createdAt])
+}
+
+model VideoInterview {
+  id                   String          @id @default(cuid())
+  userId               String
+  user                 User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assessmentId         String?         @unique
+  assessment           Assessment?     @relation(fields: [assessmentId], references: [id], onDelete: SetNull)
+  /// practice | competency | job — used to resume sessions and show prior results per flow.
+  interviewKind      String?
+  jobId                String?
+  status               InterviewStatus @default(PENDING)
+  questions            Json?
+  answers              Json?
+  transcripts          Json?
+  overallScore         Int?
+  communicationScore   Int?
+  confidenceScore      Int?
+  clarityScore         Int?
+  relevanceScore       Int?
+  aiAnalysis           Json?
+  strengths            Json?
+  improvements         Json?
+  recordingUrl         String?
+  /// Full-session audio (e.g. WebM Opus) for employer download when shared.
+  recordingData        Bytes?
+  recordingMimeType    String?
+  duration             Int?
+  proctoringFlags      Json?
+  isFlagged            Boolean         @default(false)
+  shareWithEmployers   Boolean         @default(false)
+  startedAt            DateTime?
+  completedAt          DateTime?
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  proctoringSessions   ProctoringSession[]
+
+  @@index([userId, status])
+  @@index([userId, interviewKind, status])
+}
+
+model ProctoringSession {
+  id                 String   @id @default(cuid())
+  userId             String
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assessmentId       String?
+  assessment         Assessment?   @relation(fields: [assessmentId], references: [id], onDelete: SetNull)
+  interviewId        String?
+  videoInterview     VideoInterview? @relation(fields: [interviewId], references: [id], onDelete: SetNull)
+  tabSwitches        Int      @default(0)
+  faceNotVisible     Int      @default(0)
+  multipleFaces      Int      @default(0)
+  copyPasteAttempts  Int      @default(0)
+  aiToolDetected     Int      @default(0)
+  flags              Json?
+  screenshots        Json?
+  startedAt          DateTime @default(now())
+  endedAt            DateTime?
+  isFlagged          Boolean  @default(false)
+  severity           String?
+  warningCount       Int      @default(0)
+
+  @@index([userId])
+  @@index([assessmentId])
+  @@index([interviewId])
 }
 
 model Contact {

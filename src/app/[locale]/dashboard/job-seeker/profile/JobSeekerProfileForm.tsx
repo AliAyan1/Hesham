@@ -3,16 +3,20 @@
 import axios, { isAxiosError } from "axios";
 import { JobType } from "@prisma/client";
 import type { Profile, CV } from "@prisma/client";
-import { Link } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import { JOB_CATEGORIES } from "@/lib/constants";
-import { computeCvCompletionPercent } from "@/lib/cv/completion";
-import { computeProfileCompletionPercent } from "@/lib/profile-completion";
+import { nationalityGroupsForValue, normalizeNationality } from "@/lib/nationalities";
+import { mapParsedCvToForm } from "@/lib/cv/apply-parsed-cv";
 import { mergeExperienceDescriptionFromRecord } from "@/lib/cv/experience-description";
-import { hasAccess } from "@/lib/subscription";
-import type { SubscriptionTier } from "@/types";
+import { handleProseTextareaPaste, insertNormalizedPaste } from "@/lib/normalize-pasted-text";
+import {
+  computeProfilePageCompletionPercent,
+  getProfilePageSections,
+  type ProfilePageSectionKey,
+} from "@/lib/profile-page-completion";
+import { Upload } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { ErrorState } from "@/components/ui/ErrorState";
@@ -87,13 +91,11 @@ function prefsFromProfile(prof: Profile | null): {
 export function JobSeekerProfileForm() {
   const t = useTranslations("profile");
   const tc = useTranslations("common");
-  const ts = useTranslations("sidebar");
   const tCv = useTranslations("cv");
   const tJobs = useTranslations("jobs");
   const { update: updateSession } = useSession();
   const photoInputRef = useRef<HTMLInputElement>(null);
 
-  const [tier, setTier] = useState<SubscriptionTier>("FREE");
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [photoBusy, setPhotoBusy] = useState(false);
   const [name, setName] = useState("");
@@ -117,14 +119,11 @@ export function JobSeekerProfileForm() {
 
   const [prefs, setPrefs] = useState(() => prefsFromProfile(null));
 
-  const [completion, setCompletion] = useState(0);
   const [pending, setPending] = useState(false);
-  const [aiPending, setAiPending] = useState<null | "summary" | "skills">(null);
+  const [cvUploading, setCvUploading] = useState(false);
   const [saved, setSaved] = useState<string | null>(null);
   const [loadState, setLoadState] = useState<"loading" | "error" | "ready">("loading");
-
-  const canAiSummary = hasAccess(tier, "ai_improve_summary");
-  const canAiSkills = hasAccess(tier, "ai_skill_suggestions");
+  const cvInputRef = useRef<HTMLInputElement>(null);
 
   const hydrate = useCallback(async () => {
     setLoadState("loading");
@@ -136,14 +135,13 @@ export function JobSeekerProfileForm() {
             name?: string;
             email?: string;
             image?: string | null;
-            subscriptionTier?: SubscriptionTier | string;
+            subscriptionTier?: string;
           };
           profile?: Profile | null;
           cv?: CV | null;
         };
       }>("/api/profile/job-seeker");
       const d = res.data.data;
-      setTier((d?.user?.subscriptionTier as SubscriptionTier) ?? "FREE");
       setName(d?.user?.name ?? "");
       setEmail(d?.user?.email ?? "");
       setPhotoUrl(typeof d?.user?.image === "string" && d.user.image ? d.user.image : null);
@@ -152,7 +150,7 @@ export function JobSeekerProfileForm() {
       setPhone(prof?.phone ?? "");
       setLocation(prof?.location ?? "");
       setBio(prof?.bio ?? "");
-      setNationality(prof?.nationality ?? "");
+      setNationality(normalizeNationality(prof?.nationality));
       setDateOfBirth(
         prof?.dateOfBirth instanceof Date
           ? prof.dateOfBirth.toISOString().slice(0, 10)
@@ -235,15 +233,6 @@ export function JobSeekerProfileForm() {
         setCertsText("");
       }
 
-      const pct = cv
-        ? computeCvCompletionPercent({
-            cv,
-            hasProfilePhoto: Boolean(
-              typeof d?.user?.image === "string" && d.user.image && d.user.image.length > 0,
-            ),
-          })
-        : computeProfileCompletionPercent(prof);
-      setCompletion(pct);
       setLoadState("ready");
     } catch {
       setLoadState("error");
@@ -257,6 +246,62 @@ export function JobSeekerProfileForm() {
   const skillsPayload = useMemo(() => mergeLinesAndComma(skillsText), [skillsText]);
   const languagesPayload = useMemo(() => linesToArr(languagesText), [languagesText]);
   const certsPayload = useMemo(() => linesToArr(certsText), [certsText]);
+
+  const hasProfilePhoto = Boolean(photoUrl);
+  const completionInput = useMemo(
+    () => ({
+      hasProfilePhoto,
+      name: name.trim(),
+      phone: phone.trim(),
+      location: location.trim(),
+      bio: bio.trim(),
+      professionalTitle: professionalTitle.trim(),
+      summary: summary.trim(),
+      experience,
+      education,
+      skillsCount: skillsPayload.length,
+      languagesCount: languagesPayload.length,
+      prefs,
+    }),
+    [
+      hasProfilePhoto,
+      name,
+      phone,
+      location,
+      bio,
+      professionalTitle,
+      summary,
+      experience,
+      education,
+      skillsPayload.length,
+      languagesPayload.length,
+      prefs,
+    ],
+  );
+
+  const completion = useMemo(
+    () => computeProfilePageCompletionPercent(completionInput),
+    [completionInput],
+  );
+
+  const sectionStatus = useMemo(() => getProfilePageSections(completionInput), [completionInput]);
+
+  const sectionLabel = useCallback(
+    (key: ProfilePageSectionKey) => {
+      const labels: Record<ProfilePageSectionKey, string> = {
+        photo: t("sectionPhoto"),
+        personal: t("sectionPersonal"),
+        cvHeadline: t("sectionCvHeadline"),
+        experience: t("sectionExperience"),
+        education: t("sectionEducation"),
+        skills: t("sectionSkills"),
+        languages: t("sectionLanguages"),
+        jobPrefs: t("sectionJobPrefs"),
+      };
+      return labels[key];
+    },
+    [t],
+  );
 
   async function save() {
     setPending(true);
@@ -307,50 +352,61 @@ export function JobSeekerProfileForm() {
     }
   }
 
-  async function runAiSummary() {
-    if (!canAiSummary) return;
-    setAiPending("summary");
+  function applyParsedToForm(parsed: Record<string, unknown>) {
+    const mapped = mapParsedCvToForm(parsed);
+    if (mapped.name) setName(mapped.name);
+    if (mapped.phone) setPhone(mapped.phone);
+    if (mapped.location) setLocation(mapped.location);
+    if (mapped.bio) setBio(mapped.bio);
+    if (mapped.professionalTitle) setProfessionalTitle(mapped.professionalTitle);
+    if (mapped.summary) setSummary(mapped.summary);
+    if (mapped.linkedinUrl) setLinkedinUrl(mapped.linkedinUrl);
+    if (mapped.portfolioUrl) setPortfolioUrl(mapped.portfolioUrl);
+    if (mapped.experience.length) setExperience(mapped.experience);
+    if (mapped.education.length) setEducation(mapped.education);
+    if (mapped.skillsText) setSkillsText(mapped.skillsText);
+    if (mapped.languagesText) setLanguagesText(mapped.languagesText);
+    if (mapped.certsText) setCertsText(mapped.certsText);
+  }
+
+  async function onCvUpload(file: File) {
+    setCvUploading(true);
     setSaved(null);
     try {
-      const res = await axios.post<{ success: boolean; data?: { summary: string; summaryAr?: string } }>(
-        "/api/cv/improve-summary",
-        { summary: summary.trim() || bio.trim() || " ", professionalTitle: professionalTitle.trim() || undefined },
+      const form = new FormData();
+      form.append("file", file);
+      form.append("context", "profile");
+      const res = await axios.post<{ success: boolean; data?: { parsed?: unknown }; error?: string }>(
+        "/api/cv/parse",
+        form,
+        { headers: { "Content-Type": "multipart/form-data" }, timeout: 180_000 },
       );
-      if (res.data.success && res.data.data?.summary) {
-        setSummary(res.data.data.summary);
-        setSaved(t("saved"));
+      if (!res.data?.success) {
+        setSaved(res.data?.error ?? t("cvUploadFailed"));
+        return;
       }
-    } catch {
-      setSaved(tc("error"));
+      const parsed = res.data.data?.parsed;
+      if (!parsed || typeof parsed !== "object") {
+        setSaved(t("cvUploadFailed"));
+        return;
+      }
+      applyParsedToForm(parsed as Record<string, unknown>);
+      await hydrate();
+      await updateSession();
+      setSaved(t("cvImported"));
+    } catch (e) {
+      const msg = isAxiosError(e) ? String(e.response?.data?.error ?? "") : "";
+      setSaved(msg || t("cvUploadFailed"));
     } finally {
-      setAiPending(null);
+      setCvUploading(false);
     }
   }
 
-  async function runAiSkills() {
-    if (!canAiSkills) return;
-    const title = professionalTitle.trim();
-    if (!title) {
-      setSaved(tc("required"));
-      return;
-    }
-    setAiPending("skills");
-    setSaved(null);
-    try {
-      const res = await axios.post<{ success: boolean; data?: { skills: string[] } }>(
-        "/api/cv/suggest-skills",
-        { professionalTitle: title },
-      );
-      if (res.data.success && res.data.data?.skills?.length) {
-        const merged = [...new Set([...skillsPayload, ...res.data.data.skills])];
-        setSkillsText(merged.join("\n"));
-        setSaved(t("saved"));
-      }
-    } catch {
-      setSaved(tc("error"));
-    } finally {
-      setAiPending(null);
-    }
+  function onCvFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    void onCvUpload(file);
   }
 
   function toggleCategory(cat: string) {
@@ -499,20 +555,49 @@ export function JobSeekerProfileForm() {
           <div className="min-w-0 flex-1">
             <h1 className="text-xl font-bold text-[#0D2137]">{name || email}</h1>
             <p className="text-sm text-[#6B7280]">{t("completion")}</p>
+            <ul className="mt-3 grid gap-1 text-xs text-[#6B7280] sm:grid-cols-2" aria-label={t("completionSectionsAria")}>
+              {sectionStatus.map(({ key, done }) => (
+                <li key={key} className={done ? "text-brand-teal" : undefined}>
+                  {done ? "✓ " : "○ "}
+                  {sectionLabel(key)}
+                </li>
+              ))}
+            </ul>
             {saved ? (
               <p className="mt-3 text-xs text-[#6B7280]" role="status">
                 {saved}
               </p>
             ) : null}
-            <Button
-              type="button"
-              variant="secondary"
-              loading={pending}
-              className="mt-4 min-h-11"
-              onClick={() => void save()}
-            >
-              {t("save")}
-            </Button>
+            <p className="mt-2 text-xs leading-relaxed text-[#6B7280]">{t("cvUploadHint")}</p>
+            <input
+              ref={cvInputRef}
+              type="file"
+              accept=".pdf,.doc,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              className="sr-only"
+              aria-label={t("uploadCv")}
+              onChange={onCvFileSelected}
+            />
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                loading={cvUploading}
+                className="min-h-11 gap-2"
+                onClick={() => cvInputRef.current?.click()}
+              >
+                <Upload className="h-4 w-4" aria-hidden />
+                {cvUploading ? t("cvUploading") : t("uploadCv")}
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                loading={pending}
+                className="min-h-11"
+                onClick={() => void save()}
+              >
+                {t("save")}
+              </Button>
+            </div>
           </div>
         </div>
       </header>
@@ -551,7 +636,22 @@ export function JobSeekerProfileForm() {
           </label>
           <label className="block text-sm font-medium md:col-span-2">
             {t("nationalityShort")}
-            <input value={nationality} onChange={(e) => setNationality(e.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2" />
+            <select
+              value={nationality}
+              onChange={(e) => setNationality(e.target.value)}
+              className="mt-1 w-full rounded-lg border bg-white px-3 py-2"
+            >
+              <option value="">{t("nationalitySelect")}</option>
+              {nationalityGroupsForValue(nationality).map((group) => (
+                <optgroup key={group.letter} label={group.letter}>
+                  {group.items.map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
           </label>
           <label className="block text-sm font-medium">
             {t("uiLanguageShort")}
@@ -570,28 +670,19 @@ export function JobSeekerProfileForm() {
           </label>
           <label className="block text-sm font-medium md:col-span-2">
             {t("bioShort")}
-            <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={3} className="mt-1 w-full rounded-lg border px-3 py-2" />
+            <textarea
+              value={bio}
+              onChange={(e) => setBio(e.target.value)}
+              onPaste={(e) => handleProseTextareaPaste(e, bio, setBio)}
+              rows={3}
+              className="mt-1 w-full rounded-lg border px-3 py-2"
+            />
           </label>
         </div>
       </section>
 
       <section className="rounded-xl border bg-white p-6 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="font-bold text-[#0D2137]">{t("cvSummarySection")}</h2>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              loading={aiPending === "summary"}
-              disabled={!canAiSummary}
-              onClick={() => void runAiSummary()}
-            >
-              {tCv("ai.improveSummary")}
-            </Button>
-            {!canAiSummary ? <span className="text-xs text-[#6B7280]">{t("upgradeForAi")}</span> : null}
-          </div>
-        </div>
+        <h2 className="font-bold text-[#0D2137]">{t("cvSummarySection")}</h2>
         <div className="mt-4 grid gap-4">
           <label className="block text-sm font-medium">
             {t("professionalTitleShort")}
@@ -599,7 +690,13 @@ export function JobSeekerProfileForm() {
           </label>
           <label className="block text-sm font-medium">
             {tCv("fields.summary")}
-            <textarea value={summary} onChange={(e) => setSummary(e.target.value)} rows={5} className="mt-1 w-full rounded-lg border px-3 py-2" />
+            <textarea
+              value={summary}
+              onChange={(e) => setSummary(e.target.value)}
+              onPaste={(e) => handleProseTextareaPaste(e, summary, setSummary)}
+              rows={5}
+              className="mt-1 w-full rounded-lg border px-3 py-2"
+            />
           </label>
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block text-sm font-medium">
@@ -652,8 +749,23 @@ export function JobSeekerProfileForm() {
                   onChange={(e) =>
                     setExperience((prev) =>
                       prev.map((row, i) => (i === idx ? { ...row, description: e.target.value } : row)),
-                  )
+                    )
                   }
+                  onPaste={(e) => {
+                    const plain = e.clipboardData.getData("text/plain");
+                    if (!plain || !/[\r\n]/.test(plain)) return;
+                    e.preventDefault();
+                    const el = e.currentTarget;
+                    const start = el.selectionStart ?? ex.description.length;
+                    const end = el.selectionEnd ?? ex.description.length;
+                    const { nextValue, caret } = insertNormalizedPaste(ex.description, plain, start, end);
+                    setExperience((prev) =>
+                      prev.map((row, i) => (i === idx ? { ...row, description: nextValue } : row)),
+                    );
+                    requestAnimationFrame(() => {
+                      el.setSelectionRange(caret, caret);
+                    });
+                  }}
                   rows={3}
                   className="mt-1 w-full rounded-lg border px-3 py-2"
                 />
@@ -714,19 +826,7 @@ export function JobSeekerProfileForm() {
       </section>
 
       <section className="rounded-xl border bg-white p-6 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="font-bold text-[#0D2137]">{t("skills")}</h2>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            loading={aiPending === "skills"}
-            disabled={!canAiSkills}
-            onClick={() => void runAiSkills()}
-          >
-            {tCv("ai.suggestSkills")}
-          </Button>
-        </div>
+        <h2 className="font-bold text-[#0D2137]">{t("skills")}</h2>
         <label className="mt-4 block text-sm font-medium">
           {t("skillsHintProfile")}
           <textarea value={skillsText} onChange={(e) => setSkillsText(e.target.value)} rows={4} className="mt-1 w-full rounded-lg border px-3 py-2" />
@@ -833,14 +933,6 @@ export function JobSeekerProfileForm() {
           </label>
         </div>
       </section>
-
-      <p className="text-center text-sm text-[#6B7280]">
-        <Link href="/dashboard/job-seeker/cv-builder" className="font-semibold text-brand-teal hover:underline">
-          {ts("jobSeeker.cv")}
-        </Link>
-        {" · "}
-        {t("openCvBuilder")}
-      </p>
 
       <div className="flex justify-center pb-8">
         <Button type="button" variant="secondary" loading={pending} className="min-h-11 px-8" onClick={() => void save()}>

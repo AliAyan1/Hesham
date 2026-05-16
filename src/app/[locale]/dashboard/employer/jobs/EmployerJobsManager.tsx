@@ -3,7 +3,9 @@
 import { Link } from "@/i18n/navigation";
 import axios from "axios";
 import { useTranslations } from "next-intl";
+import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { TalentPoolJobMatchesBanner } from "@/components/employer/TalentPoolJobMatchesBanner";
 import type { SubscriptionTier } from "@/types";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -24,6 +26,9 @@ export function EmployerJobsManager({ tier }: { tier: SubscriptionTier }) {
   const tc = useTranslations("common");
   const dash = useTranslations("dashboard");
   void tier;
+
+  const searchParams = useSearchParams();
+  const poolJobId = searchParams.get("poolJob");
 
   const [items, setItems] = useState<Row[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -68,6 +73,7 @@ export function EmployerJobsManager({ tier }: { tier: SubscriptionTier }) {
 
   return (
     <div className="space-y-6">
+      {poolJobId ? <TalentPoolJobMatchesBanner jobId={poolJobId} /> : null}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-xl font-bold text-[#0D2137]">{dash("actionManageJobs")}</h2>
         <Link
@@ -97,7 +103,7 @@ export function EmployerJobsManager({ tier }: { tier: SubscriptionTier }) {
                 <th className="px-4 py-4">{dash("categoryCol")}</th>
                 <th className="px-4 py-4">{dash("applications")}</th>
                 <th className="px-4 py-4">{dash("statusCol")}</th>
-                <th className="px-4 py-4">{dash("actionView")}</th>
+                <th className="px-4 py-4">{dash("actionsCol")}</th>
               </tr>
             </thead>
             <tbody>
@@ -122,6 +128,12 @@ export function EmployerJobsManager({ tier }: { tier: SubscriptionTier }) {
                     <Button type="button" variant="outline" size="sm" className="min-h-10" onClick={() => void remove(j.id)}>
                       {t("deleteJob")}
                     </Button>
+                    <Link
+                      href={`/dashboard/employer/jobs/${j.id}/shortlist`}
+                      className="inline-flex min-h-10 items-center rounded-lg border-2 border-brand-teal px-3 text-xs font-semibold text-brand-teal hover:bg-brand-lightTeal"
+                    >
+                      {dash("shortlistCol")}
+                    </Link>
                   </td>
                 </tr>
               ))}

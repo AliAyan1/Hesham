@@ -7,7 +7,9 @@ import type { ApiResponse, IUser } from "@/types";
 import jwt from "jsonwebtoken";
 import { getAuthSecret } from "@/lib/auth-secret";
 import { tierFromPlan } from "@/lib/subscription";
-import { UserRole } from "@prisma/client";
+import { UserRole, NotificationType } from "@prisma/client";
+import { createUserNotification } from "@/lib/notifications/create-user-notification";
+import { sendTransactionalEmail } from "@/lib/email/send-transactional";
 
 /**
  * POST /api/auth/register
@@ -62,6 +64,7 @@ export async function POST(
         password: hashedPassword,
         role,
         subscriptionTier,
+        /** First-run wizard; middleware sends users to `/onboarding` until completed. */
         onboardingComplete: false,
         subscriptionStart: subscriptionTier === "FREE" ? null : new Date(),
         profile:
@@ -79,6 +82,29 @@ export async function POST(
       },
       select: { id: true, email: true, name: true, role: true },
     });
+
+    if (role === UserRole.JOBSEEKER) {
+      try {
+        await createUserNotification({
+          userId: user.id,
+          type: NotificationType.ASSESSMENT_INVITE,
+          title: "Complete your AI assessment",
+          titleAr: "أكمل تقييمك الذكي",
+          message:
+            "Welcome to QudrahTech. Complete at least one AI assessment to unlock job applications and stand out to employers.",
+          messageAr:
+            "مرحبًا بك في قدرتك. أكمل تقييمًا ذكيًا واحدًا على الأقل لفتح التقديم على الوظائف.",
+          link: "/dashboard/job-seeker/assessment",
+        });
+        await sendTransactionalEmail({
+          to: user.email,
+          subject: "Welcome — complete your QudrahTech assessment",
+          html: `<p>Hi ${name || "there"},</p><p>Complete at least one AI assessment on QudrahTech to apply for jobs.</p><p><a href="${process.env.NEXTAUTH_URL ?? "https://qudrahtech.com"}/dashboard/job-seeker/assessment">Open assessments</a></p>`,
+        });
+      } catch (sideEffectErr) {
+        console.error("[register] post-create welcome steps failed:", sideEffectErr);
+      }
+    }
 
     const secret = getAuthSecret();
     if (!secret) {
@@ -107,7 +133,8 @@ export async function POST(
       },
       { status: 201 }
     );
-  } catch {
+  } catch (err) {
+    console.error("[register]", err);
     return NextResponse.json(
       { success: false, error: "Internal server error" },
       { status: 500 }

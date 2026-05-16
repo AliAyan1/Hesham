@@ -132,7 +132,7 @@ export function PostJobForm({
       };
       const res = await axios.post<{ success: boolean; data?: { id: string } }>("/api/jobs/create", payload);
       if (res.data.success && res.data.data?.id) {
-        router.push("/dashboard/employer/jobs");
+        router.push(`/dashboard/employer/jobs?poolJob=${encodeURIComponent(res.data.data.id)}`);
         router.refresh();
       }
     } catch (e) {
@@ -226,19 +226,7 @@ export function PostJobForm({
               <Button type="button" variant="outline" loading={aiPending} onClick={() => void runAi()}>
                 {pw("aiGenerateDesc")}
               </Button>
-            ) : (
-              <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-[#78350F]">
-                <p className="font-semibold">{pw("aiJobDescLockedTitle")}</p>
-                <p className="mt-1 text-[#92400E]">{pw("aiJobDescLockedBody")}</p>
-                <Link
-                  href={hrefUpgradeProfessional}
-                  prefetch={false}
-                  className="mt-2 inline-flex font-semibold text-[#0F4C75] underline underline-offset-2 hover:text-[#0D2137]"
-                >
-                  {pw("aiJobDescUpgradeLink")}
-                </Link>
-              </div>
-            )}
+            ) : null}
           </div>
           <label className="block text-sm font-medium">
             {pw("descEnRequired")}

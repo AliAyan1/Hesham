@@ -29,7 +29,7 @@ export default function OnboardingClient() {
         return;
       }
       await update();
-      const role = session.user.role;
+      const role = String(session.user.role ?? "").toUpperCase();
       const next =
         role === UserRole.EMPLOYER
           ? "/dashboard/employer"
@@ -47,7 +47,7 @@ export default function OnboardingClient() {
     return <LoadingSpinner size="full" label={tc("loading")} />;
   }
 
-  const isEmployer = session.user.role === UserRole.EMPLOYER;
+  const isEmployer = String(session.user.role ?? "").toUpperCase() === UserRole.EMPLOYER;
 
   function stepRow(text: string, href: string) {
     return (

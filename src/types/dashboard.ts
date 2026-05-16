@@ -1,5 +1,6 @@
 import type { Application, Job, User } from "@prisma/client";
 import type { NotificationType as PrismaNotificationType, SubscriptionTier } from "@prisma/client";
+import type { JobSeekerTalentPoolStatus } from "@/lib/talent-pool/talent-pool-types";
 
 export type SerializedJobSeekerApplication = Pick<Application, "id" | "status"> & {
   jobId: string;
@@ -38,9 +39,14 @@ export type JobSeekerDashboardPayload = {
   /** Shown as “smart matches” for paid tiers — same pool size until dedicated ranking cache exists. */
   jobMatchesCount: number;
   assessmentScore: number | null;
+  /** Latest completed AI interview overall score (shared or not). */
+  interviewScore: number | null;
+  /** True when assessment score is in the top band (e.g. 85+); UI shows translated badge. */
+  showTopPercentileBand: boolean;
   atsScore: number | null;
   subscriptionTier: SubscriptionTier;
   recentApplications: SerializedJobSeekerApplication[];
+  talentPool: JobSeekerTalentPoolStatus;
 };
 
 export type EmployerDashboardPayload = {
@@ -48,6 +54,14 @@ export type EmployerDashboardPayload = {
   totalApplicationsCount: number;
   shortlistedCount: number;
   interviewsCount: number;
+  /** Distinct applicants (to your jobs) who shared a completed assessment. */
+  candidatesWithSharedAssessment: number;
+  /** Distinct applicants who shared a completed video interview. */
+  applicantsWithSharedInterview: number;
+  /** Video interviews tied to your job postings (jobId set). */
+  aiInterviewsTotal: number;
+  /** Job-linked interviews still in progress or pending. */
+  aiInterviewsPendingReview: number;
   applicationsTodayCount: number;
   pendingReviewCount: number;
   jobsExpiringSoonCount: number;

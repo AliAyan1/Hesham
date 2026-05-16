@@ -179,8 +179,9 @@ export async function POST(): Promise<
       );
     }
 
+    const userId = session.user.id;
     await prisma.cV.update({
-      where: { userId: session.user.id },
+      where: { userId },
       data: {
         atsScore: Math.round(parsed.data.totalScore),
         atsAnalysis: toInputJson(parsed.data),
@@ -192,6 +193,9 @@ export async function POST(): Promise<
       },
       select: { id: true },
     });
+
+    const { evaluateTalentPoolExit } = await import("@/lib/talent-pool/evaluate-talent-pool-exit");
+    await evaluateTalentPoolExit(userId);
 
     return NextResponse.json({ success: true, data: { analysis: parsed.data } });
   } catch (e) {

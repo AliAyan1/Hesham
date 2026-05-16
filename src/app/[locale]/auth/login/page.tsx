@@ -7,9 +7,43 @@ import { Link } from "@/i18n/navigation";
 import { useRouter } from "@/i18n/navigation";
 import { loginSchema } from "@/lib/validations";
 import { BRAND_COLORS } from "@/lib/constants";
-import { Logo } from "@/components/ui/Logo";
+import { AuthShell } from "@/components/auth/AuthShell";
+import { ClientHydrationGate } from "@/components/ui/ClientHydrationGate";
+import { GoogleIcon } from "@/components/auth/GoogleIcon";
+import { dashboardPathForRole } from "@/lib/subscription";
 import type { LoginFormData } from "@/types";
 import type { ZodIssue } from "zod";
+
+/** Same-origin only; strip locale prefix for next-intl `router.push`. */
+function intlPathFromCallback(raw: string | null, locale: string): string | undefined {
+  if (!raw?.trim()) return undefined;
+  let pathname = "";
+  let search = "";
+  try {
+    if (/^https?:\/\//i.test(raw)) {
+      const u = new URL(raw);
+      if (typeof window !== "undefined" && u.origin !== window.location.origin) return undefined;
+      pathname = u.pathname;
+      search = u.search;
+    } else {
+      const base = typeof window !== "undefined" ? window.location.origin : "http://localhost";
+      const path = raw.startsWith("/") ? raw : `/${raw}`;
+      const u = new URL(path, base);
+      pathname = u.pathname;
+      search = u.search;
+    }
+  } catch {
+    return undefined;
+  }
+  if (!pathname.startsWith("/")) return undefined;
+  const combined = pathname + search;
+  const prefix = `/${locale}`;
+  if (combined === prefix || combined.startsWith(`${prefix}/`)) {
+    const rest = combined.slice(prefix.length);
+    return rest.length ? rest : "/";
+  }
+  return combined;
+}
 
 type FieldErrors = Partial<Record<keyof LoginFormData, string>>;
 
@@ -27,7 +61,6 @@ export default function LoginPage() {
   const [serverError, setServerError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  /** Update local form state and clear per-field errors. */
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -35,192 +68,149 @@ export default function LoginPage() {
     setServerError(null);
   }
 
-  /** Validate and sign in using Credentials provider. */
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    try {
-      const parsed = loginSchema.safeParse(formData);
-      if (!parsed.success) {
-        const errors: FieldErrors = {};
-        parsed.error.issues.forEach((err: ZodIssue) => {
-          const field = err.path[0] as keyof LoginFormData;
-          errors[field] = err.message;
+    const parsed = loginSchema.safeParse(formData);
+    if (!parsed.success) {
+      const errors: FieldErrors = {};
+      parsed.error.issues.forEach((err: ZodIssue) => {
+        const field = err.path[0] as keyof LoginFormData;
+        errors[field] = err.message;
+      });
+      setFieldErrors(errors);
+      return;
+    }
+
+    startTransition(async () => {
+      try {
+        const result = await signIn("credentials", {
+          email: parsed.data.email,
+          password: parsed.data.password,
+          redirect: false,
         });
-        setFieldErrors(errors);
-        return;
+
+        if (result?.error) {
+          setServerError(t("auth.invalidCredentials"));
+          return;
+        }
+
+        const sessionRes = await fetch("/api/auth/session", { credentials: "include" });
+        const sessionJson = (await sessionRes.json()) as { user?: { role?: string } };
+        const role = String(sessionJson?.user?.role ?? "JOBSEEKER").toUpperCase();
+        const dash = dashboardPathForRole(role);
+
+        const params = new URLSearchParams(window.location.search);
+        const fromCallback = intlPathFromCallback(params.get("callbackUrl"), locale);
+        router.push(fromCallback ?? dash);
+        router.refresh();
+      } catch {
+        setServerError(t("common.error"));
       }
-
-      startTransition(async () => {
-        try {
-          const result = await signIn("credentials", {
-            email: formData.email,
-            password: formData.password,
-            redirect: false,
-          });
-
-          if (result?.error) {
-            setServerError(t("auth.invalidCredentials"));
-            return;
-          }
-
-          router.push("/dashboard");
-          router.refresh();
-        } catch {
-          setServerError(t("common.error"));
-        }
-      });
-    } catch {
-      setServerError(t("common.error"));
-    }
+    });
   }
 
-  /** Sign in with Google OAuth. */
   async function handleGoogleSignIn() {
-    try {
-      startTransition(async () => {
-        try {
-          await signIn("google", { callbackUrl: `/${locale}/dashboard` });
-        } catch {
-          setServerError(t("common.error"));
-        }
-      });
-    } catch {
-      setServerError(t("common.error"));
-    }
+    startTransition(async () => {
+      try {
+        await signIn("google", {
+          callbackUrl: `/${locale}/dashboard`,
+        });
+      } catch {
+        setServerError(t("common.error"));
+      }
+    });
   }
 
   return (
-    <div
-      className="relative min-h-screen flex items-center justify-center px-4"
-      style={{ backgroundColor: BRAND_COLORS.primary }}
-      dir={isRTL ? "rtl" : "ltr"}
-    >
-      <div className="w-full max-w-md">
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <div className="mb-3 flex justify-center">
-            <Logo variant="dark" size="lg" className="max-w-[260px]" priority />
-          </div>
-          <p className="text-gray-400 text-sm">{t("common.slogan")}</p>
+    <AuthShell isRtl={isRTL} slogan={t("common.slogan")}>
+      <h2 className="mb-1 text-xl font-semibold text-white">{t("auth.login")}</h2>
+      <p className="mb-6 text-sm text-gray-400">{t("auth.subtitleLogin")}</p>
+
+      {serverError ? (
+        <div className="mb-4 rounded-lg border border-red-700 bg-red-900/30 p-3 text-sm text-red-400">
+          {serverError}
         </div>
+      ) : null}
 
-        <div className="bg-[#242424] rounded-2xl p-8 shadow-xl border border-[#333]">
-          <h2 className="text-xl font-semibold text-white mb-1">
-            {t("auth.login")}
-          </h2>
-          <p className="text-gray-400 text-sm mb-6">{t("auth.subtitleLogin")}</p>
-
-          {serverError && (
-            <div className="mb-4 p-3 bg-red-900/30 border border-red-700 rounded-lg text-red-400 text-sm">
-              {serverError}
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} noValidate className="space-y-4">
-            {/* Email */}
-            <div>
-              <label className="block text-sm text-gray-300 mb-1">
-                {t("auth.email")}
-              </label>
-              <input
-                type="email"
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                disabled={isPending}
-                className="w-full px-4 py-2.5 bg-brand-primary border border-[#444] rounded-lg text-white placeholder-gray-600 focus:outline-none focus:border-brand-accent transition-colors disabled:opacity-50"
-                placeholder={t("auth.placeholderEmail")}
-              />
-              {fieldErrors.email && (
-                <p className="mt-1 text-xs text-red-400">{fieldErrors.email}</p>
-              )}
-            </div>
-
-            {/* Password */}
-            <div>
-              <label className="block text-sm text-gray-300 mb-1">
-                {t("auth.password")}
-              </label>
-              <input
-                type="password"
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                disabled={isPending}
-                className="w-full px-4 py-2.5 bg-brand-primary border border-[#444] rounded-lg text-white placeholder-gray-600 focus:outline-none focus:border-brand-accent transition-colors disabled:opacity-50"
-                placeholder={t("auth.placeholderPassword")}
-              />
-              {fieldErrors.password && (
-                <p className="mt-1 text-xs text-red-400">
-                  {fieldErrors.password}
-                </p>
-              )}
-            </div>
-
-            <button
-              type="submit"
+      <ClientHydrationGate
+        fallback={
+          <div className="space-y-4" aria-hidden>
+            <div className="h-[4.5rem] animate-pulse rounded-lg bg-[#333]" />
+            <div className="h-[4.5rem] animate-pulse rounded-lg bg-[#333]" />
+            <div className="h-10 animate-pulse rounded-lg bg-[#333]" />
+          </div>
+        }
+      >
+        <form onSubmit={handleSubmit} noValidate className="space-y-4" suppressHydrationWarning>
+          <div suppressHydrationWarning>
+            <label className="mb-1 block text-sm text-gray-300">{t("auth.email")}</label>
+            <input
+              type="email"
+              name="email"
+              value={formData.email}
+              onChange={handleChange}
               disabled={isPending}
-              className="w-full py-2.5 rounded-lg font-semibold text-white transition-opacity disabled:opacity-50 hover:opacity-90"
-              style={{ backgroundColor: BRAND_COLORS.accent }}
-            >
-              {isPending ? t("auth.loggingIn") : t("auth.login")}
-            </button>
-          </form>
-
-          {/* Divider */}
-          <div className="flex items-center gap-3 my-5">
-            <div className="flex-1 h-px bg-[#333]" />
-            <span className="text-gray-500 text-xs">{t("auth.orContinueWith")}</span>
-            <div className="flex-1 h-px bg-[#333]" />
+              autoComplete="email"
+              className="w-full rounded-lg border border-[#444] bg-brand-primary px-4 py-2.5 text-white placeholder-gray-600 transition-colors focus:border-brand-accent focus:outline-none disabled:opacity-50"
+              placeholder={t("auth.placeholderEmail")}
+            />
+            {fieldErrors.email ? <p className="mt-1 text-xs text-red-400">{fieldErrors.email}</p> : null}
           </div>
 
-          {/* Google */}
+          <div>
+            <label className="mb-1 block text-sm text-gray-300">{t("auth.password")}</label>
+            <input
+              type="password"
+              name="password"
+              value={formData.password}
+              onChange={handleChange}
+              disabled={isPending}
+              autoComplete="current-password"
+              className="w-full rounded-lg border border-[#444] bg-brand-primary px-4 py-2.5 text-white placeholder-gray-600 transition-colors focus:border-brand-accent focus:outline-none disabled:opacity-50"
+              placeholder={t("auth.placeholderPassword")}
+            />
+            {fieldErrors.password ? (
+              <p className="mt-1 text-xs text-red-400">{fieldErrors.password}</p>
+            ) : null}
+          </div>
+
           <button
-            onClick={handleGoogleSignIn}
+            type="submit"
             disabled={isPending}
-            className="w-full py-2.5 rounded-lg border border-[#444] text-white font-medium flex items-center justify-center gap-2 hover:bg-[#2a2a2a] transition-colors disabled:opacity-50"
+            className="w-full rounded-lg py-2.5 font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+            style={{ backgroundColor: BRAND_COLORS.accent }}
           >
-            <GoogleIcon />
-            {t("auth.loginWithGoogle")}
+            {isPending ? t("auth.loggingIn") : t("auth.login")}
           </button>
+        </form>
 
-          {/* Switch to register */}
-          <p className="text-center text-sm text-gray-400 mt-6">
-            {t("auth.noAccount")}{" "}
-            <Link
-              href="/auth/register"
-              className="font-medium hover:underline"
-              style={{ color: BRAND_COLORS.accent }}
-            >
-              {t("auth.register")}
-            </Link>
-          </p>
+        <div className="my-5 flex items-center gap-3">
+          <div className="h-px flex-1 bg-[#333]" />
+          <span className="text-xs text-gray-500">{t("auth.orContinueWith")}</span>
+          <div className="h-px flex-1 bg-[#333]" />
         </div>
-      </div>
-    </div>
-  );
-}
 
-function GoogleIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-      <path
-        d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"
-        fill="#4285F4"
-      />
-      <path
-        d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"
-        fill="#34A853"
-      />
-      <path
-        d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"
-        fill="#FBBC05"
-      />
-      <path
-        d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"
-        fill="#EA4335"
-      />
-    </svg>
+        <button
+          type="button"
+          onClick={() => void handleGoogleSignIn()}
+          disabled={isPending}
+          className="flex w-full items-center justify-center gap-2 rounded-lg border border-[#444] py-2.5 font-medium text-white transition-colors hover:bg-[#2a2a2a] disabled:opacity-50"
+        >
+          <GoogleIcon />
+          {t("auth.loginWithGoogle")}
+        </button>
+      </ClientHydrationGate>
+
+      <div className="mt-8 space-y-3 border-t border-[#333] pt-6">
+        <p className="text-center text-sm text-gray-400">{t("auth.noAccount")}</p>
+        <Link
+          href="/auth/register"
+          className="flex w-full items-center justify-center rounded-lg border-2 border-brand-teal/60 py-2.5 text-sm font-semibold text-brand-teal transition-colors hover:bg-brand-teal/10"
+        >
+          {t("auth.register")}
+        </Link>
+      </div>
+    </AuthShell>
   );
 }

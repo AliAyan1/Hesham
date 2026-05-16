@@ -1,7 +1,9 @@
 import { auth } from "@/lib/auth";
 import { notFound, redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
-import { UserRole } from "@/types";
+import { getPrisma } from "@/lib/db";
+import { hasAccess } from "@/lib/subscription";
+import { SubscriptionTier, UserRole } from "@/types";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import type { BreadcrumbItem } from "@/components/layout/Breadcrumbs";
 import { Card } from "@/components/ui/Card";
@@ -34,6 +36,18 @@ export default async function EmployerSegmentPage({
   if (!session?.user) redirect(`/${locale}/auth/login`);
   if (session.user.role !== UserRole.EMPLOYER)
     redirect(`/${locale}/dashboard`);
+
+  if (segment === "analytics") {
+    const prisma = getPrisma();
+    const row = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { subscriptionTier: true },
+    });
+    const tier = (row?.subscriptionTier ?? "FREE") as SubscriptionTier;
+    if (!hasAccess(tier, "employer_analytics")) {
+      redirect(`/${locale}/dashboard/employer`);
+    }
+  }
 
   const tSide = await getTranslations({ locale, namespace: "sidebar" });
   const tb = await getTranslations({ locale, namespace: "breadcrumb" });

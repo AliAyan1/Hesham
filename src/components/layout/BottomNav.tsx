@@ -41,6 +41,7 @@ function picks(role: UserRole): NavDef[] {
           labelKey: "jobSeeker.applications",
           emoji: "📋",
         },
+        { href: "/dashboard/job-seeker/messages", labelKey: "jobSeeker.messages", emoji: "💬" },
         { href: "/dashboard/job-seeker/profile", labelKey: "jobSeeker.profile", emoji: "👤" },
         {
           href: "/dashboard/job-seeker/notifications",
@@ -53,7 +54,9 @@ function picks(role: UserRole): NavDef[] {
         { href: "/dashboard/employer", labelKey: "employer.dashboard", emoji: "🏠" },
         { href: "/dashboard/employer/post-job", labelKey: "employer.postJob", emoji: "📢" },
         { href: "/dashboard/employer/candidates", labelKey: "employer.candidates", emoji: "👥" },
-        { href: "/dashboard/employer/analytics", labelKey: "employer.analytics", emoji: "📊" },
+        { href: "/dashboard/employer/interviews", labelKey: "employer.aiInterviews", emoji: "🎬" },
+        { href: "/dashboard/employer/talent-pool", labelKey: "employer.recruitingTalentPool", emoji: "📑" },
+        { href: "/dashboard/employer/messages", labelKey: "employer.messages", emoji: "💬" },
         {
           href: "/dashboard/employer/notifications",
           labelKey: "employer.notifications",

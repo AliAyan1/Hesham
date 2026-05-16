@@ -8,10 +8,7 @@ import {
   hrefRegisterFree,
   hrefRegisterPremium,
   hrefRegisterProfessional,
-  hrefUpgradePremium,
-  hrefUpgradeProfessional,
 } from "@/lib/i18n-hrefs";
-import { getServerSession } from "@/lib/get-server-session";
 import {
   ArrowRight,
   Brain,
@@ -251,7 +248,7 @@ export default async function LocaleHomePage({
                   t("employersBullet6"),
                 ]}
                 ctaLabel={t("audienceCtaEmployers")}
-                ctaHref="/auth/register"
+                ctaHref={hrefRegisterFree}
               />
             </div>
           </div>
@@ -407,8 +404,6 @@ function AudienceCard({
 async function PricingSection({ locale }: { locale: string }) {
   const t = await getTranslations({ locale, namespace: "landing" });
   const tp = await getTranslations({ locale, namespace: "pages.pricing" });
-  const session = await getServerSession();
-  const isLoggedIn = Boolean(session?.user?.id);
 
   return (
     <div className="mx-auto max-w-6xl px-6">
@@ -419,7 +414,7 @@ async function PricingSection({ locale }: { locale: string }) {
           price={t("priceFreeValue")}
           variant="free"
           ctaLabel={t("finalCtaPrimary")}
-          ctaHref={isLoggedIn ? "/dashboard" : hrefRegisterFree}
+          ctaHref={hrefRegisterFree}
           features={[
             t("priceFreeFeature1"),
             t("priceFreeFeature2"),
@@ -433,9 +428,7 @@ async function PricingSection({ locale }: { locale: string }) {
           variant="pro"
           badge={t("priceProBadge")}
           ctaLabel={tp("ctaProfessional")}
-          ctaHref={
-            isLoggedIn ? hrefUpgradeProfessional : hrefRegisterProfessional
-          }
+          ctaHref={hrefRegisterProfessional}
           features={[
             t("priceProFeature1"),
             t("priceProFeature2"),
@@ -449,7 +442,7 @@ async function PricingSection({ locale }: { locale: string }) {
           variant="premium"
           badge={t("pricePremiumBadge")}
           ctaLabel={tp("ctaPremium")}
-          ctaHref={isLoggedIn ? hrefUpgradePremium : hrefRegisterPremium}
+          ctaHref={hrefRegisterPremium}
           features={[
             t("pricePremiumFeature1"),
             t("pricePremiumFeature2"),

@@ -23,11 +23,13 @@ export function DashboardLayout({
   return (
     <DashboardUIProvider>
       <DashboardHydrationGate>
-        <div className="min-h-screen max-w-[100vw] bg-[#F8FAFC] text-gray-900">
+        <div className="min-h-screen w-full min-w-0 overflow-x-hidden bg-[#F8FAFC] text-gray-900">
           <DashboardNavbar locale={locale} />
-          <div className="flex max-w-[100vw] overflow-x-clip">
-            <Sidebar locale={locale} role={role} />
-            <div className="relative flex min-w-0 flex-1 flex-col ps-0 md:ps-64 md:duration-150">
+          <Sidebar locale={locale} role={role} />
+          <div className="flex w-full min-w-0">
+            {/* In-flow width matches fixed sidebar (w-64) so content aligns and no horizontal scroll */}
+            <div className="hidden shrink-0 md:block md:w-64" aria-hidden />
+            <div className="relative flex min-w-0 flex-1 flex-col">
               <div className="grow space-y-8 p-4 pb-28 pt-6 md:p-8 md:pb-12">
                 <Breadcrumbs items={breadcrumbs} />
                 {children}

@@ -10,16 +10,20 @@ import {
   Lock,
   Sparkles,
   UserRound,
+  Video,
 } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import { useRouter } from "@/i18n/navigation";
-import { useFormatter, useTranslations } from "next-intl";
-import { useEffect, useState } from "react";
+import { useFormatter, useLocale, useTranslations } from "next-intl";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { JobSeekerDashboardPayload } from "@/types/dashboard";
 import type { SubscriptionTier } from "@/types";
+import { signOut } from "next-auth/react";
 import { ApplicationScoreBadge } from "@/components/dashboard/ApplicationScoreBadge";
 import { DashboardActionCard } from "@/components/dashboard/DashboardActionCard";
 import { DashboardWelcomeBanner } from "@/components/dashboard/DashboardWelcomeBanner";
+import { TalentPoolStatusBanner } from "@/components/dashboard/TalentPoolStatusBanner";
+import { TalentPoolProgressTracker } from "@/components/dashboard/TalentPoolProgressTracker";
 import { InitialsAvatar } from "@/components/dashboard/InitialsAvatar";
 import { PremiumStatCard } from "@/components/dashboard/PremiumStatCard";
 import {
@@ -31,6 +35,7 @@ import { ErrorState } from "@/components/ui/ErrorState";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { cn } from "@/lib/cn";
 import { hasAccess } from "@/lib/subscription";
+import { MIN_PROFILE_COMPLETION_FOR_AI_JOB_MATCH } from "@/lib/profile-page-completion";
 
 type MatchReco = {
   jobId: string;
@@ -47,32 +52,53 @@ export default function JobSeekerDashboardClient({ userName }: { userName: strin
   const tj = useTranslations("jobs");
   const tc = useTranslations("common");
   const format = useFormatter();
+  const locale = useLocale();
   const [data, setData] = useState<JobSeekerDashboardPayload | null>(null);
   const [status, setStatus] = useState<"loading" | "error" | "ready">("loading");
   const [reco, setReco] = useState<MatchReco[]>([]);
 
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const res = await fetch("/api/dashboard/job-seeker", { credentials: "include" });
-        if (!res.ok) {
-          setStatus("error");
-          return;
+  const loadDashboard = useCallback(async (silent = false) => {
+    if (!silent) setStatus((s) => (s === "ready" ? "ready" : "loading"));
+    try {
+      const res = await fetch("/api/dashboard/job-seeker", { credentials: "include" });
+      if (!res.ok) {
+        if (res.status === 401) {
+          void signOut({ callbackUrl: `/${locale}/auth/login` });
         }
-        const json = (await res.json()) as JobSeekerDashboardPayload;
-        if (!cancelled) {
-          setData(json);
-          setStatus("ready");
-        }
-      } catch {
-        if (!cancelled) setStatus("error");
+        setStatus("error");
+        return;
       }
-    })();
-    return () => {
-      cancelled = true;
+      const json = (await res.json()) as JobSeekerDashboardPayload;
+      setData(json);
+      setStatus("ready");
+    } catch {
+      setStatus("error");
+    }
+  }, [locale]);
+
+  useEffect(() => {
+    void loadDashboard();
+  }, [loadDashboard]);
+
+  useEffect(() => {
+    const onFocus = () => void loadDashboard(true);
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [loadDashboard]);
+
+  useEffect(() => {
+    const onVis = () => {
+      if (document.visibilityState === "visible") void loadDashboard(true);
     };
-  }, []);
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [loadDashboard]);
+
+  useEffect(() => {
+    if (!data?.talentPool.proctoringSuspended) return;
+    const id = window.setInterval(() => void loadDashboard(true), 60_000);
+    return () => window.clearInterval(id);
+  }, [data?.talentPool.proctoringSuspended, loadDashboard]);
 
   useEffect(() => {
     if (status !== "ready" || !data) return;
@@ -101,20 +127,16 @@ export default function JobSeekerDashboardClient({ userName }: { userName: strin
     return () => {
       cancelled = true;
     };
-  }, [status, data]);
+  }, [status, data?.profileCompletion]);
+
+  const recoDisplay = useMemo(() => {
+    const pct = data?.profileCompletion ?? 0;
+    if (pct >= MIN_PROFILE_COMPLETION_FOR_AI_JOB_MATCH) return reco;
+    return reco.map((r) => ({ ...r, matchScore: null, reason: null, aiPowered: false }));
+  }, [reco, data?.profileCompletion]);
 
   function retry() {
-    setStatus("loading");
-    void fetch("/api/dashboard/job-seeker", { credentials: "include" })
-      .then((res) => {
-        if (!res.ok) throw new Error("load failed");
-        return res.json() as Promise<JobSeekerDashboardPayload>;
-      })
-      .then((json) => {
-        setData(json);
-        setStatus("ready");
-      })
-      .catch(() => setStatus("error"));
+    void loadDashboard();
   }
 
   if (status === "loading" && !data) {
@@ -129,8 +151,9 @@ export default function JobSeekerDashboardClient({ userName }: { userName: strin
 
   const completion = data.profileCompletion;
   const tier = data.subscriptionTier as SubscriptionTier;
-  const canAiAssessment = hasAccess(tier, "ai_assessment");
+  const canAiAssessment = true;
   const canJobMatchingAi = hasAccess(tier, "job_matching_ai");
+  const profileReadyForAiMatch = completion >= MIN_PROFILE_COMPLETION_FOR_AI_JOB_MATCH;
   const canAtsScore = hasAccess(tier, "ats_score");
   const isPremium = tier === "PREMIUM";
   const assessed = data.assessmentScore != null;
@@ -178,6 +201,13 @@ export default function JobSeekerDashboardClient({ userName }: { userName: strin
           </>
         }
       />
+
+      {data.talentPool.inTalentPool || data.talentPool.proctoringSuspended ? (
+        <TalentPoolStatusBanner status={data.talentPool} locale={locale} />
+      ) : null}
+      {data.talentPool.inTalentPool && data.talentPool.progress ? (
+        <TalentPoolProgressTracker progress={data.talentPool.progress} />
+      ) : null}
 
       <section className={statGap} aria-labelledby="js-stats">
         <h2 id="js-stats" className="sr-only">
@@ -336,13 +366,18 @@ export default function JobSeekerDashboardClient({ userName }: { userName: strin
       ) : null}
 
       <section aria-labelledby="js-quick" className="space-y-5">
+        {data.showTopPercentileBand ? (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-center text-sm font-semibold text-emerald-900">
+            {t("topPercentileBand")}
+          </div>
+        ) : null}
         <div>
           <h3 id="js-quick" className="text-xl font-semibold text-[#0D2137]">
             {t("quickActionsTitle")}
           </h3>
           <p className="mt-1 text-sm text-[#6B7280]">{t("sectionQuickActionsSubtitle")}</p>
         </div>
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           <DashboardActionCard
             href="/dashboard/job-seeker/profile"
             title={t("actionCompleteProfile")}
@@ -369,6 +404,15 @@ export default function JobSeekerDashboardClient({ userName }: { userName: strin
             locked={!canAiAssessment}
           />
           <DashboardActionCard
+            href="/dashboard/job-seeker/interview"
+            title={t("actionInterview")}
+            description={t("quickActionInterviewDesc")}
+            iconBgClass="bg-[#EEF2FF]"
+            iconColorClass="text-[#4F46E5]"
+            Icon={Video}
+            locked={!canAiAssessment}
+          />
+          <DashboardActionCard
             href="/dashboard/job-seeker/cv-builder"
             title={canAtsScore ? t("actionCvBuilderAts") : t("actionUploadCv")}
             description={t("quickActionUploadCvDesc")}
@@ -379,7 +423,7 @@ export default function JobSeekerDashboardClient({ userName }: { userName: strin
         </div>
       </section>
 
-      {reco.length > 0 ? (
+      {recoDisplay.length > 0 ? (
         <section aria-labelledby="js-reco-heading" className="space-y-4">
           <div>
             <h3 id="js-reco-heading" className="text-xl font-semibold text-[#0D2137]">
@@ -388,7 +432,7 @@ export default function JobSeekerDashboardClient({ userName }: { userName: strin
             <p className="mt-1 text-sm text-[#6B7280]">{t("recommendedJobsSubtitle")}</p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {reco.map((r) => (
+            {recoDisplay.map((r) => (
               <article
                 key={r.jobId}
                 className="flex flex-col rounded-xl border border-[#F1F5F9] bg-white p-5 shadow-sm"
@@ -401,7 +445,7 @@ export default function JobSeekerDashboardClient({ userName }: { userName: strin
                     <Badge size="sm" className="bg-[#CCFBF1] font-semibold text-[#115E59]">
                       {tj("aiMatch")} {r.matchScore}%
                     </Badge>
-                  ) : canJobMatchingAi ? (
+                  ) : canJobMatchingAi && profileReadyForAiMatch ? (
                     <Badge size="sm" className="bg-gray-100 font-medium text-gray-600">
                       {tj("matchScore")}
                     </Badge>

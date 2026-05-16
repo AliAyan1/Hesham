@@ -99,9 +99,10 @@ export default async function middleware(request: NextRequest) {
     }
 
     if (persistedLocale && persistedLocale !== pathnameLocale) {
-      const suffix = pathname.replace(/^\/[^/]+/, "");
-      const nextPath = `/${persistedLocale}${suffix}`;
-      return redirectPreservingSearch(request, nextPath);
+      const suffix = pathname.replace(/^\/[^/]+/, "") || "/";
+      const destination = request.nextUrl.clone();
+      destination.pathname = `/${persistedLocale}${suffix}`;
+      return NextResponse.redirect(destination);
     }
 
     const pathWithoutLocale = pathname.slice(`/${pathnameLocale}`.length) || "/";
@@ -140,9 +141,16 @@ export default async function middleware(request: NextRequest) {
         return NextResponse.redirect(new URL(`/${pathnameLocale}/onboarding`, request.url));
       }
 
-      const rawRole = token.role as MiddlewareUserRole | undefined;
+      /** JWT role must match middleware keys (uppercase). Lowercase or garbage ⇒ wrong dashboard prefix + redirects. */
+      const rawRole = token.role;
+      const normalized =
+        typeof rawRole === "string" ? rawRole.toUpperCase() : "";
       const userRole: MiddlewareUserRole =
-        rawRole && rawRole in MIDDLEWARE_DASHBOARD_ROUTES ? rawRole : "JOBSEEKER";
+        normalized === "JOBSEEKER" ||
+        normalized === "EMPLOYER" ||
+        normalized === "ADMIN"
+          ? normalized
+          : "JOBSEEKER";
       const expectedBase = MIDDLEWARE_DASHBOARD_ROUTES[userRole];
 
       if (pathWithoutLocale === "/dashboard") {

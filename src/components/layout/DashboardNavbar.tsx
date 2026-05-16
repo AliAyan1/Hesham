@@ -84,7 +84,7 @@ export function DashboardNavbar({ locale }: DashboardNavbarProps): ReactNode {
         </div>
 
         <div className="flex min-w-0 flex-1 justify-center px-2 sm:px-4">
-          <label className="relative w-full max-w-[220px] min-w-0">
+          <label className="relative w-full min-w-0 max-w-full sm:max-w-md md:max-w-lg lg:max-w-2xl">
             <Search
               className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
               strokeWidth={2}
@@ -94,7 +94,7 @@ export function DashboardNavbar({ locale }: DashboardNavbarProps): ReactNode {
               type="search"
               name="dashboard-search"
               placeholder={searchPh}
-              className="w-full rounded-lg border border-gray-200 bg-[#F8FAFC] py-2 ps-10 pe-3 text-sm text-gray-900 shadow-sm placeholder:text-gray-500 focus:border-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-teal/30"
+              className="min-h-10 w-full rounded-lg border border-gray-200 bg-[#F8FAFC] py-2.5 ps-10 pe-3 text-sm leading-normal text-gray-900 shadow-sm placeholder:text-gray-500 focus:border-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-teal/30"
               aria-label={searchPh}
               autoComplete="off"
             />

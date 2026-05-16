@@ -10,12 +10,16 @@ import {
   FolderKanban,
   GraduationCap,
   LayoutDashboard,
+  Bookmark,
+  Clapperboard,
   LineChart,
   Megaphone,
+  MessageCircle,
   Settings,
   Sparkles,
   UserRound,
   Users,
+  Video,
   type LucideIcon,
 } from "lucide-react";
 import { Link } from "@/i18n/navigation";
@@ -25,6 +29,7 @@ import { useTranslations } from "next-intl";
 import { SubscriptionTier, type UserRole } from "@/types";
 
 import { cn } from "@/lib/cn";
+import { hasAccess } from "@/lib/subscription";
 import { Avatar } from "@/components/ui/Avatar";
 import { useDashboardUI } from "@/components/layout/dashboard-ui";
 
@@ -39,7 +44,13 @@ type LabelKey =
   | "cv"
   | "jobs"
   | "applications"
+  | "invites"
   | "assessment"
+  | "interview"
+  | "messages"
+  | "aiInterviews"
+  | "recruitingTalentPool"
+  | "talentPool"
   | "mentors"
   | "notifications"
   | "postJob"
@@ -60,7 +71,13 @@ const ICON: Record<LabelKey, LucideIcon> = {
   cv: FolderKanban,
   jobs: Briefcase,
   applications: ClipboardList,
+  invites: ClipboardList,
   assessment: Sparkles,
+  interview: Video,
+  messages: MessageCircle,
+  aiInterviews: Clapperboard,
+  recruitingTalentPool: Bookmark,
+  talentPool: Users,
   mentors: GraduationCap,
   notifications: Bell,
   postJob: Megaphone,
@@ -99,12 +116,15 @@ function groupsFor(role: UserRole): NavGroup[] {
             { href: "/dashboard/job-seeker/cv-builder", labelKey: "cv", Icon: ICON.cv },
             { href: "/dashboard/job-seeker/jobs", labelKey: "jobs", Icon: ICON.jobs },
             { href: "/dashboard/job-seeker/applications", labelKey: "applications", Icon: ICON.applications },
+            { href: "/dashboard/job-seeker/invites", labelKey: "invites", Icon: ICON.applications },
+            { href: "/dashboard/job-seeker/messages", labelKey: "messages", Icon: ICON.messages },
           ],
         },
         {
           sectionKey: "groupGrow",
           items: [
             { href: "/dashboard/job-seeker/assessment", labelKey: "assessment", Icon: ICON.assessment },
+            { href: "/dashboard/job-seeker/interview", labelKey: "interview", Icon: ICON.interview },
             { href: "/dashboard/job-seeker/mentors", labelKey: "mentors", Icon: ICON.mentors },
           ],
         },
@@ -127,6 +147,13 @@ function groupsFor(role: UserRole): NavGroup[] {
             { href: "/dashboard/employer/post-job", labelKey: "postJob", Icon: ICON.postJob },
             { href: "/dashboard/employer/jobs", labelKey: "jobs", Icon: ICON.jobs },
             { href: "/dashboard/employer/candidates", labelKey: "candidates", Icon: ICON.candidates },
+            { href: "/dashboard/employer/messages", labelKey: "messages", Icon: ICON.messages },
+            { href: "/dashboard/employer/interviews", labelKey: "aiInterviews", Icon: ICON.aiInterviews },
+            {
+              href: "/dashboard/employer/talent-pool",
+              labelKey: "recruitingTalentPool",
+              Icon: ICON.recruitingTalentPool,
+            },
           ],
         },
         {
@@ -155,6 +182,7 @@ function groupsFor(role: UserRole): NavGroup[] {
             { href: "/dashboard/admin/users", labelKey: "users", Icon: ICON.users },
             { href: "/dashboard/admin/jobs", labelKey: "jobs", Icon: ICON.jobs },
             { href: "/dashboard/admin/assessments", labelKey: "assessments", Icon: ICON.assessments },
+            { href: "/dashboard/admin/talent-pool", labelKey: "talentPool", Icon: ICON.talentPool },
             { href: "/dashboard/admin/revenue", labelKey: "revenue", Icon: ICON.revenue },
           ],
         },
@@ -175,7 +203,6 @@ export function Sidebar({ locale, role }: SidebarProps) {
   const t = useTranslations("sidebar");
   const tNav = useTranslations("nav");
   const tDash = useTranslations("dashboard");
-  const groups = groupsFor(role);
   const roleKey =
     role === "JOBSEEKER" ? "jobSeeker" : role === "EMPLOYER" ? "employer" : "admin";
   const root = dashboardRoot(role);
@@ -217,6 +244,16 @@ export function Sidebar({ locale, role }: SidebarProps) {
       : subscriptionTier === SubscriptionTier.PROFESSIONAL
         ? "bg-[#2563EB]"
         : "bg-[#B8860F]";
+
+  const groups = groupsFor(role).map((group) => ({
+    ...group,
+    items: group.items.filter((item) => {
+      if (role === "EMPLOYER" && item.labelKey === "analytics") {
+        return hasAccess(subscriptionTier, "employer_analytics");
+      }
+      return true;
+    }),
+  }));
 
   const userEmail =
     session.data?.user?.email !== undefined &&
@@ -270,6 +307,7 @@ export function Sidebar({ locale, role }: SidebarProps) {
                 <Link
                   key={item.href}
                   href={item.href}
+                  prefetch={false}
                   className={cn(
                     "flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border-s-[3px] px-3 py-3 text-sm font-medium transition-colors duration-150",
                     on
@@ -285,7 +323,7 @@ export function Sidebar({ locale, role }: SidebarProps) {
                     strokeWidth={2}
                     aria-hidden
                   />
-                  <span className="flex-1 text-start">{labelFor(item)}</span>
+                  <span className="min-w-0 flex-1 truncate text-start">{labelFor(item)}</span>
                 </Link>
               );
             })}

@@ -29,12 +29,8 @@ export function EmployerHiringStarter({
         ? "text-[#0F4C75]"
         : "text-[#374151]";
 
-  const aiNote = canAiJobDescription
-    ? td("employerStarterAiBodyIncluded")
-    : td("employerStarterAiBodyLocked");
-
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
+    <div className={cn("grid gap-4", canAiJobDescription ? "lg:grid-cols-2" : "max-w-md")}>
       <section
         className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm"
         aria-labelledby="employer-plan-heading"
@@ -48,30 +44,29 @@ export function EmployerHiringStarter({
         <p className={cn("mt-3 text-xl font-bold", tierPlanLineClass)}>{tierLabel}</p>
       </section>
 
-      <section
-        className={cn(
-          "rounded-2xl border p-6 shadow-sm",
-          canAiJobDescription
-            ? "border-emerald-200 bg-gradient-to-br from-[#F0FDF4] to-white"
-            : "border-amber-200 bg-[#FFFBEB]",
-        )}
-        aria-labelledby="employer-ai-jd-heading"
-      >
-        <div className="flex items-start gap-3">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-black/5">
-            <Sparkles className="h-5 w-5 text-brand-teal" strokeWidth={2} aria-hidden />
-          </span>
-          <div className="min-w-0">
-            <h2 id="employer-ai-jd-heading" className="text-lg font-bold text-[#0D2137]">
-              {td("employerStarterAiTitle")}
-            </h2>
-            <p className="mt-1 text-sm leading-relaxed text-[#6B7280]">{aiNote}</p>
-            <p className={cn("mt-4 text-sm font-semibold", tierPlanLineClass)}>
-              {td("employerStarterAiPlanLine", { plan: tierLabel })}
-            </p>
+      {canAiJobDescription ? (
+        <section
+          className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-[#F0FDF4] to-white p-6 shadow-sm"
+          aria-labelledby="employer-ai-jd-heading"
+        >
+          <div className="flex items-start gap-3">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-black/5">
+              <Sparkles className="h-5 w-5 text-brand-teal" strokeWidth={2} aria-hidden />
+            </span>
+            <div className="min-w-0">
+              <h2 id="employer-ai-jd-heading" className="text-lg font-bold text-[#0D2137]">
+                {td("employerStarterAiTitle")}
+              </h2>
+              <p className="mt-1 text-sm leading-relaxed text-[#6B7280]">
+                {td("employerStarterAiBodyIncluded")}
+              </p>
+              <p className={cn("mt-4 text-sm font-semibold", tierPlanLineClass)}>
+                {td("employerStarterAiPlanLine", { plan: tierLabel })}
+              </p>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      ) : null}
     </div>
   );
 }

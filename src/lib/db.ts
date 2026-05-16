@@ -1,8 +1,12 @@
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 
+/** Bump when Assessment (or other) Prisma models change so dev HMR picks up `prisma generate`. */
+const PRISMA_CLIENT_REVISION = "2026-talent-pool-invites-v1";
+
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
+  prismaRevision?: string;
 };
 
 /**
@@ -13,7 +17,13 @@ const globalForPrisma = globalThis as unknown as {
  */
 export function getPrisma(): PrismaClient {
   const existing = globalForPrisma.prisma;
-  if (existing) return existing;
+  if (existing && globalForPrisma.prismaRevision === PRISMA_CLIENT_REVISION) {
+    return existing;
+  }
+  if (existing) {
+    void existing.$disconnect();
+    globalForPrisma.prisma = undefined;
+  }
 
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
@@ -31,6 +41,7 @@ export function getPrisma(): PrismaClient {
 
   if (process.env.NODE_ENV !== "production") {
     globalForPrisma.prisma = client;
+    globalForPrisma.prismaRevision = PRISMA_CLIENT_REVISION;
   }
 
   return client;

@@ -5,6 +5,7 @@ import { UserRole } from "@/types";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import type { BreadcrumbItem } from "@/components/layout/Breadcrumbs";
 import JobSeekerDashboardClient from "./JobSeekerDashboardClient";
+import { resolveJobSeekerDbUserForUpload } from "@/lib/resolve-session-user";
 
 export default async function JobSeekerDashboardPage({
   params,
@@ -18,6 +19,9 @@ export default async function JobSeekerDashboardPage({
   if (session.user.role !== UserRole.JOBSEEKER) {
     redirect(`/${locale}/dashboard`);
   }
+
+  const resolved = await resolveJobSeekerDbUserForUpload(session);
+  if (!resolved) redirect(`/${locale}/auth/login`);
 
   const tb = await getTranslations({ locale, namespace: "breadcrumb" });
   const breadcrumbs: BreadcrumbItem[] = [

@@ -6,6 +6,7 @@ export const FREE_FEATURES = [
   "apply_jobs",
   "cv_download",
   "notifications",
+  "ai_assessment",
 ] as const;
 
 export const PROFESSIONAL_FEATURES = [
@@ -17,6 +18,8 @@ export const PROFESSIONAL_FEATURES = [
   "job_matching_ai",
   /** Employer: AI-generated bilingual job description in Post Job wizard. */
   "ai_job_description",
+  /** Employer: hiring analytics dashboard (Professional+). */
+  "employer_analytics",
   "training_recommendations",
   "ai_improve_summary",
   "ai_enhance_bullets",
@@ -51,5 +54,12 @@ export function tierFromPlan(plan: string | null | undefined): SubscriptionTier 
   if (plan === "professional") return SubscriptionTier.PROFESSIONAL;
   if (plan === "premium") return SubscriptionTier.PREMIUM;
   return SubscriptionTier.FREE;
+}
+
+export function dashboardPathForRole(role: string): string {
+  const r = String(role ?? "").toUpperCase();
+  if (r === "EMPLOYER") return "/dashboard/employer";
+  if (r === "ADMIN") return "/dashboard/admin";
+  return "/dashboard/job-seeker";
 }
 

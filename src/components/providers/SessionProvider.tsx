@@ -10,8 +10,14 @@ interface SessionProviderProps {
 }
 
 export function SessionProvider({ children, session }: SessionProviderProps) {
+  const isProd = process.env.NODE_ENV === "production";
+
   return (
-    <NextAuthSessionProvider session={session}>
+    <NextAuthSessionProvider
+      session={session}
+      basePath="/api/auth"
+      refetchOnWindowFocus={isProd}
+    >
       {children}
     </NextAuthSessionProvider>
   );

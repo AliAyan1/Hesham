@@ -48,18 +48,22 @@ async function hydrateTokenFromDb(
   image: string | null;
   email: string;
 } | null> {
-  const prisma = getPrisma();
-  const row = await prisma.user.findUnique({
-    where: { id: userId },
-    select: {
-      subscriptionTier: true,
-      role: true,
-      onboardingComplete: true,
-      image: true,
-      email: true,
-    },
-  });
-  return row ?? null;
+  try {
+    const prisma = getPrisma();
+    const row = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        subscriptionTier: true,
+        role: true,
+        onboardingComplete: true,
+        image: true,
+        email: true,
+      },
+    });
+    return row ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /** After DB resets / re-register with same email, JWT can keep an old user id → repair `token.id` from email. */
@@ -74,18 +78,22 @@ async function reconcileJwtUserIdWithDb(token: {
     typeof token.email === "string" && token.email.trim().length > 0 ? token.email.trim() : null;
   if (!rawId && !email) return;
 
-  const prisma = getPrisma();
-  if (rawId) {
-    const hit = await prisma.user.findUnique({ where: { id: rawId }, select: { id: true } });
-    if (hit) return;
-  }
-  if (!email) return;
-  const byEmail = await prisma.user.findFirst({
-    where: { email: { equals: email, mode: "insensitive" } },
-    select: { id: true },
-  });
-  if (byEmail?.id) {
-    token.id = byEmail.id;
+  try {
+    const prisma = getPrisma();
+    if (rawId) {
+      const hit = await prisma.user.findUnique({ where: { id: rawId }, select: { id: true } });
+      if (hit) return;
+    }
+    if (!email) return;
+    const byEmail = await prisma.user.findFirst({
+      where: { email: { equals: email, mode: "insensitive" } },
+      select: { id: true },
+    });
+    if (byEmail?.id) {
+      token.id = byEmail.id;
+    }
+  } catch {
+    // DB unreachable or schema not applied — keep existing JWT claims
   }
 }
 
@@ -109,8 +117,11 @@ export const authConfig: NextAuthConfig = {
 
         try {
           const prisma = getPrisma();
-          const user = await prisma.user.findUnique({
-            where: { email },
+          const normalizedEmail = email.trim().toLowerCase();
+          const user = await prisma.user.findFirst({
+            where: {
+              email: { equals: normalizedEmail, mode: "insensitive" },
+            },
             select: {
               id: true,
               name: true,
@@ -257,4 +268,6 @@ export const authConfig: NextAuthConfig = {
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
   secret: getAuthSecret(),
+  /** Helps `/api/auth/*` when host is localhost, 127.0.0.1, LAN IP, or tunnels (avoids flaky session fetches). */
+  trustHost: true,
 });

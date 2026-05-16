@@ -5,10 +5,10 @@ import { getToken } from "next-auth/jwt";
 import { getPrisma } from "@/lib/db";
 import { getAuthSecret } from "@/lib/auth-secret";
 
-/** Normalized emails from Session + JWT cookie (some JWTs omit `session.user.email`). */
+/** Normalized emails from Session + optional JWT cookie (some JWTs omit `session.user.email`). */
 async function emailsFromSessionAndCookie(
-  request: NextRequest,
   session: Session | null,
+  request?: NextRequest,
 ): Promise<string[]> {
   const emails = new Set<string>();
   const add = (v: unknown) => {
@@ -19,13 +19,15 @@ async function emailsFromSessionAndCookie(
   };
   add(session?.user?.email);
 
-  const secret = getAuthSecret();
-  if (secret) {
-    try {
-      const tok = await getToken({ req: request, secret });
-      add(tok?.email);
-    } catch {
-      // ignore
+  if (request) {
+    const secret = getAuthSecret();
+    if (secret) {
+      try {
+        const tok = await getToken({ req: request, secret });
+        add(tok?.email);
+      } catch {
+        // ignore
+      }
     }
   }
 
@@ -33,28 +35,31 @@ async function emailsFromSessionAndCookie(
 }
 
 /**
- * Resolve Prisma User id for job seeker flows when JWT id is stale (db reset, same-email re-register).
+ * Resolve Prisma User id for job seeker flows when JWT id is missing or stale (db reset, same-email re-register).
  */
 export async function resolveJobSeekerDbUserForUpload(
-  request: NextRequest,
   session: Session | null,
+  request?: NextRequest,
 ): Promise<{ id: string; image: string | null } | null> {
-  if (!session?.user?.id) return null;
-  const prisma = getPrisma();
+  if (!session?.user) return null;
   const isJobSeeker =
     session.user.role === UserRole.JOBSEEKER ||
     String(session.user.role ?? "").toUpperCase() === UserRole.JOBSEEKER;
   if (!isJobSeeker) return null;
 
-  const hit = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { id: true, image: true, role: true },
-  });
-  if (hit?.role === UserRole.JOBSEEKER) {
-    return { id: hit.id, image: hit.image };
+  const prisma = getPrisma();
+  const sid = typeof session.user.id === "string" ? session.user.id.trim() : "";
+  if (sid.length > 0) {
+    const hit = await prisma.user.findUnique({
+      where: { id: sid },
+      select: { id: true, image: true, role: true },
+    });
+    if (hit?.role === UserRole.JOBSEEKER) {
+      return { id: hit.id, image: hit.image };
+    }
   }
 
-  for (const em of await emailsFromSessionAndCookie(request, session)) {
+  for (const em of await emailsFromSessionAndCookie(session, request)) {
     const row = await prisma.user.findFirst({
       where: {
         email: { equals: em, mode: "insensitive" },
@@ -68,27 +73,61 @@ export async function resolveJobSeekerDbUserForUpload(
   return null;
 }
 
+/**
+ * Resolve Prisma User id for account-wide APIs (upgrade, billing) when JWT `id` is stale
+ * after DB reset or re-register with the same email.
+ */
+export async function resolveDbUserIdForSession(
+  session: Session | null,
+  request?: NextRequest,
+): Promise<{ id: string } | null> {
+  if (!session?.user) return null;
+
+  const prisma = getPrisma();
+  const sid = typeof session.user.id === "string" ? session.user.id.trim() : "";
+  if (sid.length > 0) {
+    const hit = await prisma.user.findUnique({
+      where: { id: sid },
+      select: { id: true },
+    });
+    if (hit) return hit;
+  }
+
+  for (const em of await emailsFromSessionAndCookie(session, request)) {
+    const row = await prisma.user.findFirst({
+      where: { email: { equals: em, mode: "insensitive" } },
+      select: { id: true },
+    });
+    if (row) return row;
+  }
+
+  return null;
+}
+
 /** Same as job seeker resolver, for employer dashboards and uploads. */
 export async function resolveEmployerDbUserForDashboard(
-  request: NextRequest,
   session: Session | null,
+  request?: NextRequest,
 ): Promise<{ id: string } | null> {
-  if (!session?.user?.id) return null;
-  const prisma = getPrisma();
+  if (!session?.user) return null;
   const isEmployer =
     session.user.role === UserRole.EMPLOYER ||
     String(session.user.role ?? "").toUpperCase() === UserRole.EMPLOYER;
   if (!isEmployer) return null;
 
-  const hit = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { id: true, role: true },
-  });
-  if (hit?.role === UserRole.EMPLOYER) {
-    return { id: hit.id };
+  const prisma = getPrisma();
+  const sid = typeof session.user.id === "string" ? session.user.id.trim() : "";
+  if (sid.length > 0) {
+    const hit = await prisma.user.findUnique({
+      where: { id: sid },
+      select: { id: true, role: true },
+    });
+    if (hit?.role === UserRole.EMPLOYER) {
+      return { id: hit.id };
+    }
   }
 
-  for (const em of await emailsFromSessionAndCookie(request, session)) {
+  for (const em of await emailsFromSessionAndCookie(session, request)) {
     const row = await prisma.user.findFirst({
       where: {
         email: { equals: em, mode: "insensitive" },

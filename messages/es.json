@@ -354,7 +354,9 @@
       "strengthStrong": "Strong",
       "planFree": "Free",
       "planProfessional": "Professional",
-      "planPremium": "Premium"
+      "planPremium": "Premium",
+      "signedInFreePlanHint": "You're already signed in. Open your dashboard, or log out to register a different account.",
+      "goToDashboard": "Go to dashboard"
     }
   },
   "dashboard": {
@@ -388,6 +390,11 @@
     "applicationsReceived": "Solicitudes recibidas",
     "candidatesShortlisted": "Candidatos preseleccionados",
     "interviewsScheduled": "Entrevistas programadas",
+    "statCandidatesWithAssessment": "Candidates with shared assessment",
+    "statApplicantsInterviewed": "Applicants with shared interview",
+    "topPercentileBand": "Top 15% of candidates",
+    "statFootnoteSharedAssessment": "Among applicants to your jobs",
+    "statFootnoteSharedInterview": "Completed interviews shared with employers",
     "recentApplicationsEmployerSubtitle": "Nuevas solicitudes en tus ofertas",
     "totalJobSeekers": "Buscadores de empleo",
     "totalEmployers": "Empleadores",
@@ -411,6 +418,7 @@
     "actionCompleteProfile": "Completar perfil",
     "actionBrowseJobs": "Explorar empleos",
     "actionAssessment": "Evaluación IA",
+    "actionInterview": "Entrevista IA",
     "actionUploadCv": "Subir CV",
     "actionPostJob": "Publicar empleo",
     "actionViewCandidates": "Ver todos los candidatos",
@@ -466,6 +474,9 @@
     "quickActionCompleteProfileDesc": "Add details employers and AI use to match you.",
     "quickActionBrowseJobsDesc": "Explore roles curated for your profile.",
     "quickActionAssessmentDesc": "Sharpen your fit score in minutes.",
+    "quickActionInterviewDesc": "Practice with AI voice and video interview.",
+    "quickActionInterview": "AI interview practice",
+    "quickActionInterviewDesc": "Voice questions, recording, and feedback.",
     "quickActionUploadCvDesc": "Keep your résumé ready for instant apply.",
     "quickActionPostJobDesc": "Create a new job listing",
     "quickActionCandidatesDesc": "Browse AI-screened applicants",
@@ -519,7 +530,25 @@
     "noCvOnFile": "Este candidato aún no ha guardado un CV en QudrahTech.",
     "nationalityLabel": "Nacionalidad",
     "languagesHeading": "Idiomas",
-    "certificationsHeading": "Certificaciones"
+    "certificationsHeading": "Certificaciones",
+    "downloadCv": "Download CV (PDF)",
+    "assessmentSection": "Shared AI assessment",
+    "interviewSection": "Shared AI interview",
+    "verifiedAssessment": "Verified assessment",
+    "noSharedAssessment": "No assessment shared yet.",
+    "noSharedInterview": "No interview shared yet.",
+    "proctoringSection": "Proctoring summary",
+    "proctoringNoFlags": "No flags detected",
+    "proctoringFlags": "{count} proctoring flags",
+    "applicationStatus": "Application status",
+    "filterHasAssessment": "Has shared assessment",
+    "filterHasInterview": "Has shared interview",
+    "filterMinScore": "Min score",
+    "filterMaxScore": "Max score",
+    "filterAny": "Any",
+    "filterYes": "Yes",
+    "badgeAssessment": "Assessment",
+    "badgeInterview": "Interview"
   },
   "common": {
     "loading": "Cargando…",
@@ -626,7 +655,8 @@
       "applications": "Mis solicitudes",
       "assessment": "Evaluación IA",
       "mentors": "Mentores",
-      "notifications": "Notificaciones"
+      "notifications": "Notificaciones",
+      "interview": "AI interview"
     },
     "employer": {
       "dashboard": "Panel",
@@ -804,6 +834,7 @@
     "locationShort": "City / region",
     "bioShort": "Professional summary",
     "nationalityShort": "Nationality",
+    "nationalitySelect": "Seleccionar nacionalidad",
     "dateOfBirthShort": "Date of birth",
     "genderShort": "Gender",
     "genderFemale": "Female",
@@ -872,5 +903,112 @@
     "stepEmCandidates": "Review applications",
     "cta": "Let’s go!",
     "finishing": "Saving…"
+  },
+  "assessment": {
+    "title": "AI Assessment",
+    "subtitle": "Choose a track. Each session is proctored and takes about 20–30 minutes.",
+    "start": "Start Assessment",
+    "retake": "Retake Assessment",
+    "score": "Your Score",
+    "duration": "Duration: 20–30 minutes",
+    "scoreBreakdown": "Scores: Skills, Communication, Behavioral, Industry fit",
+    "upgradeTitle": "Upgrade to unlock AI assessments",
+    "upgradeBody": "Professional and Premium plans include AI assessments, interviews, and deeper insights.",
+    "upgradeCta": "View plans",
+    "preTitle": "Before you begin",
+    "ruleTab": "Keep this tab active at all times.",
+    "ruleFace": "Keep your face visible on camera.",
+    "ruleScreen": "Share your full screen (entire display).",
+    "ruleNoAi": "Do not use AI tools or external help.",
+    "checkCamera": "Camera is working",
+    "checkMic": "Microphone is working",
+    "checkScreen": "Screen share is ready (entire screen)",
+    "checkNet": "Stable internet connection",
+    "agreeRules": "I agree to the assessment rules",
+    "complete": "Assessment Complete",
+    "progress": "Question {current} of {total}",
+    "timer": "Time left: {sec}s",
+    "skills": "Skills",
+    "comm": "Communication",
+    "behavior": "Behavioral",
+    "industry": "Industry fit",
+    "strengths": "Your strengths",
+    "improvements": "Areas to improve",
+    "recommendations": "Career recommendations",
+    "shareWithEmployers": "Share with employers",
+    "types": {
+      "general": {
+        "title": "General Career Assessment",
+        "desc": "Broad strengths and career fit — recommended first."
+      },
+      "technical": {
+        "title": "Skills Assessment",
+        "desc": "Role-specific and technical depth."
+      },
+      "communication": {
+        "title": "Communication Assessment",
+        "desc": "Clarity, structure, and professional tone."
+      },
+      "behavioral": {
+        "title": "Behavioral Assessment",
+        "desc": "Situational judgment and workplace behavior."
+      },
+      "industry": {
+        "title": "Industry-Specific Assessment",
+        "desc": "Scenarios aligned to your target sector."
+      }
+    },
+    "proctoring": {
+      "panelTitle": "Proctored session",
+      "camera": "Camera",
+      "screen": "Screen share",
+      "fullscreen": "Full screen",
+      "tab_switch": "Warning: tab switch detected.",
+      "fullscreen_exit": "Warning: full screen was exited.",
+      "screen_share": "Warning: screen sharing stopped.",
+      "not_monitor": "Warning: please share your entire screen (monitor).",
+      "face_not_visible": "Warning: face not clearly visible.",
+      "multiple_faces": "Warning: multiple faces detected.",
+      "looking_away": "Warning: repeated looking away detected.",
+      "copy_paste": "Warning: copy/paste shortcut blocked.",
+      "ai_typing": "Warning: unusual typing speed detected.",
+      "suspicious_activity": "Warning: suspicious activity detected.",
+      "tabSwitch": "Tab switch detected",
+      "faceNotVisible": "Face not visible",
+      "warning": "Warning",
+      "flagged": "Assessment has been flagged for review."
+    }
+  },
+  "interview": {
+    "title": "AI Video Interview",
+    "subtitle": "Practice with AI voice questions and structured feedback.",
+    "start": "Start Interview",
+    "recording": "Recording…",
+    "processing": "Processing answer…",
+    "analyzing": "Analyzing interview…",
+    "complete": "Interview Complete",
+    "score": "Interview Score",
+    "communication": "Communication",
+    "confidence": "Confidence",
+    "clarity": "Clarity",
+    "relevance": "Relevance",
+    "durationHint": "15–20 minutes · 5–7 questions",
+    "cards": {
+      "practice": {
+        "title": "General interview practice",
+        "desc": "Warm-up questions for any role."
+      },
+      "competency": {
+        "title": "HR competency interview",
+        "desc": "Leadership, teamwork, and ethics."
+      },
+      "job": {
+        "title": "Job-specific interview",
+        "desc": "Tailored to a job you applied for (optional job ID)."
+      }
+    },
+    "upgradeTitle": "Upgrade for AI interviews",
+    "upgradeBody": "Available on Professional and Premium.",
+    "upgradeCta": "View plans"
   }
 }

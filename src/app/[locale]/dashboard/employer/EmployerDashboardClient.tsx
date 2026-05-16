@@ -1,11 +1,12 @@
 "use client";
 
-import { BarChart3, Briefcase, ClipboardList, FileText, Star, TrendingUp } from "lucide-react";
+import { BarChart3, Brain, Briefcase, ClipboardList, FileText, Sparkles, Star, Video } from "lucide-react";
 import { Link } from "@/i18n/navigation";
-import { useFormatter, useTranslations } from "next-intl";
-import { useEffect, useState } from "react";
+import { useFormatter, useLocale, useTranslations } from "next-intl";
+import { useCallback, useEffect, useState } from "react";
 import type { EmployerDashboardPayload } from "@/types/dashboard";
 import type { SubscriptionTier } from "@/types";
+import { signOut } from "next-auth/react";
 import { EmployerHiringStarter } from "@/components/dashboard/EmployerHiringStarter";
 import { ApplicationScoreBadge } from "@/components/dashboard/ApplicationScoreBadge";
 import { DashboardActionCard } from "@/components/dashboard/DashboardActionCard";
@@ -20,6 +21,7 @@ import { Badge } from "@/components/ui/Badge";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { cn } from "@/lib/cn";
+import { hasAccess } from "@/lib/subscription";
 
 export default function EmployerDashboardClient({
   userName,
@@ -33,60 +35,54 @@ export default function EmployerDashboardClient({
   const t = useTranslations("dashboard");
   const tc = useTranslations("common");
   const format = useFormatter();
+  const locale = useLocale();
   const [data, setData] = useState<EmployerDashboardPayload | null>(null);
   const [status, setStatus] = useState<"loading" | "error" | "ready">("loading");
+  const canEmployerAnalytics = hasAccess(subscriptionTier, "employer_analytics");
+
+  const loadEmployerDashboard = useCallback(async () => {
+    try {
+      const res = await fetch("/api/dashboard/employer", {
+        credentials: "include",
+        cache: "no-store",
+        headers: { Accept: "application/json" },
+      });
+      if (!res.ok) {
+        if (res.status === 401) {
+          void signOut({ callbackUrl: `/${locale}/auth/login` });
+        }
+        setStatus("error");
+        return;
+      }
+      const json = (await res.json()) as EmployerDashboardPayload | null;
+      if (
+        !json ||
+        typeof json !== "object" ||
+        typeof (json as { activeJobsCount?: unknown }).activeJobsCount !== "number"
+      ) {
+        setStatus("error");
+        return;
+      }
+      const normalized: EmployerDashboardPayload = {
+        ...json,
+        aiInterviewsTotal: typeof json.aiInterviewsTotal === "number" ? json.aiInterviewsTotal : 0,
+        aiInterviewsPendingReview:
+          typeof json.aiInterviewsPendingReview === "number" ? json.aiInterviewsPendingReview : 0,
+      };
+      setData(normalized);
+      setStatus("ready");
+    } catch {
+      setStatus("error");
+    }
+  }, [locale]);
 
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch("/api/dashboard/employer", {
-          credentials: "include",
-          cache: "no-store",
-          headers: { Accept: "application/json" },
-        });
-        if (!res.ok) {
-          if (!cancelled) setStatus("error");
-          return;
-        }
-        const json = (await res.json()) as EmployerDashboardPayload | null;
-        if (
-          !json ||
-          typeof json !== "object" ||
-          typeof (json as { activeJobsCount?: unknown }).activeJobsCount !== "number"
-        ) {
-          if (!cancelled) setStatus("error");
-          return;
-        }
-        if (!cancelled) {
-          setData(json);
-          setStatus("ready");
-        }
-      } catch {
-        if (!cancelled) setStatus("error");
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    void loadEmployerDashboard();
+  }, [loadEmployerDashboard]);
 
   function retry() {
     setStatus("loading");
-    void fetch("/api/dashboard/employer", {
-      credentials: "include",
-      cache: "no-store",
-      headers: { Accept: "application/json" },
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error("load failed");
-        return res.json() as Promise<EmployerDashboardPayload>;
-      })
-      .then((json) => {
-        setData(json);
-        setStatus("ready");
-      })
-      .catch(() => setStatus("error"));
+    void loadEmployerDashboard();
   }
 
   const hiringStarter = (
@@ -220,14 +216,46 @@ export default function EmployerDashboardClient({
           borderClass="border-s-4 border-s-[#7C3AED]"
           iconBgClass="bg-[#F5F3FF]"
           iconColorClass="text-[#7C3AED]"
-          Icon={TrendingUp}
-          value={data.applicationsTodayCount}
-          label={t("statNewApplicationsToday")}
+          Icon={Video}
+          value={data.aiInterviewsTotal}
+          label={t("statAiInterviewsTitle")}
           footer={
-            <span className="text-[#6B7280]">
-              {t("employerBannerSubtitle", { count: String(data.applicationsTodayCount) })}
+            <span
+              className={cn(
+                data.aiInterviewsPendingReview > 0 ? "font-medium text-[#7C3AED]" : "text-gray-500",
+              )}
+            >
+              {data.aiInterviewsPendingReview > 0
+                ? t("statFootnoteAiInterviewsPending", {
+                    count: String(data.aiInterviewsPendingReview),
+                  })
+                : t("statFootnoteAiInterviewsNone")}
             </span>
           }
+        />
+      </section>
+
+      <section aria-labelledby="employer-ai-insights" className={statGap}>
+        <h2 id="employer-ai-insights" className="sr-only">
+          {t("statCandidatesWithAssessment")}
+        </h2>
+        <PremiumStatCard
+          borderClass="border-s-4 border-s-[#6366F1]"
+          iconBgClass="bg-[#EEF2FF]"
+          iconColorClass="text-[#4338CA]"
+          Icon={Brain}
+          value={data.candidatesWithSharedAssessment}
+          label={t("statCandidatesWithAssessment")}
+          footer={<span className="text-gray-500">{t("statFootnoteSharedAssessment")}</span>}
+        />
+        <PremiumStatCard
+          borderClass="border-s-4 border-s-[#0D9488]"
+          iconBgClass="bg-[#CCFBF1]"
+          iconColorClass="text-[#0F766E]"
+          Icon={Video}
+          value={data.applicantsWithSharedInterview}
+          label={t("statApplicantsInterviewed")}
+          footer={<span className="text-gray-500">{t("statFootnoteSharedInterview")}</span>}
         />
       </section>
 
@@ -238,7 +266,12 @@ export default function EmployerDashboardClient({
           </h3>
           <p className="mt-1 text-sm text-[#6B7280]">{t("sectionQuickActionsSubtitle")}</p>
         </div>
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+        <div
+          className={cn(
+            "grid grid-cols-1 gap-5 sm:grid-cols-2",
+            canEmployerAnalytics ? "xl:grid-cols-5" : "xl:grid-cols-4",
+          )}
+        >
           <DashboardActionCard
             href="/dashboard/employer/post-job"
             title={t("actionPostJob")}
@@ -256,21 +289,31 @@ export default function EmployerDashboardClient({
             Icon={FileText}
           />
           <DashboardActionCard
+            href="/dashboard/employer/interviews/create"
+            title={t("actionDesignAiInterview")}
+            description={t("quickActionDesignAiInterviewDesc")}
+            iconBgClass="bg-[#F5F3FF]"
+            iconColorClass="text-[#7C3AED]"
+            Icon={Sparkles}
+          />
+          <DashboardActionCard
             href="/dashboard/employer/jobs"
             title={t("actionManageJobs")}
             description={t("quickActionManageJobsDesc")}
-            iconBgClass="bg-[#F5F3FF]"
-            iconColorClass="text-[#7C3AED]"
+            iconBgClass="bg-[#EDE9FE]"
+            iconColorClass="text-[#6D28D9]"
             Icon={ClipboardList}
           />
-          <DashboardActionCard
-            href="/dashboard/employer/analytics"
-            title={t("actionViewAnalytics")}
-            description={t("quickActionAnalyticsDesc")}
-            iconBgClass="bg-[#FDF3E3]"
-            iconColorClass="text-[#C9973A]"
-            Icon={BarChart3}
-          />
+          {canEmployerAnalytics ? (
+            <DashboardActionCard
+              href="/dashboard/employer/analytics"
+              title={t("actionViewAnalytics")}
+              description={t("quickActionAnalyticsDesc")}
+              iconBgClass="bg-[#FDF3E3]"
+              iconColorClass="text-[#C9973A]"
+              Icon={BarChart3}
+            />
+          ) : null}
         </div>
       </section>
 
