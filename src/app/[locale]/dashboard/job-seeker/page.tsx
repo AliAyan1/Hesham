@@ -19,6 +19,9 @@ export default async function JobSeekerDashboardPage({
   if (session.user.role !== UserRole.JOBSEEKER) {
     redirect(`/${locale}/dashboard`);
   }
+  if (!session.user.onboardingComplete) {
+    redirect(`/${locale}/onboarding`);
+  }
 
   const resolved = await resolveJobSeekerDbUserForUpload(session);
   if (!resolved) redirect(`/${locale}/auth/login`);

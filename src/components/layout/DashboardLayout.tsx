@@ -1,15 +1,16 @@
 import type { ReactNode } from "react";
-import type { UserRole } from "@/types";
+import { UserRole, type UserRole as UserRoleType } from "@/types";
 import { DashboardNavbar } from "@/components/layout/DashboardNavbar";
 import { DashboardUIProvider } from "@/components/layout/dashboard-ui";
 import { Sidebar } from "@/components/layout/Sidebar";
+import { MentorSidebar } from "@/components/layout/MentorSidebar";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { DashboardHydrationGate } from "@/components/layout/DashboardHydrationGate";
 import { Breadcrumbs, type BreadcrumbItem } from "@/components/layout/Breadcrumbs";
 
 export interface DashboardLayoutProps {
   locale: string;
-  role: UserRole;
+  role: UserRoleType;
   breadcrumbs: BreadcrumbItem[];
   children: ReactNode;
 }
@@ -25,7 +26,11 @@ export function DashboardLayout({
       <DashboardHydrationGate>
         <div className="min-h-screen w-full min-w-0 overflow-x-hidden bg-[#F8FAFC] text-gray-900">
           <DashboardNavbar locale={locale} />
-          <Sidebar locale={locale} role={role} />
+          {role === UserRole.MENTOR ? (
+            <MentorSidebar locale={locale} />
+          ) : (
+            <Sidebar locale={locale} role={role} />
+          )}
           <div className="flex w-full min-w-0">
             {/* In-flow width matches fixed sidebar (w-64) so content aligns and no horizontal scroll */}
             <div className="hidden shrink-0 md:block md:w-64" aria-hidden />

@@ -5,6 +5,8 @@ import { getServerSession } from "@/lib/get-server-session";
 import { getPrisma } from "@/lib/db";
 import type { ApiResponse } from "@/types";
 import { jobCategorySchema, jobTypeSchema, hiringMetaSchema } from "@/lib/jobs/constants";
+import { notifyJobSeekersOnNewJob } from "@/lib/jobs/notify-job-matches";
+import { runAutoShortlistForJob } from "@/lib/jobs/run-auto-shortlist";
 
 const updateBodySchema = z.object({
   title: z.string().min(3).max(200).optional(),
@@ -106,7 +108,7 @@ export async function PUT(
   const prisma = getPrisma();
   const existing = await prisma.job.findFirst({
     where: { id: jobId, employerId: session.user.id },
-    select: { id: true },
+    select: { id: true, isActive: true },
   });
   if (!existing) {
     return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
@@ -119,6 +121,7 @@ export async function PUT(
   }
 
   const b = parsed.data;
+  const activating = b.isActive === true && !existing.isActive;
   await prisma.job.update({
     where: { id: jobId },
     data: {
@@ -147,6 +150,12 @@ export async function PUT(
     },
     select: { id: true },
   });
+
+  if (activating) {
+    void runAutoShortlistForJob(jobId, session.user.id).then(() =>
+      notifyJobSeekersOnNewJob(jobId),
+    );
+  }
 
   return NextResponse.json({ success: true, data: { ok: true } });
 }

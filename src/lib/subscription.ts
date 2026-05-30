@@ -27,6 +27,8 @@ export const PROFESSIONAL_FEATURES = [
   "cv_templates_all",
   /** Full CV rewrite for ATS when scan is under threshold (Professional + Premium). */
   "ai_cv_ats_rebuild",
+  /** Paste a job description → tailored ATS resume + PDF download (Professional + Premium). */
+  "ai_cv_jd_tailor",
 ] as const;
 
 export const PREMIUM_FEATURES = [
@@ -59,6 +61,7 @@ export function tierFromPlan(plan: string | null | undefined): SubscriptionTier 
 export function dashboardPathForRole(role: string): string {
   const r = String(role ?? "").toUpperCase();
   if (r === "EMPLOYER") return "/dashboard/employer";
+  if (r === "MENTOR") return "/dashboard/mentor";
   if (r === "ADMIN") return "/dashboard/admin";
   return "/dashboard/job-seeker";
 }

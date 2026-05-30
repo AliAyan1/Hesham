@@ -5,9 +5,10 @@ import { getServerSession } from "@/lib/get-server-session";
 import { getPrisma } from "@/lib/db";
 import type { ApiResponse } from "@/types";
 import { createUserNotification } from "@/lib/notifications/create-user-notification";
-import { sendTransactionalEmail } from "@/lib/email/send-transactional";
+import { onApplicationSubmitted, onInterviewInvitation } from "@/lib/email-triggers";
 import { getInterviewTemplateForJob } from "@/lib/employer-interview/job-template-db";
 import { employerInterviewQuestionsToVideoJson } from "@/lib/employer-interview/to-video-interview-questions";
+import { shareCompletedAssessmentsForUser } from "@/lib/assessment/auto-share";
 
 const bodySchema = z.object({
   jobId: z.string().min(1),
@@ -49,7 +50,7 @@ export async function POST(
       isFlagged: false,
       totalScore: { gte: 50 },
     },
-    select: { id: true },
+    select: { id: true, totalScore: true },
   });
   if (!completedAssessment) {
     return NextResponse.json(
@@ -99,6 +100,8 @@ export async function POST(
       return created;
     });
 
+    await shareCompletedAssessmentsForUser(prisma, seekerId);
+
     const seeker = await prisma.user.findUnique({
       where: { id: seekerId },
       select: { name: true, email: true },
@@ -106,15 +109,23 @@ export async function POST(
     const displayName =
       seeker?.name?.trim() || seeker?.email?.split("@")[0] || "Candidate";
 
-    await createUserNotification({
-      userId: job.employerId,
-      type: NotificationType.NEW_APPLICATION,
-      title: "New application",
-      titleAr: "طلب جديد",
-      message: `${displayName} applied for ${job.title}.`,
-      messageAr: `${displayName} قدّم طلبًا لوظيفة ${job.title}.`,
-      link: `/dashboard/employer/candidates?job=${job.id}`,
-    });
+    const company =
+      job.employer.employerProfile?.companyName?.trim() || job.employer.name || "Employer";
+
+    if (seeker?.email && job.employer.email) {
+      await onApplicationSubmitted({
+        applicationId: result.id,
+        jobId: job.id,
+        jobTitle: job.title,
+        company,
+        seekerId,
+        seekerEmail: seeker.email,
+        seekerName: displayName,
+        employerId: job.employerId,
+        employerEmail: job.employer.email,
+        assessmentScore: completedAssessment?.totalScore ?? null,
+      });
+    }
 
     const jobTemplate = await getInterviewTemplateForJob(job.id);
     if (jobTemplate.questions.length > 0 && seeker?.email) {
@@ -138,7 +149,6 @@ export async function POST(
           },
           select: { id: true },
         });
-        const base = process.env.NEXTAUTH_URL ?? "https://qudrahtech.com";
         await createUserNotification({
           userId: seekerId,
           type: NotificationType.INTERVIEW_READY,
@@ -148,10 +158,12 @@ export async function POST(
           messageAr: `لديك مقابلة فيديو لوظيفة ${job.title}. افتح لوحة التحكم للبدء.`,
           link: "/dashboard/job-seeker/interview",
         });
-        await sendTransactionalEmail({
-          to: seeker.email,
-          subject: `Interview requested — ${job.title}`,
-          html: `<p>Hi ${displayName},</p><p>You applied for <strong>${job.title}</strong>. Please complete your AI video interview on QudrahTech.</p><p><a href="${base}/dashboard/job-seeker/interview">Open interviews</a></p>`,
+        await onInterviewInvitation({
+          seekerId,
+          seekerEmail: seeker.email,
+          jobTitle: job.title,
+          company,
+          jobId: job.id,
         });
       }
     }

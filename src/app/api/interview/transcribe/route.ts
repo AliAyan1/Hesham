@@ -6,6 +6,7 @@ import { getOpenAI } from "@/lib/ai/openai";
 import { hasAccess } from "@/lib/subscription";
 import { getPrisma } from "@/lib/db";
 import type { ApiResponse, SubscriptionTier } from "@/types";
+import { getWhisperLanguageCode } from "@/lib/interview/locale-language";
 
 export async function POST(request: NextRequest): Promise<NextResponse<ApiResponse<{ text: string }>>> {
   const session = await getServerSession();
@@ -45,7 +46,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespon
     const transcription = await openai.audio.transcriptions.create({
       file: fileObj,
       model: "whisper-1",
-      language: locale === "ar" || locale === "ur" ? "ar" : "en",
+      language: getWhisperLanguageCode(locale),
     });
     const text = transcription.text?.trim() ?? "";
     return NextResponse.json({ success: true, data: { text } }, { status: 200 });

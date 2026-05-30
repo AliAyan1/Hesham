@@ -41,7 +41,7 @@ export async function POST(
       userId: session.user.id,
       status: InterviewStatus.IN_PROGRESS,
     },
-    select: { id: true },
+    select: { id: true, interviewKind: true },
   });
   if (!row) {
     return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
@@ -51,6 +51,37 @@ export async function POST(
   const violationSummary =
     parsed.data.flagReason ??
     `Proctoring policy violation (${parsed.data.violationKind ?? "multiple"})`;
+  const flagsPayload = {
+    ...(parsed.data.proctoringFlags ?? {}),
+    maxWarnings: PROCTORING_MAX_WARNINGS,
+    warningCount,
+    violationSummary,
+    suspendedAt: new Date().toISOString(),
+  };
+
+  /** Practice sessions stop locally only — no account cooldown or talent pool. */
+  if (row.interviewKind === "practice") {
+    await prisma.videoInterview.updateMany({
+      where: { id: row.id, userId: session.user.id },
+      data: {
+        status: InterviewStatus.FLAGGED,
+        isFlagged: true,
+        proctoringFlags: flagsPayload as object,
+        completedAt: new Date(),
+      },
+    });
+    return NextResponse.json(
+      {
+        success: true,
+        data: {
+          ok: true,
+          cooldownUntil: new Date().toISOString(),
+          talentPoolAdded: false,
+        },
+      },
+      { status: 200 },
+    );
+  }
 
   const { cooldownUntil, talentPoolAdded } = await applyProctoringSuspension({
     userId: session.user.id,

@@ -3,6 +3,7 @@ import { ApplicationStatus, AssessmentStatus, InterviewStatus, Prisma, UserRole 
 import { z } from "zod";
 import { getServerSession } from "@/lib/get-server-session";
 import { getPrisma } from "@/lib/db";
+import { sanitizeUserForEmployer } from "@/lib/sanitize-user";
 
 const qpSchema = z.object({
   jobId: z.string().optional(),
@@ -54,7 +55,6 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       assessments: {
         some: {
           status: AssessmentStatus.COMPLETED,
-          shareWithEmployers: true,
         },
       },
     });
@@ -64,7 +64,6 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       videoInterviews: {
         some: {
           status: InterviewStatus.COMPLETED,
-          shareWithEmployers: true,
         },
       },
     });
@@ -74,7 +73,6 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       assessments: {
         some: {
           status: AssessmentStatus.COMPLETED,
-          shareWithEmployers: true,
           totalScore: {
             ...(minScore != null ? { gte: minScore } : {}),
             ...(maxScore != null ? { lte: maxScore } : {}),
@@ -118,13 +116,15 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
             name: true,
             email: true,
             image: true,
+            role: true,
+            profile: { select: { bio: true, location: true, phone: true } },
             assessments: {
-              where: { status: AssessmentStatus.COMPLETED, shareWithEmployers: true },
+              where: { status: AssessmentStatus.COMPLETED },
               take: 1,
               select: { id: true, totalScore: true },
             },
             videoInterviews: {
-              where: { status: InterviewStatus.COMPLETED, shareWithEmployers: true },
+              where: { status: InterviewStatus.COMPLETED },
               take: 1,
               select: { id: true, overallScore: true },
             },
@@ -140,25 +140,27 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     success: true,
     data: {
       items: rows.map((r) => {
-        const contactHidden =
-          r.status !== ApplicationStatus.HIRED && r.offerAcceptedAt == null;
-        return {
-          id: r.id,
-          status: r.status,
-          matchScore: r.matchScore,
-          createdAt: r.createdAt.toISOString(),
-          jobId: r.job.id,
-          jobTitle: r.job.title,
-          candidateName: r.jobSeeker.name,
-          candidateEmail: contactHidden ? "" : r.jobSeeker.email,
-          contactHidden,
-          candidateImage: r.jobSeeker.image,
-          candidateId: r.jobSeeker.id,
-          hasSharedAssessment: r.jobSeeker.assessments.length > 0,
-          hasSharedInterview: r.jobSeeker.videoInterviews.length > 0,
-          sharedAssessmentScore: r.jobSeeker.assessments[0]?.totalScore ?? null,
-        };
-      }),
+          const isHired =
+            r.status === ApplicationStatus.HIRED || r.offerAcceptedAt != null;
+          const candidate = sanitizeUserForEmployer(r.jobSeeker, isHired);
+          return {
+            id: r.id,
+            status: r.status,
+            matchScore: r.matchScore,
+            createdAt: r.createdAt.toISOString(),
+            jobId: r.job.id,
+            jobTitle: r.job.title,
+            candidate,
+            candidateName: candidate.name,
+            candidateEmail: candidate.email ?? "",
+            contactHidden: !isHired,
+            candidateImage: candidate.image,
+            candidateId: candidate.id,
+            hasSharedAssessment: r.jobSeeker.assessments.length > 0,
+            hasSharedInterview: r.jobSeeker.videoInterviews.length > 0,
+            sharedAssessmentScore: r.jobSeeker.assessments[0]?.totalScore ?? null,
+          };
+        }),
       page,
       pageSize,
       total,

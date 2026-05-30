@@ -19,6 +19,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { JobSeekerDashboardPayload } from "@/types/dashboard";
 import type { SubscriptionTier } from "@/types";
 import { signOut } from "next-auth/react";
+import { hardNavigate } from "@/lib/auth-redirect";
 import { ApplicationScoreBadge } from "@/components/dashboard/ApplicationScoreBadge";
 import { DashboardActionCard } from "@/components/dashboard/DashboardActionCard";
 import { DashboardWelcomeBanner } from "@/components/dashboard/DashboardWelcomeBanner";
@@ -59,11 +60,18 @@ export default function JobSeekerDashboardClient({ userName }: { userName: strin
 
   const loadDashboard = useCallback(async (silent = false) => {
     if (!silent) setStatus((s) => (s === "ready" ? "ready" : "loading"));
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 20_000);
     try {
-      const res = await fetch("/api/dashboard/job-seeker", { credentials: "include" });
+      const res = await fetch("/api/dashboard/job-seeker", {
+        credentials: "include",
+        signal: controller.signal,
+      });
       if (!res.ok) {
         if (res.status === 401) {
-          void signOut({ callbackUrl: `/${locale}/auth/login` });
+          void signOut({ redirect: false }).then(() => {
+            hardNavigate("/auth/login", locale);
+          });
         }
         setStatus("error");
         return;
@@ -73,6 +81,8 @@ export default function JobSeekerDashboardClient({ userName }: { userName: strin
       setStatus("ready");
     } catch {
       setStatus("error");
+    } finally {
+      window.clearTimeout(timeoutId);
     }
   }, [locale]);
 

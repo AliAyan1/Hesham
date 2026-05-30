@@ -6,6 +6,7 @@
 export const MIDDLEWARE_DASHBOARD_ROUTES = {
   JOBSEEKER: "/dashboard/job-seeker",
   EMPLOYER: "/dashboard/employer",
+  MENTOR: "/dashboard/mentor",
   ADMIN: "/dashboard/admin",
 } as const;
 

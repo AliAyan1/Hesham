@@ -1,4 +1,5 @@
 import { auth } from "@/lib/auth";
+import { getPrisma } from "@/lib/db";
 import { redirect } from "next/navigation";
 import { UserRole } from "@/types";
 import { Footer } from "@/components/layout/Footer";
@@ -6,6 +7,14 @@ import { PublicNavbar } from "@/components/layout/PublicNavbar";
 import OnboardingClient from "./OnboardingClient";
 
 export const dynamic = "force-dynamic";
+
+function dashboardPathForRole(locale: string, role: string): string {
+  const r = role.toUpperCase();
+  if (r === UserRole.EMPLOYER) return `/${locale}/dashboard/employer`;
+  if (r === UserRole.ADMIN) return `/${locale}/dashboard/admin`;
+  if (r === UserRole.MENTOR) return `/${locale}/dashboard/mentor`;
+  return `/${locale}/dashboard/job-seeker`;
+}
 
 export default async function OnboardingPage({
   params,
@@ -15,19 +24,17 @@ export default async function OnboardingPage({
   const { locale } = await params;
   const session = await auth();
 
-  if (!session?.user) {
+  if (!session?.user?.id) {
     redirect(`/${locale}/auth/login`);
   }
 
-  if (session.user.onboardingComplete) {
-    const role = String(session.user.role ?? "").toUpperCase();
-    const next =
-      role === UserRole.EMPLOYER
-        ? `/${locale}/dashboard/employer`
-        : role === UserRole.ADMIN
-          ? `/${locale}/dashboard/admin`
-          : `/${locale}/dashboard/job-seeker`;
-    redirect(next);
+  const dbUser = await getPrisma().user.findUnique({
+    where: { id: session.user.id },
+    select: { onboardingComplete: true, role: true },
+  });
+
+  if (dbUser?.onboardingComplete) {
+    redirect(dashboardPathForRole(locale, String(dbUser.role ?? session.user.role ?? "")));
   }
 
   return (

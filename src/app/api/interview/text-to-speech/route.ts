@@ -12,6 +12,13 @@ const bodySchema = z.object({
   locale: z.string().max(8).optional(),
 });
 
+const ttsCache = new Map<string, Buffer>();
+const TTS_CACHE_MAX = 80;
+
+function ttsCacheKey(text: string, locale: string): string {
+  return `${locale}::${text}`;
+}
+
 export async function POST(request: NextRequest): Promise<Response> {
   const session = await getServerSession();
   if (!session?.user?.id || session.user.role !== UserRole.JOBSEEKER) {
@@ -34,6 +41,21 @@ export async function POST(request: NextRequest): Promise<Response> {
     return NextResponse.json({ success: false, error: "Validation failed" }, { status: 400 });
   }
 
+  const locale = parsed.data.locale ?? "en";
+  const cacheKey = ttsCacheKey(parsed.data.text, locale);
+  const cached = ttsCache.get(cacheKey);
+  if (cached) {
+    return new Response(new Uint8Array(cached), {
+      status: 200,
+      headers: {
+        "Content-Type": "audio/mpeg",
+        "Content-Length": String(cached.length),
+        "Cache-Control": "private, max-age=3600",
+        "X-Tts-Cache": "hit",
+      },
+    });
+  }
+
   let openai: ReturnType<typeof getOpenAI>;
   try {
     openai = getOpenAI();
@@ -44,20 +66,30 @@ export async function POST(request: NextRequest): Promise<Response> {
   }
 
   try {
-    const speech = await openai.audio.speech.create({
+    const mp3 = await openai.audio.speech.create({
       model: "tts-1",
       voice: "nova",
       input: parsed.data.text,
+      speed: 1.0,
     });
-    const buf = Buffer.from(await speech.arrayBuffer());
-    return new Response(buf, {
+
+    const buf = Buffer.from(await mp3.arrayBuffer());
+    if (ttsCache.size >= TTS_CACHE_MAX) {
+      const first = ttsCache.keys().next().value;
+      if (first) ttsCache.delete(first);
+    }
+    ttsCache.set(cacheKey, buf);
+    return new Response(new Uint8Array(buf), {
       status: 200,
       headers: {
         "Content-Type": "audio/mpeg",
-        "Cache-Control": "no-store",
+        "Content-Length": String(buf.length),
+        "Cache-Control": "private, max-age=3600",
+        "X-Tts-Cache": "miss",
       },
     });
-  } catch {
-    return NextResponse.json({ success: false, error: "TTS failed" }, { status: 502 });
+  } catch (error) {
+    console.error("TTS error:", error);
+    return NextResponse.json({ error: "Failed to generate voice" }, { status: 500 });
   }
 }

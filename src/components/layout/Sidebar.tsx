@@ -6,6 +6,7 @@ import {
   Bell,
   Brain,
   Briefcase,
+  Calendar,
   ClipboardList,
   FolderKanban,
   GraduationCap,
@@ -59,7 +60,11 @@ type LabelKey =
   | "assessments"
   | "settings"
   | "users"
-  | "revenue";
+  | "revenue"
+  | "mentorManagement"
+  | "sessions"
+  | "mentorSessions"
+  | "mentorPayouts";
 
 type NavItem = { href: string; labelKey: LabelKey; Icon: LucideIcon };
 
@@ -87,6 +92,10 @@ const ICON: Record<LabelKey, LucideIcon> = {
   settings: Settings,
   users: Users,
   revenue: LineChart,
+  mentorManagement: GraduationCap,
+  sessions: Calendar,
+  mentorSessions: Calendar,
+  mentorPayouts: LineChart,
 };
 
 function dashboardRoot(role: UserRole): string {
@@ -126,6 +135,7 @@ function groupsFor(role: UserRole): NavGroup[] {
             { href: "/dashboard/job-seeker/assessment", labelKey: "assessment", Icon: ICON.assessment },
             { href: "/dashboard/job-seeker/interview", labelKey: "interview", Icon: ICON.interview },
             { href: "/dashboard/job-seeker/mentors", labelKey: "mentors", Icon: ICON.mentors },
+            { href: "/dashboard/job-seeker/sessions", labelKey: "sessions", Icon: ICON.mentors },
           ],
         },
         {
@@ -183,7 +193,11 @@ function groupsFor(role: UserRole): NavGroup[] {
             { href: "/dashboard/admin/jobs", labelKey: "jobs", Icon: ICON.jobs },
             { href: "/dashboard/admin/assessments", labelKey: "assessments", Icon: ICON.assessments },
             { href: "/dashboard/admin/talent-pool", labelKey: "talentPool", Icon: ICON.talentPool },
+            { href: "/dashboard/admin/mentors", labelKey: "mentorManagement", Icon: ICON.mentorManagement },
+            { href: "/dashboard/admin/sessions", labelKey: "mentorSessions", Icon: ICON.mentorManagement },
+            { href: "/dashboard/admin/payouts", labelKey: "mentorPayouts", Icon: ICON.revenue },
             { href: "/dashboard/admin/revenue", labelKey: "revenue", Icon: ICON.revenue },
+            { href: "/dashboard/admin/analytics", labelKey: "analytics", Icon: ICON.analytics },
           ],
         },
         {

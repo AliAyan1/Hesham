@@ -14,7 +14,7 @@ export default async function TermsPage({
 
   return (
     <div className="min-h-screen bg-white text-gray-900" dir={isRTL ? "rtl" : "ltr"}>
-      <PublicNavbar locale={locale} />
+      <PublicNavbar locale={locale} guestOnly />
       <main className="mx-auto max-w-3xl px-6 py-16">
         <h1 className="text-4xl font-black tracking-tight text-[#0D2137] sm:text-5xl">
           {t("termsTitle")}

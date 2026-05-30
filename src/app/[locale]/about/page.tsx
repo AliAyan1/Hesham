@@ -14,7 +14,7 @@ export default async function AboutPage({
 
   return (
     <div className="min-h-screen bg-white text-gray-900" dir={isRTL ? "rtl" : "ltr"}>
-      <PublicNavbar locale={locale} />
+      <PublicNavbar locale={locale} guestOnly />
       <main className="mx-auto max-w-6xl px-6 py-16">
         <div className="max-w-3xl">
           <h1 className="text-balance text-4xl font-black tracking-tight text-[#0D2137] sm:text-5xl">
@@ -43,7 +43,7 @@ export default async function AboutPage({
           <h2 className="text-2xl font-bold">{t("ctaTitle")}</h2>
           <div className="mt-6">
             <Link
-              href="/auth/register"
+              href={{ pathname: "/auth/register", query: { plan: "free" } }}
               className="inline-flex min-h-11 items-center justify-center rounded-xl bg-white px-6 py-3 text-sm font-semibold text-[#0D2137] transition-colors hover:bg-white/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal"
             >
               {t("ctaButton")}

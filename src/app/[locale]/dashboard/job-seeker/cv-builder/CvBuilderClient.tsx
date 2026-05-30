@@ -7,6 +7,7 @@ import { Lock } from "lucide-react";
 import { Link, useRouter } from "@/i18n/navigation";
 import { Button } from "@/components/ui/Button";
 import { CvUpgradeSheet, type CvUpsellKind } from "@/components/cv/CvUpgradeSheet";
+import { JdTailoredResumePanel } from "@/components/cv/JdTailoredResumePanel";
 import { SubscriptionTier } from "@/types";
 import { hasAccess } from "@/lib/subscription";
 import { ATS_PASS_THRESHOLD } from "@/lib/cv/ats-threshold";
@@ -128,7 +129,6 @@ export function CvBuilderClient({
   const canSuggestSkills = hasAccess(tier, "ai_skill_suggestions");
   const canAllTemplates = hasAccess(tier, "cv_templates_all");
   const canAtsRebuild = hasAccess(tier, "ai_cv_ats_rebuild");
-
   const upsellTitle =
     upsellKind === "upload"
       ? t("upgradeSheet.uploadTitle")
@@ -136,8 +136,10 @@ export function CvBuilderClient({
         ? t("upgradeSheet.atsTitle")
         : upsellKind === "atsRebuild"
           ? t("upgradeSheet.atsRebuildTitle")
-          : upsellKind === "templates"
-            ? t("upgradeSheet.templatesTitle")
+        : upsellKind === "templates"
+          ? t("upgradeSheet.templatesTitle")
+          : upsellKind === "jdTailor"
+            ? t("upgradeSheet.jdTailorTitle")
             : t("upgradeSheet.aiTitle");
   const upsellBody =
     upsellKind === "upload"
@@ -146,8 +148,10 @@ export function CvBuilderClient({
         ? t("upgradeSheet.atsBody")
         : upsellKind === "atsRebuild"
           ? t("upgradeSheet.atsRebuildBody")
-          : upsellKind === "templates"
-            ? t("upgradeSheet.templatesBody")
+        : upsellKind === "templates"
+          ? t("upgradeSheet.templatesBody")
+          : upsellKind === "jdTailor"
+            ? t("upgradeSheet.jdTailorBody")
             : t("upgradeSheet.aiBody");
 
   async function onSave() {
@@ -529,6 +533,8 @@ export function CvBuilderClient({
           </div>
         )}
       </div>
+
+      <JdTailoredResumePanel tier={tier} onOpenUpgrade={() => openUpsell("jdTailor")} />
 
       {tier === SubscriptionTier.FREE ? (
         <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">

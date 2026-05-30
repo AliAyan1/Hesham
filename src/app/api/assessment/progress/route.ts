@@ -66,7 +66,11 @@ export async function GET(
       status: true,
       currentStep: true,
       stepsCompleted: true,
+      overallScore: true,
       totalScore: true,
+      thinkingStyleScore: true,
+      behavioralScore: true,
+      interestsScore: true,
       stepScores: true,
       shareWithEmployers: true,
       isFlagged: true,
@@ -75,7 +79,7 @@ export async function GET(
 
   const scores = parseStepScores(row?.stepScores);
   const overall =
-    row?.totalScore ?? computeOverallFromSteps(scores);
+    row?.overallScore ?? row?.totalScore ?? computeOverallFromSteps(scores);
   const passed = overall != null && overall >= ASSESSMENT_PASS_SCORE;
 
   const steps: StepProgressDto[] = ASSESSMENT_STEPS.map((cfg) => {
@@ -104,7 +108,7 @@ export async function GET(
       currentStep: row?.currentStep ?? null,
       overallScore: overall,
       passed,
-      shareWithEmployers: row?.shareWithEmployers ?? false,
+      shareWithEmployers: row?.shareWithEmployers ?? true,
       isFlagged: row?.isFlagged ?? false,
       status: row?.status ?? null,
       stepScores: scores,

@@ -1,4 +1,4 @@
-/** Five-step general AI assessment (free for all users). */
+/** ProfileXT five-step psychometric assessment */
 
 export const ASSESSMENT_STEP_COUNT = 5;
 export const ASSESSMENT_PASS_SCORE = 50;
@@ -10,56 +10,70 @@ export type StepConfig = {
   slug: string;
   questionCount: number;
   stepTimeLimitSec: number;
-  dominantTypes: Array<"multiple_choice" | "text" | "rating" | "scenario">;
-  category: "skills" | "communication" | "behavioral" | "industry";
-  promptFocus: string;
+  titleEn: string;
+  titleAr: string;
+  descriptionEn: string;
+  descriptionAr: string;
+  category: "thinking" | "communication" | "behavioral" | "interests" | "situational";
 };
+
+import { questionCountForStep } from "@/lib/assessment/profilext-traits";
 
 export const ASSESSMENT_STEPS: StepConfig[] = [
   {
     id: 1,
     slug: "1",
-    questionCount: 15,
-    stepTimeLimitSec: 15 * 60,
-    dominantTypes: ["multiple_choice"],
-    category: "skills",
-    promptFocus: "General knowledge, logic, basic math, patterns — no field knowledge.",
+    questionCount: questionCountForStep(1),
+    stepTimeLimitSec: 30 * 60,
+    titleEn: "Thinking & Learning",
+    titleAr: "التفكير والتعلم",
+    descriptionEn: "Cognitive abilities, logical sequences, and numerical reasoning",
+    descriptionAr: "القدرات المعرفية والتسلسلات المنطقية والاستنتاج العددي",
+    category: "thinking",
   },
   {
     id: 2,
     slug: "2",
-    questionCount: 10,
-    stepTimeLimitSec: 15 * 60,
-    dominantTypes: ["text", "multiple_choice"],
+    questionCount: questionCountForStep(2),
+    stepTimeLimitSec: 20 * 60,
+    titleEn: "Communication Skills",
+    titleAr: "مهارات التواصل",
+    descriptionEn: "Verbal skill and verbal reasoning",
+    descriptionAr: "المهارة الشفهية والاستنتاج اللفظي",
     category: "communication",
-    promptFocus: "Professional communication: emails, clarity, rewriting — universal scenarios.",
   },
   {
     id: 3,
     slug: "3",
-    questionCount: 15,
-    stepTimeLimitSec: 10 * 60,
-    dominantTypes: ["multiple_choice"],
+    questionCount: questionCountForStep(3),
+    stepTimeLimitSec: 25 * 60,
+    titleEn: "Behavioral Profile",
+    titleAr: "الملف السلوكي",
+    descriptionEn: "Work style and personality traits (self-report)",
+    descriptionAr: "أسلوب العمل وسمات الشخصية (تقييم ذاتي)",
     category: "behavioral",
-    promptFocus: "Workplace behavior MCQ scenarios — conflict, priorities, teamwork.",
   },
   {
     id: 4,
     slug: "4",
-    questionCount: 15,
+    questionCount: questionCountForStep(4),
     stepTimeLimitSec: 15 * 60,
-    dominantTypes: ["multiple_choice"],
-    category: "skills",
-    promptFocus: "Generic professional competencies — NOT industry or job-specific.",
+    titleEn: "Professional Interests",
+    titleAr: "الاهتمامات المهنية",
+    descriptionEn: "Career preferences and motivations",
+    descriptionAr: "التفضيلات المهنية والدوافع",
+    category: "interests",
   },
   {
     id: 5,
     slug: "5",
-    questionCount: 10,
-    stepTimeLimitSec: 10 * 60,
-    dominantTypes: ["multiple_choice"],
-    category: "behavioral",
-    promptFocus: "Emotional intelligence MCQ — empathy, stress, reactions, collaboration.",
+    questionCount: questionCountForStep(5),
+    stepTimeLimitSec: 20 * 60,
+    titleEn: "Situational Judgment",
+    titleAr: "الحكم في المواقف",
+    descriptionEn: "Decision-making scenarios and behavioral depth",
+    descriptionAr: "سيناريوهات اتخاذ القرار وعمق السلوك",
+    category: "situational",
   },
 ];
 

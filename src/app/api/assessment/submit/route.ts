@@ -3,32 +3,38 @@ import { AssessmentStatus, Prisma, UserRole } from "@prisma/client";
 import { z } from "zod";
 import { getServerSession } from "@/lib/get-server-session";
 import { getPrisma } from "@/lib/db";
-import { fetchClaudeJsonText } from "@/lib/ai/claude-json";
-import { parseJsonFromModel } from "@/lib/ai/parse-model-json";
+import { getQuestionsData, getAnswersData, parseTraitScores } from "@/lib/assessment/assessment-data";
+import { generateWrittenReport } from "@/lib/assessment/generate-written-report";
 import { createUserNotification } from "@/lib/notifications/create-user-notification";
 import { notifyEmployersAboutJobSeeker } from "@/lib/assessment/notify-employers";
 import { onAssessmentCompletedForTalentPool } from "@/lib/talent-pool/evaluate-talent-pool-entry";
 import { evaluateTalentPoolExit } from "@/lib/talent-pool/evaluate-talent-pool-exit";
 import { refreshInvitesAfterAssessment } from "@/lib/talent-pool/talent-pool-invites";
-import { assessmentStepTitle } from "@/lib/assessment/question-prompts";
+import { onAssessmentComplete } from "@/lib/email-triggers";
+import {
+  computeCategoryScores,
+  computeInterestScores,
+  computeTraitScores,
+  mergeTraitScores,
+} from "@/lib/assessment-scoring";
+import { calculateAllJobFits, topRecommendedRoles } from "@/lib/job-fit-calculator";
 import {
   ASSESSMENT_PASS_SCORE,
   ASSESSMENT_STEP_COUNT,
   isValidStep,
-  stepConfig,
 } from "@/lib/assessment/steps";
 import {
-  computeOverallFromSteps,
   countCompletedSteps,
   parseStepScores,
   stepKey,
   type StepScoresMap,
 } from "@/lib/assessment/step-scores";
+import type { ProfileXtAnswer, TraitScoresMap } from "@/lib/assessment/profilext-types";
 import type { ApiResponse } from "@/types";
 
 const answerSchema = z.object({
   questionId: z.string(),
-  value: z.union([z.string(), z.number(), z.array(z.string())]),
+  value: z.union([z.string(), z.number()]),
 });
 
 const bodySchema = z.object({
@@ -41,28 +47,12 @@ const bodySchema = z.object({
   flagReason: z.string().max(2000).optional(),
 });
 
-const strengthSchema = z.object({
-  title: z.string(),
-  titleAr: z.string(),
-  description: z.string(),
-  descriptionAr: z.string(),
-});
-
-const weaknessSchema = z.object({
-  title: z.string(),
-  titleAr: z.string(),
-  description: z.string(),
-  tip: z.string(),
-  tipAr: z.string(),
-});
-
-const stepScorePackSchema = z.object({
-  stepScore: z.number().min(0).max(100),
-  strengths: z.array(strengthSchema).min(1).max(5),
-  weaknesses: z.array(weaknessSchema).min(1).max(5),
-  stepFeedback: z.string(),
-  stepFeedbackAr: z.string(),
-});
+function stepScoreFromTraits(traitScores: TraitScoresMap): number {
+  const vals = Object.values(traitScores).filter((v): v is number => v != null);
+  if (!vals.length) return 0;
+  const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
+  return Math.round(avg * 10);
+}
 
 export async function POST(
   request: NextRequest,
@@ -75,8 +65,6 @@ export async function POST(
       allStepsComplete: boolean;
       overallScore: number | null;
       passed: boolean;
-      strengths: z.infer<typeof strengthSchema>[];
-      weaknesses: z.infer<typeof weaknessSchema>[];
       stepFeedback: string;
       stepFeedbackAr: string;
     }>
@@ -106,135 +94,93 @@ export async function POST(
       status: AssessmentStatus.IN_PROGRESS,
     },
   });
-  if (!row || !row.questions) {
+  if (!row) {
     return NextResponse.json({ success: false, error: "Assessment not found" }, { status: 404 });
   }
 
-  const cfg = stepConfig(step)!;
-  const profile = await prisma.profile.findUnique({ where: { userId: session.user.id } });
-  const cv = await prisma.cV.findUnique({ where: { userId: session.user.id } });
-  const profileSnippet = JSON.stringify(
-    {
-      bio: profile?.bio,
-      professionalTitle: cv?.professionalTitle,
-      summary: cv?.summary,
-    },
-    null,
-    2,
-  ).slice(0, 8000);
-
-  const payload = {
-    step,
-    stepTitle: assessmentStepTitle(step),
-    questions: row.questions,
-    answers: parsed.data.answers,
-    candidateProfile: profileSnippet,
-  };
-
-  const userPrompt =
-    `Score STEP ${step} (${assessmentStepTitle(step)}) of a universal job seeker assessment.\n` +
-    `Questions are for ANY industry — score reasoning and professionalism, not specialist knowledge.\n` +
-    `Focus: ${cfg.promptFocus}\n\n` +
-    `Questions and answers JSON:\n${JSON.stringify(payload).slice(0, 24000)}\n\n` +
-    `Return ONLY this JSON (no markdown):\n` +
-    `{"stepScore":0-100,"strengths":[{"title":"","titleAr":"","description":"","descriptionAr":""}],` +
-    `"weaknesses":[{"title":"","titleAr":"","description":"","tip":"","tipAr":""}],` +
-    `"stepFeedback":"","stepFeedbackAr":""}`;
-
-  const claude = await fetchClaudeJsonText({
-    system:
-      "You output a single JSON object only. Score fairly based on answer quality. Be constructive.",
-    user: userPrompt,
-    maxTokens: 4096,
-  });
-
-  if (!claude.ok) {
-    return NextResponse.json({ success: false, error: "Scoring service unavailable" }, { status: 503 });
+  const questions = getQuestionsData(row);
+  if (!questions.length) {
+    return NextResponse.json({ success: false, error: "No questions loaded" }, { status: 404 });
   }
 
-  let scores: z.infer<typeof stepScorePackSchema>;
-  try {
-    const json = parseJsonFromModel(claude.text);
-    const v = stepScorePackSchema.safeParse(json);
-    if (!v.success) {
-      return NextResponse.json({ success: false, error: "Invalid scoring response" }, { status: 502 });
-    }
-    scores = v.data;
-  } catch {
-    return NextResponse.json({ success: false, error: "Could not parse scoring response" }, { status: 502 });
-  }
+  const stepAnswers = parsed.data.answers as ProfileXtAnswer[];
+  const stepTraitScores = computeTraitScores(questions, stepAnswers);
+  const stepScore = stepScoreFromTraits(stepTraitScores);
+
+  const prevTraitScores = parseTraitScores(row.traitScores) as TraitScoresMap;
+  const mergedTraits = mergeTraitScores(prevTraitScores, stepTraitScores);
+
+  const prevAnswers = getAnswersData(row);
+  const mergedAnswers = [
+    ...prevAnswers.filter((a) => !stepAnswers.some((s) => s.questionId === a.questionId)),
+    ...stepAnswers,
+  ];
+
+  const interestScores =
+    step === 4
+      ? computeInterestScores(mergedTraits, questions, stepAnswers)
+      : ((row.interestScores as Record<string, number> | null) ?? {});
 
   const isFlagged = Boolean(parsed.data.isFlagged);
   const prevScores = parseStepScores(row.stepScores);
   const merged: StepScoresMap = { ...prevScores };
   merged[stepKey(step)] = {
-    score: scores.stepScore,
+    score: stepScore,
     completedAt: new Date().toISOString(),
-    strengths: scores.strengths,
-    weaknesses: scores.weaknesses,
+    strengths: [],
+    weaknesses: [],
   };
 
   const stepsDone = countCompletedSteps(merged);
   const allStepsComplete = stepsDone >= ASSESSMENT_STEP_COUNT;
-  const overallScore = allStepsComplete ? computeOverallFromSteps(merged) : null;
-  const passed = overallScore != null ? overallScore >= ASSESSMENT_PASS_SCORE : scores.stepScore >= ASSESSMENT_PASS_SCORE;
 
-  const skillsScore = merged.step1?.score ?? row.skillsScore ?? 0;
-  const communicationScore = merged.step2?.score ?? row.communicationScore ?? 0;
-  const industryFitScore = merged.step4?.score ?? row.industryFitScore ?? 0;
-  const behavioralScore =
-    merged.step3 && merged.step5
-      ? Math.round((merged.step3.score + merged.step5.score) / 2)
-      : merged.step3?.score ?? merged.step5?.score ?? row.behavioralScore ?? 0;
+  let thinkingStyleScore: number | null = row.thinkingStyleScore;
+  let behavioralScore: number | null = row.behavioralScore;
+  let interestsScore: number | null = row.interestsScore;
+  let overallScore: number | null = row.overallScore;
+  let jobFitScores: Record<string, number> | null = null;
+  let topJobMatches: ReturnType<typeof topRecommendedRoles> | null = null;
+  let writtenReport: unknown = row.writtenReport;
 
-  const allStrengths = Object.values(merged).flatMap((e) =>
-    Array.isArray(e?.strengths) ? e.strengths : [],
-  );
-  const allWeaknesses = Object.values(merged).flatMap((e) =>
-    Array.isArray(e?.weaknesses) ? e.weaknesses : [],
-  );
-
-  let recommendations: object[] = [];
   if (allStepsComplete && !isFlagged) {
-    const recoSchema = z.object({
-      recommendations: z
-        .array(
-          z.object({
-            type: z.enum(["job", "training", "skill"]),
-            title: z.string(),
-            titleAr: z.string(),
-            description: z.string(),
-          }),
-        )
-        .min(1)
-        .max(8),
+    const cats = computeCategoryScores(mergedTraits, interestScores);
+    thinkingStyleScore = cats.thinkingStyleScore;
+    behavioralScore = cats.behavioralScore;
+    interestsScore = cats.interestsScore;
+    overallScore = cats.overallScore;
+    jobFitScores = calculateAllJobFits(mergedTraits, interestScores);
+    topJobMatches = topRecommendedRoles(jobFitScores, mergedTraits);
+
+    const reportResult = await generateWrittenReport({
+      candidateName: session.user.name ?? "Candidate",
+      traitScores: mergedTraits,
+      interestScores,
+      jobFitScores,
+      topJobMatches,
     });
-    const recoPrompt =
-      `Based on 5-step assessment scores (overall ${overallScore}/100), suggest career recommendations.\n` +
-      `Step scores JSON: ${JSON.stringify(merged).slice(0, 4000)}\n` +
-      `Return ONLY: {"recommendations":[{"type":"job"|"training"|"skill","title":"","titleAr":"","description":""}]}`;
-    const recoAi = await fetchClaudeJsonText({
-      system: "Output JSON only.",
-      user: recoPrompt,
-      maxTokens: 2048,
-    });
-    if (recoAi.ok) {
-      try {
-        const recoJson = parseJsonFromModel(recoAi.text);
-        const rv = recoSchema.safeParse(recoJson);
-        if (rv.success) recommendations = rv.data.recommendations;
-      } catch {
-        /* optional */
-      }
-    }
+    if (reportResult.ok) writtenReport = reportResult.report;
   }
 
-  const status =
-    isFlagged
-      ? AssessmentStatus.FLAGGED
-      : allStepsComplete
-        ? AssessmentStatus.COMPLETED
-        : AssessmentStatus.IN_PROGRESS;
+  const passed =
+    overallScore != null ? overallScore >= ASSESSMENT_PASS_SCORE : stepScore >= ASSESSMENT_PASS_SCORE;
+
+  const status = isFlagged
+    ? AssessmentStatus.FLAGGED
+    : allStepsComplete
+      ? AssessmentStatus.COMPLETED
+      : AssessmentStatus.IN_PROGRESS;
+
+  const skillsScore = mergedTraits.learningIndicator
+    ? Math.round((mergedTraits.learningIndicator ?? 0) * 10)
+    : step === 1
+      ? stepScore
+      : row.skillsScore;
+  const communicationScore =
+    mergedTraits.verbalSkill != null
+      ? Math.round(((mergedTraits.verbalSkill ?? 0) + (mergedTraits.verbalReasoning ?? 0)) / 2 * 10)
+      : step === 2
+        ? stepScore
+        : row.communicationScore;
 
   await prisma.assessment.update({
     where: { id: row.id },
@@ -243,58 +189,76 @@ export async function POST(
       stepScores: merged as object,
       stepsCompleted: stepsDone,
       currentStep: allStepsComplete ? null : Math.min(step + 1, ASSESSMENT_STEP_COUNT),
-      questions: allStepsComplete ? row.questions : Prisma.DbNull,
-      answers: parsed.data.answers as object[],
-      totalScore: overallScore,
-      skillsScore: merged.step1?.score ?? skillsScore,
-      communicationScore: merged.step2?.score ?? communicationScore,
-      behavioralScore:
-        merged.step3 && merged.step5
-          ? Math.round((merged.step3.score + merged.step5.score) / 2)
-          : merged.step3?.score ?? behavioralScore,
-      industryFitScore: merged.step4?.score ?? industryFitScore,
-      strengths: (allStrengths.length ? allStrengths : scores.strengths) as object[],
-      weaknesses: (allWeaknesses.length ? allWeaknesses : scores.weaknesses) as object[],
-      recommendations: recommendations.length ? (recommendations as object[]) : undefined,
-      detailedReport: {
-        stepScores: merged,
-        lastStep: step,
-        stepFeedback: scores.stepFeedback,
-        stepFeedbackAr: scores.stepFeedbackAr,
-        answers: parsed.data.answers,
-      } as object,
+      ...(allStepsComplete ? {} : { questionsData: Prisma.DbNull }),
+      answersData: mergedAnswers as object[],
+      traitScores: mergedTraits as object,
+      interestScores: interestScores as object,
+      thinkingStyleScore,
+      behavioralScore,
+      interestsScore,
+      overallScore,
+      totalScore: overallScore != null ? Math.round(overallScore) : row.totalScore,
+      skillsScore: skillsScore ?? row.skillsScore,
+      communicationScore: communicationScore ?? row.communicationScore,
+      industryFitScore: interestsScore != null ? Math.round(interestsScore) : row.industryFitScore,
+      jobFitScores: jobFitScores as object | undefined,
+      topJobMatches: topJobMatches as object[] | undefined,
+      writtenReport: writtenReport as object | undefined,
       completedAt: allStepsComplete ? new Date() : null,
       duration: parsed.data.duration ?? null,
       proctoringFlags: (parsed.data.proctoringFlags ?? undefined) as object | undefined,
       isFlagged,
       flagReason: parsed.data.flagReason ?? (isFlagged ? "Proctoring policy violation" : null),
+      ...(allStepsComplete ? { shareWithEmployers: true } : {}),
     },
   });
+
+  const stepFeedback =
+    stepScore >= 70
+      ? "Strong performance on this section."
+      : stepScore >= 50
+        ? "Solid progress — continue building consistency."
+        : "Review this area and consider a retake for improvement.";
+  const stepFeedbackAr =
+    stepScore >= 70
+      ? "أداء قوي في هذا القسم."
+      : stepScore >= 50
+        ? "تقدم جيد — استمر في بناء الاتساق."
+        : "راجع هذا المجال وفكر في إعادة المحاولة للتحسين.";
 
   const userName = session.user.name ?? null;
   if (allStepsComplete && !isFlagged) {
     await createUserNotification({
       userId: session.user.id,
-      title: "Your AI assessment is complete",
-      titleAr: "اكتمل تقييم الذكاء الاصطناعي",
-      message: `Overall score: ${overallScore}/100`,
-      messageAr: `الدرجة الإجمالية: ${overallScore}/100`,
+      title: "Your psychometric assessment is complete",
+      titleAr: "اكتمل تقييمك النفسي",
+      message: `Overall fit: ${overallScore ?? 0}%`,
+      messageAr: `الملاءمة الإجمالية: ${overallScore ?? 0}%`,
       type: "ASSESSMENT_READY",
-      link: "/dashboard/job-seeker/assessment",
+      link: "/dashboard/job-seeker/assessment/report",
     });
     await notifyEmployersAboutJobSeeker({
       jobSeekerId: session.user.id,
       jobSeekerName: userName,
       title: "{name} completed an assessment",
       titleAr: "أكمل مرشح تقييمًا",
-      message: "{name} completed their AI assessment.",
-      messageAr: "أكمل المرشح تقييم الذكاء الاصطناعي.",
+      message: "{name} completed their psychometric assessment.",
+      messageAr: "أكمل المرشح التقييم النفسي.",
       linkPath: "/dashboard/employer/candidates",
     });
     if (overallScore != null) {
-      await onAssessmentCompletedForTalentPool(session.user.id, overallScore);
+      await onAssessmentCompletedForTalentPool(session.user.id, Math.round(overallScore));
       await refreshInvitesAfterAssessment(session.user.id);
       await evaluateTalentPoolExit(session.user.id);
+    }
+    if (session.user.email && overallScore != null) {
+      await onAssessmentComplete({
+        userId: session.user.id,
+        email: session.user.email,
+        name: userName ?? "there",
+        score: Math.round(overallScore),
+        strengths: [],
+      });
     }
   } else if (isFlagged) {
     await createUserNotification({
@@ -313,14 +277,12 @@ export async function POST(
     data: {
       assessmentId: row.id,
       step,
-      stepScore: scores.stepScore,
+      stepScore,
       allStepsComplete,
-      overallScore,
+      overallScore: overallScore != null ? Math.round(overallScore) : null,
       passed,
-      strengths: scores.strengths,
-      weaknesses: scores.weaknesses,
-      stepFeedback: scores.stepFeedback,
-      stepFeedbackAr: scores.stepFeedbackAr,
+      stepFeedback,
+      stepFeedbackAr,
     },
   });
 }

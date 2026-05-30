@@ -14,7 +14,7 @@ export default async function JobsPage({
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900" dir={isRTL ? "rtl" : "ltr"}>
-      <PublicNavbar locale={locale} />
+      <PublicNavbar locale={locale} guestOnly />
       <main className="mx-auto max-w-6xl px-6 py-14">
         <div className="max-w-3xl">
           <h1 className="text-balance text-4xl font-black tracking-tight text-[#0D2137] sm:text-5xl">

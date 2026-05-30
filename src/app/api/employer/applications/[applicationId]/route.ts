@@ -6,7 +6,7 @@ import { getPrisma } from "@/lib/db";
 import type { ApiResponse } from "@/types";
 import { createUserNotification } from "@/lib/notifications/create-user-notification";
 import { addTalentPoolEntry } from "@/lib/talent-pool/add-talent-pool-entry";
-import { sendTransactionalEmail } from "@/lib/email/send-transactional";
+import { onApplicationStatusChanged } from "@/lib/email-triggers";
 const patchSchema = z
   .object({
     status: z.nativeEnum(ApplicationStatus),
@@ -116,11 +116,14 @@ export async function PATCH(
     link: `/dashboard/job-seeker/applications`,
   });
 
-  if (becameHired && existing.jobSeeker.email) {
-    await sendTransactionalEmail({
-      to: existing.jobSeeker.email,
-      subject: `Congratulations — hired for ${existing.job.title}`,
-      html: `<p>Hi ${existing.jobSeeker.name ?? "there"},</p><p>Your application for <strong>${existing.job.title}</strong> at ${company} is marked as hired. The employer may reach out with next steps.</p>`,
+  if (existing.jobSeeker.email) {
+    await onApplicationStatusChanged({
+      applicationId,
+      seekerId: existing.jobSeekerId,
+      seekerEmail: existing.jobSeeker.email,
+      jobTitle: existing.job.title,
+      status: nextStatus,
+      declineReason: parsed.data.declineReason ?? null,
     });
   }
 

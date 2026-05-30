@@ -9,6 +9,8 @@ import { createUserNotification } from "@/lib/notifications/create-user-notifica
 import { notifyEmployersAboutJobSeeker } from "@/lib/assessment/notify-employers";
 import type { ApiResponse } from "@/types";
 import { addTalentPoolEntry } from "@/lib/talent-pool/add-talent-pool-entry";
+import { onInterviewComplete } from "@/lib/email-triggers";
+import { getAnalysisLanguageInstruction } from "@/lib/interview/locale-language";
 
 const itemSchema = z.object({
   questionId: z.string(),
@@ -21,6 +23,7 @@ const bodySchema = z.object({
   proctoringFlags: z.record(z.string(), z.unknown()).optional(),
   isFlagged: z.boolean().optional(),
   durationSeconds: z.number().int().min(0).max(7200).optional(),
+  locale: z.string().max(8).optional(),
 });
 
 const perQSchema = z.object({
@@ -83,13 +86,81 @@ export async function POST(
     return NextResponse.json({ success: false, error: "Interview not found" }, { status: 404 });
   }
 
+  if (row.interviewKind === "practice") {
+    const practiceAnalysis = {
+      overallScore: 80,
+      communicationScore: 80,
+      confidenceScore: 80,
+      clarityScore: 80,
+      relevanceScore: 80,
+      perQuestion: parsed.data.items.map((item) => ({
+        questionId: item.questionId,
+        score: 80,
+        feedback: "Good practice response.",
+        feedbackAr: "إجابة تدريبية جيدة.",
+      })),
+      strengths: [
+        {
+          title: "Practice complete",
+          description: "You finished the warm-up interview with Lara.",
+          titleAr: "اكتمل التدريب",
+          descriptionAr: "أنهيت مقابلة التعارف مع لارا.",
+        },
+      ],
+      improvements: [
+        {
+          title: "Next step",
+          tip: "Start a real job interview when you are invited.",
+          titleAr: "الخطوة التالية",
+          tipAr: "ابدأ مقابلة الوظيفة الحقيقية عند استلام الدعوة.",
+        },
+      ],
+      overallFeedback: "Great practice! You're ready for your real interview.",
+      overallFeedbackAr: "تدريب رائع! أنت جاهز لمقابلتك الحقيقية.",
+    };
+
+    await prisma.videoInterview.update({
+      where: { id: row.id },
+      data: {
+        status: InterviewStatus.COMPLETED,
+        transcripts: parsed.data.items as object[],
+        answers: parsed.data.items as object[],
+        overallScore: practiceAnalysis.overallScore,
+        communicationScore: practiceAnalysis.communicationScore,
+        confidenceScore: practiceAnalysis.confidenceScore,
+        clarityScore: practiceAnalysis.clarityScore,
+        relevanceScore: practiceAnalysis.relevanceScore,
+        strengths: practiceAnalysis.strengths as object[],
+        improvements: practiceAnalysis.improvements as object[],
+        aiAnalysis: {
+          perQuestion: practiceAnalysis.perQuestion,
+          overallFeedback: practiceAnalysis.overallFeedback,
+          overallFeedbackAr: practiceAnalysis.overallFeedbackAr,
+        } as object,
+        completedAt: new Date(),
+        duration: parsed.data.durationSeconds ?? null,
+        proctoringFlags: (parsed.data.proctoringFlags ?? undefined) as object | undefined,
+        isFlagged: false,
+      },
+    });
+
+    return NextResponse.json(
+      { success: true, data: { interviewId: row.id, ...practiceAnalysis } },
+      { status: 200 },
+    );
+  }
+
   const payload = {
     questions: row.questions,
     transcripts: parsed.data.items,
   };
 
+  const locale = parsed.data.locale ?? "en";
+  const langInstr = getAnalysisLanguageInstruction(locale);
+
   const userPrompt =
     `You are an expert HR interviewer.\n` +
+    `${langInstr}\n` +
     `Analyze these interview responses and return scores.\n\n` +
     `Data JSON:\n${JSON.stringify(payload).slice(0, 28000)}\n\n` +
     `Return ONLY JSON (no markdown):\n` +
@@ -196,6 +267,30 @@ export async function POST(
       message: "{name} completed a video interview.",
       messageAr: "أكمل المرشح مقابلة فيديو.",
       linkPath: "/dashboard/employer/candidates",
+    });
+  }
+
+  if (!isFlagged && session.user.email) {
+    let applicationId: string | undefined;
+    let employerEmail: string | undefined;
+    if (row.jobId) {
+      const app = await prisma.application.findFirst({
+        where: { jobId: row.jobId, jobSeekerId: session.user.id },
+        select: {
+          id: true,
+          job: { select: { employer: { select: { email: true } } } },
+        },
+      });
+      applicationId = app?.id;
+      employerEmail = app?.job.employer.email ?? undefined;
+    }
+    await onInterviewComplete({
+      seekerId: session.user.id,
+      seekerEmail: session.user.email,
+      seekerName: userName ?? "Candidate",
+      score: analysis.overallScore,
+      employerEmail,
+      applicationId,
     });
   }
 

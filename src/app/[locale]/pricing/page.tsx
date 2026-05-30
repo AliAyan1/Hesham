@@ -41,7 +41,7 @@ export default async function PricingPage({
 
   return (
     <div className="min-h-screen bg-white text-gray-900" dir={isRTL ? "rtl" : "ltr"}>
-      <PublicNavbar locale={locale} />
+      <PublicNavbar locale={locale} guestOnly />
       <main className="mx-auto max-w-6xl px-6 py-16">
         <div className="max-w-3xl">
           <h1 className="text-balance text-4xl font-black tracking-tight text-[#0D2137] sm:text-5xl">

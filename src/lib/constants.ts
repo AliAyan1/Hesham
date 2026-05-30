@@ -14,6 +14,7 @@ export const USER_ROLES: Record<UserRole, { label: string; labelAr: string }> =
     [UserRole.JOBSEEKER]: { label: "Job Seeker", labelAr: "باحث عن عمل" },
     [UserRole.EMPLOYER]: { label: "Employer", labelAr: "صاحب عمل" },
     [UserRole.ADMIN]: { label: "Admin", labelAr: "مسؤول" },
+    [UserRole.MENTOR]: { label: "Mentor", labelAr: "مرشد" },
   };
 
 export const JOB_CATEGORIES: { value: string; label: string; labelAr: string }[] =
@@ -43,4 +44,5 @@ export const DASHBOARD_ROUTES: Record<UserRole, string> = {
   [UserRole.JOBSEEKER]: "/dashboard/job-seeker",
   [UserRole.EMPLOYER]: "/dashboard/employer",
   [UserRole.ADMIN]: "/dashboard/admin",
+  [UserRole.MENTOR]: "/dashboard/mentor",
 };

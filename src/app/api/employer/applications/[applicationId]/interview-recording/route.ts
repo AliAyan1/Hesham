@@ -36,7 +36,6 @@ export async function GET(
     where: {
       id: interviewId,
       userId: app.jobSeekerId,
-      shareWithEmployers: true,
       status: { in: [InterviewStatus.COMPLETED, InterviewStatus.FLAGGED] },
       recordingData: { not: null },
     },

@@ -1,16 +1,26 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useSession } from "next-auth/react";
 import { useTranslations } from "next-intl";
 import { Link, usePathname } from "@/i18n/navigation";
 import { cn } from "@/lib/cn";
+import { ClearSessionButton } from "@/components/auth/ClearSessionButton";
+import { signOutThenNavigate } from "@/lib/auth-redirect";
 import { hrefRegisterFree } from "@/lib/i18n-hrefs";
+import { dashboardPathForRole } from "@/lib/subscription";
+import { UserRole } from "@/types";
 import { Logo } from "@/components/ui/Logo";
 import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
 import { Button } from "@/components/ui/Button";
 
 type PublicNavbarProps = {
   locale: string;
+  /**
+   * Marketing pages (home, jobs, pricing): always Login + Get Started.
+   * Ignores stale client session cookies so visitors never see Log out / Dashboard here.
+   */
+  guestOnly?: boolean;
 };
 
 function useScrollShadow(threshold = 6) {
@@ -24,11 +34,22 @@ function useScrollShadow(threshold = 6) {
   return on;
 }
 
-export function PublicNavbar({ locale }: PublicNavbarProps): ReactNode {
+export function PublicNavbar({ locale, guestOnly = false }: PublicNavbarProps): ReactNode {
   const t = useTranslations("nav");
   const pathname = usePathname();
   const shadow = useScrollShadow(8);
   const isRtl = locale === "ar" || locale === "ur";
+  const { data: session, status } = useSession();
+  const sessionLoading = !guestOnly && status === "loading";
+  const clientLoggedIn =
+    status === "authenticated" &&
+    Boolean(session?.user?.id) &&
+    Boolean(session?.user?.email);
+  const isLoggedIn = guestOnly ? false : clientLoggedIn;
+  const dashboardHref =
+    isLoggedIn && session?.user
+      ? dashboardPathForRole(String(session.user.role ?? UserRole.JOBSEEKER))
+      : null;
 
   const items = useMemo(
     () => [
@@ -94,29 +115,67 @@ export function PublicNavbar({ locale }: PublicNavbarProps): ReactNode {
             <LanguageSwitcher tone="light" minimal />
           </div>
           <div className="hidden items-center gap-2 sm:flex">
-            <Link href="/auth/login">
-              <Button
-                variant="outline"
-                size="sm"
-                type="button"
-                className="h-11 min-h-0 border border-[#0F4C75] px-3 py-2 text-sm text-[#0F4C75] hover:bg-brand-lightBlue"
-              >
-                {t("login")}
-              </Button>
-            </Link>
-            <Link href={hrefRegisterFree}>
-              <Button
-                variant="primary"
-                size="sm"
-                type="button"
-                className="h-11 min-h-0 bg-[#0F4C75] px-3 py-2 text-sm hover:bg-[#0D2137]"
-              >
-                {t("getStarted")}
-              </Button>
-            </Link>
+            {sessionLoading ? (
+              <span className="inline-flex h-11 w-[9.5rem] animate-pulse rounded-lg bg-gray-100" aria-hidden />
+            ) : isLoggedIn && dashboardHref ? (
+              <>
+                <ClearSessionButton locale={locale} variant="button" />
+                <button
+                  type="button"
+                  onClick={() => void signOutThenNavigate("/", locale)}
+                  className="inline-flex h-11 min-h-0 items-center rounded-lg border border-[#0F4C75] px-3 text-sm font-medium text-[#0F4C75] transition-colors hover:bg-brand-lightBlue"
+                >
+                  {t("logout")}
+                </button>
+                <Link href={dashboardHref}>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    type="button"
+                    className="h-11 min-h-0 bg-[#0F4C75] px-3 py-2 text-sm hover:bg-[#0D2137]"
+                  >
+                    {t("dashboard")}
+                  </Button>
+                </Link>
+              </>
+            ) : (
+              <>
+                {guestOnly ? (
+                  <ClearSessionButton locale={locale} variant="link" className="hidden sm:inline-flex" />
+                ) : (
+                  <ClearSessionButton locale={locale} variant="button" />
+                )}
+                <Link href="/auth/login">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    type="button"
+                    className="h-11 min-h-0 border border-[#0F4C75] px-3 py-2 text-sm text-[#0F4C75] hover:bg-brand-lightBlue"
+                  >
+                    {t("login")}
+                  </Button>
+                </Link>
+                <Link href={hrefRegisterFree}>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    type="button"
+                    className="h-11 min-h-0 bg-[#0F4C75] px-3 py-2 text-sm hover:bg-[#0D2137]"
+                  >
+                    {t("getStarted")}
+                  </Button>
+                </Link>
+              </>
+            )}
           </div>
 
-          <PublicMobileMenu items={items} />
+          <PublicMobileMenu
+            items={items}
+            isLoggedIn={isLoggedIn}
+            dashboardHref={dashboardHref}
+            locale={locale}
+            guestOnly={guestOnly}
+          />
         </div>
       </div>
     </header>
@@ -125,8 +184,16 @@ export function PublicNavbar({ locale }: PublicNavbarProps): ReactNode {
 
 function PublicMobileMenu({
   items,
+  isLoggedIn,
+  dashboardHref,
+  locale,
+  guestOnly,
 }: {
   items: { href: string; label: string }[];
+  isLoggedIn: boolean;
+  dashboardHref: string | null;
+  locale: string;
+  guestOnly: boolean;
 }) {
   const t = useTranslations("nav");
   const [open, setOpen] = useState(false);
@@ -178,26 +245,58 @@ function PublicMobileMenu({
           <div className="mt-2 border-t border-gray-100 pt-3">
             <LanguageSwitcher tone="light" minimal className="w-full [&_button]:w-full [&_button]:justify-center" />
             <div className="mt-3 grid gap-2">
-              <Link href="/auth/login" onClick={() => setOpen(false)}>
-                <Button
-                  variant="outline"
-                  className="h-9 min-h-0 w-full border border-[#0F4C75] px-3 text-sm text-[#0F4C75]"
-                  size="sm"
-                  type="button"
-                >
-                  {t("login")}
-                </Button>
-              </Link>
-              <Link href={hrefRegisterFree} onClick={() => setOpen(false)}>
-                <Button
-                  variant="primary"
-                  className="h-9 min-h-0 w-full bg-[#0F4C75] py-2 text-sm hover:bg-[#0D2137]"
-                  size="sm"
-                  type="button"
-                >
-                  {t("getStarted")}
-                </Button>
-              </Link>
+              {guestOnly ? (
+                <ClearSessionButton locale={locale} variant="link" className="mx-auto" />
+              ) : (
+                <ClearSessionButton locale={locale} variant="button" className="w-full" />
+              )}
+              {isLoggedIn && dashboardHref ? (
+                <>
+                  <Link href={dashboardHref} onClick={() => setOpen(false)}>
+                    <Button
+                      variant="primary"
+                      className="h-9 min-h-0 w-full bg-[#0F4C75] py-2 text-sm hover:bg-[#0D2137]"
+                      size="sm"
+                      type="button"
+                    >
+                      {t("dashboard")}
+                    </Button>
+                  </Link>
+                  <button
+                    type="button"
+                    className="h-9 w-full rounded-lg border border-[#0F4C75] text-sm font-medium text-[#0F4C75]"
+                    onClick={() => {
+                      setOpen(false);
+                      void signOutThenNavigate("/", locale);
+                    }}
+                  >
+                    {t("logout")}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link href="/auth/login" onClick={() => setOpen(false)}>
+                    <Button
+                      variant="outline"
+                      className="h-9 min-h-0 w-full border border-[#0F4C75] px-3 text-sm text-[#0F4C75]"
+                      size="sm"
+                      type="button"
+                    >
+                      {t("login")}
+                    </Button>
+                  </Link>
+                  <Link href={hrefRegisterFree} onClick={() => setOpen(false)}>
+                    <Button
+                      variant="primary"
+                      className="h-9 min-h-0 w-full bg-[#0F4C75] py-2 text-sm hover:bg-[#0D2137]"
+                      size="sm"
+                      type="button"
+                    >
+                      {t("getStarted")}
+                    </Button>
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         </div>

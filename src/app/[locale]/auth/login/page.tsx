@@ -1,15 +1,18 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { signIn } from "next-auth/react";
+import { useState, useTransition, useEffect } from "react";
+import { signIn, useSession } from "next-auth/react";
+import { signInWithGoogle } from "@/lib/google-oauth";
 import { useLocale, useTranslations } from "next-intl";
+import { useSearchParams } from "next/navigation";
 import { Link } from "@/i18n/navigation";
-import { useRouter } from "@/i18n/navigation";
 import { loginSchema } from "@/lib/validations";
 import { BRAND_COLORS } from "@/lib/constants";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { ClientHydrationGate } from "@/components/ui/ClientHydrationGate";
+import { ClearSessionButton } from "@/components/auth/ClearSessionButton";
 import { GoogleIcon } from "@/components/auth/GoogleIcon";
+import { fetchPostAuthPath, hardNavigate, markOnboardingComplete } from "@/lib/auth-redirect";
 import { dashboardPathForRole } from "@/lib/subscription";
 import type { LoginFormData } from "@/types";
 import type { ZodIssue } from "zod";
@@ -49,9 +52,31 @@ type FieldErrors = Partial<Record<keyof LoginFormData, string>>;
 
 export default function LoginPage() {
   const t = useTranslations();
-  const router = useRouter();
   const locale = useLocale();
+  const searchParams = useSearchParams();
+  const { status: sessionStatus, update } = useSession();
   const isRTL = locale === "ar" || locale === "ur";
+  const oauthReturn = searchParams.get("from") === "oauth";
+  const urlPlan = searchParams.get("plan");
+
+  useEffect(() => {
+    if (!oauthReturn || sessionStatus !== "authenticated") return;
+    void (async () => {
+      await update();
+      let path = await fetchPostAuthPath();
+      if (path === "/onboarding") {
+        try {
+          await markOnboardingComplete(update);
+          const res = await fetch("/api/auth/session", { credentials: "include", cache: "no-store" });
+          const json = (await res.json()) as { user?: { role?: string } };
+          path = dashboardPathForRole(String(json.user?.role ?? "JOBSEEKER"));
+        } catch {
+          /* keep onboarding path */
+        }
+      }
+      hardNavigate(path, locale);
+    })();
+  }, [oauthReturn, sessionStatus, locale, update]);
 
   const [formData, setFormData] = useState<LoginFormData>({
     email: "",
@@ -95,15 +120,10 @@ export default function LoginPage() {
           return;
         }
 
-        const sessionRes = await fetch("/api/auth/session", { credentials: "include" });
-        const sessionJson = (await sessionRes.json()) as { user?: { role?: string } };
-        const role = String(sessionJson?.user?.role ?? "JOBSEEKER").toUpperCase();
-        const dash = dashboardPathForRole(role);
-
         const params = new URLSearchParams(window.location.search);
         const fromCallback = intlPathFromCallback(params.get("callbackUrl"), locale);
-        router.push(fromCallback ?? dash);
-        router.refresh();
+        const target = fromCallback ?? (await fetchPostAuthPath());
+        hardNavigate(target, locale);
       } catch {
         setServerError(t("common.error"));
       }
@@ -113,8 +133,8 @@ export default function LoginPage() {
   async function handleGoogleSignIn() {
     startTransition(async () => {
       try {
-        await signIn("google", {
-          callbackUrl: `/${locale}/dashboard`,
+        await signInWithGoogle({
+          callbackUrl: `/${locale}/auth/login?from=oauth`,
         });
       } catch {
         setServerError(t("common.error"));
@@ -173,6 +193,11 @@ export default function LoginPage() {
             {fieldErrors.password ? (
               <p className="mt-1 text-xs text-red-400">{fieldErrors.password}</p>
             ) : null}
+            <p className="mt-2 text-end">
+              <Link href="/auth/forgot-password" className="text-xs text-brand-teal hover:underline">
+                {t("auth.forgotPasswordLink")}
+              </Link>
+            </p>
           </div>
 
           <button
@@ -202,10 +227,18 @@ export default function LoginPage() {
         </button>
       </ClientHydrationGate>
 
+      <div className="mt-6 flex justify-center">
+        <ClearSessionButton locale={locale} className="text-amber-400/90" />
+      </div>
+
       <div className="mt-8 space-y-3 border-t border-[#333] pt-6">
         <p className="text-center text-sm text-gray-400">{t("auth.noAccount")}</p>
         <Link
-          href="/auth/register"
+          href={
+            urlPlan === "free" || urlPlan === "professional" || urlPlan === "premium"
+              ? { pathname: "/auth/register", query: { plan: urlPlan } }
+              : "/auth/register"
+          }
           className="flex w-full items-center justify-center rounded-lg border-2 border-brand-teal/60 py-2.5 text-sm font-semibold text-brand-teal transition-colors hover:bg-brand-teal/10"
         >
           {t("auth.register")}

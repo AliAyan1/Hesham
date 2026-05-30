@@ -13,6 +13,7 @@ export type InterviewSummaryRow = {
   isFlagged: boolean;
   jobId: string | null;
   interviewKind: string | null;
+  jobTitle: string | null;
 };
 
 export async function GET(
@@ -40,6 +41,16 @@ export async function GET(
     },
   });
 
+  const jobIds = [...new Set(rows.map((r) => r.jobId).filter((id): id is string => Boolean(id)))];
+  const jobs =
+    jobIds.length > 0
+      ? await prisma.job.findMany({
+          where: { id: { in: jobIds } },
+          select: { id: true, title: true },
+        })
+      : [];
+  const titleByJobId = new Map(jobs.map((j) => [j.id, j.title]));
+
   const interviews: InterviewSummaryRow[] = rows.map((r) => ({
     id: r.id,
     status: r.status,
@@ -49,6 +60,7 @@ export async function GET(
     isFlagged: r.isFlagged,
     jobId: r.jobId,
     interviewKind: r.interviewKind,
+    jobTitle: r.jobId ? (titleByJobId.get(r.jobId) ?? null) : null,
   }));
 
   return NextResponse.json({ success: true, data: { interviews } }, { status: 200 });

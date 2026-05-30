@@ -25,6 +25,8 @@ function dashboardRoot(role: UserRole): string {
       return "/dashboard/employer";
     case "ADMIN":
       return "/dashboard/admin";
+    case "MENTOR":
+      return "/dashboard/mentor";
     default:
       return "/dashboard/job-seeker";
   }
@@ -70,6 +72,14 @@ function picks(role: UserRole): NavDef[] {
         { href: "/dashboard/admin/jobs", labelKey: "admin.jobs", emoji: "💼" },
         { href: "/dashboard/admin/assessments", labelKey: "admin.assessments", emoji: "🧠" },
         { href: "/dashboard/admin/settings", labelKey: "admin.settings", emoji: "⚙️" },
+      ];
+    case "MENTOR":
+      return [
+        { href: "/dashboard/mentor", labelKey: "mentor.dashboard", emoji: "🏠" },
+        { href: "/dashboard/mentor/sessions", labelKey: "mentor.sessions", emoji: "📅" },
+        { href: "/dashboard/mentor/profile", labelKey: "mentor.profile", emoji: "👤" },
+        { href: "/dashboard/mentor/earnings", labelKey: "mentor.earnings", emoji: "💰" },
+        { href: "/dashboard/mentor/notifications", labelKey: "mentor.notifications", emoji: "🔔" },
       ];
     default:
       return [];

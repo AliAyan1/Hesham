@@ -3,7 +3,7 @@ import { getServerSession } from "@/lib/get-server-session";
 import { getPrisma } from "@/lib/db";
 import type { NotificationDto } from "@/types/dashboard";
 
-export async function GET(): Promise<
+export async function GET(request: Request): Promise<
   NextResponse<{ items: NotificationDto[] } | { error: string }>
 > {
   try {
@@ -12,11 +12,15 @@ export async function GET(): Promise<
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const url = new URL(request.url);
+    const limitRaw = Number(url.searchParams.get("limit") ?? "10");
+    const take = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 100) : 10;
+
     const prisma = getPrisma();
     const rows = await prisma.notification.findMany({
       where: { userId: session.user.id },
       orderBy: { createdAt: "desc" },
-      take: 10,
+      take,
     });
 
     const items: NotificationDto[] = rows.map((n) => ({

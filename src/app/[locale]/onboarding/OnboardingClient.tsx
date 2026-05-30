@@ -2,10 +2,12 @@
 
 import { Briefcase, Building2, CheckCircle2 } from "lucide-react";
 import { useSession } from "next-auth/react";
-import { Link, useRouter } from "@/i18n/navigation";
-import { useTranslations } from "next-intl";
+import { Link } from "@/i18n/navigation";
+import { useLocale, useTranslations } from "next-intl";
 import { useState } from "react";
 import { UserRole } from "@/types";
+import { hardNavigate } from "@/lib/auth-redirect";
+import { dashboardPathForRole } from "@/lib/subscription";
 import { Button } from "@/components/ui/Button";
 import { Logo } from "@/components/ui/Logo";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
@@ -13,7 +15,7 @@ import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 export default function OnboardingClient() {
   const t = useTranslations("onboarding");
   const tc = useTranslations("common");
-  const router = useRouter();
+  const locale = useLocale();
   const { data: session, status, update } = useSession();
   const [pending, setPending] = useState(false);
 
@@ -28,16 +30,10 @@ export default function OnboardingClient() {
       if (!res.ok) {
         return;
       }
-      await update();
+      await update({ onboardingComplete: true });
       const role = String(session.user.role ?? "").toUpperCase();
-      const next =
-        role === UserRole.EMPLOYER
-          ? "/dashboard/employer"
-          : role === UserRole.ADMIN
-            ? "/dashboard/admin"
-            : "/dashboard/job-seeker";
-      router.push(next);
-      router.refresh();
+      const next = dashboardPathForRole(role);
+      hardNavigate(next, locale);
     } finally {
       setPending(false);
     }

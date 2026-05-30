@@ -5,7 +5,7 @@ import { Lock, X } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/cn";
 
-export type CvUpsellKind = "upload" | "ai" | "ats" | "templates" | "atsRebuild";
+export type CvUpsellKind = "upload" | "ai" | "ats" | "templates" | "atsRebuild" | "jdTailor";
 
 type CvUpgradeSheetProps = {
   open: boolean;

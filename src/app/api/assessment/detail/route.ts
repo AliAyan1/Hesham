@@ -2,17 +2,27 @@ import { NextResponse, type NextRequest } from "next/server";
 import { AssessmentStatus, UserRole } from "@prisma/client";
 import { getServerSession } from "@/lib/get-server-session";
 import { getPrisma } from "@/lib/db";
+import { parseTraitScores } from "@/lib/assessment/assessment-data";
+import type { TraitScoresMap, WrittenReport } from "@/lib/assessment/profilext-types";
 import type { ApiResponse } from "@/types";
 
 export type AssessmentDetailDto = {
   id: string;
   type: string;
   status: string;
+  candidateName: string;
   totalScore: number | null;
+  overallScore: number | null;
+  thinkingStyleScore: number | null;
+  behavioralScore: number | null;
+  interestsScore: number | null;
   skillsScore: number | null;
   communicationScore: number | null;
-  behavioralScore: number | null;
   industryFitScore: number | null;
+  traitScores: TraitScoresMap;
+  writtenReport: WrittenReport | null;
+  jobFitScores: Record<string, number> | null;
+  topJobMatches: unknown;
   strengths: unknown;
   weaknesses: unknown;
   recommendations: unknown;
@@ -40,25 +50,7 @@ export async function GET(
   const prisma = getPrisma();
   const row = await prisma.assessment.findFirst({
     where: { id, userId: session.user.id },
-    select: {
-      id: true,
-      type: true,
-      status: true,
-      totalScore: true,
-      skillsScore: true,
-      communicationScore: true,
-      behavioralScore: true,
-      industryFitScore: true,
-      strengths: true,
-      weaknesses: true,
-      recommendations: true,
-      detailedReport: true,
-      shareWithEmployers: true,
-      isFlagged: true,
-      completedAt: true,
-      stepScores: true,
-      stepsCompleted: true,
-    },
+    include: { user: { select: { name: true } } },
   });
 
   if (!row) {
@@ -77,11 +69,19 @@ export async function GET(
     id: row.id,
     type: row.type,
     status: row.status,
+    candidateName: row.user.name ?? "Candidate",
     totalScore: row.totalScore,
+    overallScore: row.overallScore ?? row.totalScore,
+    thinkingStyleScore: row.thinkingStyleScore,
+    behavioralScore: row.behavioralScore,
+    interestsScore: row.interestsScore,
     skillsScore: row.skillsScore,
     communicationScore: row.communicationScore,
-    behavioralScore: row.behavioralScore,
     industryFitScore: row.industryFitScore,
+    traitScores: parseTraitScores(row.traitScores) as TraitScoresMap,
+    writtenReport: (row.writtenReport as WrittenReport | null) ?? null,
+    jobFitScores: (row.jobFitScores as Record<string, number> | null) ?? null,
+    topJobMatches: row.topJobMatches,
     strengths: row.strengths,
     weaknesses: row.weaknesses,
     recommendations: row.recommendations,

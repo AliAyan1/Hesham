@@ -3,7 +3,6 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getServerSession } from "@/lib/get-server-session";
 import { getPrisma } from "@/lib/db";
 import type { ApiResponse } from "@/types";
-
 export async function GET(
   _request: NextRequest,
   ctx: { params: Promise<{ threadId: string }> },

@@ -36,18 +36,24 @@ declare module "next-auth/jwt" {
     subscriptionTier?: PrismaSubscriptionTier;
     onboardingComplete?: boolean | null;
     picture?: string | null;
+    /** Throttle DB hydration — avoids Railway latency invalidating sessions on every tab focus. */
+    lastDbSync?: number;
   }
 }
 
 async function hydrateTokenFromDb(
   userId: string,
 ): Promise<{
-  subscriptionTier: PrismaSubscriptionTier;
-  role: UserRole;
-  onboardingComplete: boolean;
-  image: string | null;
-  email: string;
-} | null> {
+  row: {
+    subscriptionTier: PrismaSubscriptionTier;
+    role: UserRole;
+    onboardingComplete: boolean;
+    image: string | null;
+    email: string;
+  } | null;
+  /** false when the DB could not be reached — do not treat as “user deleted”. */
+  reachable: boolean;
+}> {
   try {
     const prisma = getPrisma();
     const row = await prisma.user.findUnique({
@@ -60,41 +66,44 @@ async function hydrateTokenFromDb(
         email: true,
       },
     });
-    return row ?? null;
+    return { row: row ?? null, reachable: true };
   } catch {
-    return null;
+    return { row: null, reachable: false };
   }
 }
 
-/** After DB resets / re-register with same email, JWT can keep an old user id → repair `token.id` from email. */
-async function reconcileJwtUserIdWithDb(token: {
-  id?: string;
-  email?: string | null;
-  sub?: string | null;
-}): Promise<void> {
-  const rawId =
-    typeof token.id === "string" ? token.id : typeof token.sub === "string" ? token.sub : null;
-  const email =
-    typeof token.email === "string" && token.email.trim().length > 0 ? token.email.trim() : null;
-  if (!rawId && !email) return;
-
-  try {
-    const prisma = getPrisma();
-    if (rawId) {
-      const hit = await prisma.user.findUnique({ where: { id: rawId }, select: { id: true } });
-      if (hit) return;
-    }
-    if (!email) return;
-    const byEmail = await prisma.user.findFirst({
-      where: { email: { equals: email, mode: "insensitive" } },
-      select: { id: true },
-    });
-    if (byEmail?.id) {
-      token.id = byEmail.id;
-    }
-  } catch {
-    // DB unreachable or schema not applied — keep existing JWT claims
+function applyDbRowToToken(
+  token: import("next-auth/jwt").JWT,
+  row: {
+    subscriptionTier: PrismaSubscriptionTier;
+    role: UserRole;
+    onboardingComplete: boolean;
+    image: string | null;
+    email: string;
+  },
+): void {
+  token.role = row.role;
+  token.subscriptionTier = row.subscriptionTier;
+  token.onboardingComplete = row.onboardingComplete;
+  token.picture = row.image ?? undefined;
+  if (typeof row.email === "string" && row.email.includes("@")) {
+    token.email = row.email.trim();
   }
+  token.lastDbSync = Date.now();
+}
+
+/** Re-sync tier/role from DB at most every 5 minutes (not on every session poll). */
+const JWT_DB_SYNC_MS = 5 * 60 * 1000;
+
+async function forceSyncTokenFromDb(
+  token: import("next-auth/jwt").JWT,
+  userId: string,
+): Promise<import("next-auth/jwt").JWT | null> {
+  const { row, reachable } = await hydrateTokenFromDb(userId);
+  if (!reachable) return token;
+  if (!row) return null;
+  applyDbRowToToken(token, row);
+  return token;
 }
 
 export const authConfig: NextAuthConfig = {
@@ -102,6 +111,11 @@ export const authConfig: NextAuthConfig = {
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID ?? "",
       clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
+      authorization: {
+        params: {
+          prompt: "select_account",
+        },
+      },
     }),
     Credentials({
       name: "credentials",
@@ -155,7 +169,7 @@ export const authConfig: NextAuthConfig = {
   ],
 
   callbacks: {
-    async jwt({ token, user, account }) {
+    async jwt({ token, user, account, trigger, session: sessionPatch }) {
       if (user) {
         token.id = user.id;
         if ("email" in user && typeof user.email === "string") {
@@ -171,6 +185,7 @@ export const authConfig: NextAuthConfig = {
         if (user.image !== undefined) {
           token.picture = user.image ?? undefined;
         }
+        token.lastDbSync = Date.now();
       }
       if (account?.provider === "google" && token.email) {
         try {
@@ -180,31 +195,57 @@ export const authConfig: NextAuthConfig = {
           });
           if (dbUser) {
             token.id = dbUser.id;
-            token.role = dbUser.role as UserRole;
-            token.subscriptionTier = dbUser.subscriptionTier;
-            token.onboardingComplete = dbUser.onboardingComplete;
-            token.picture = dbUser.image ?? token.picture;
+            applyDbRowToToken(token, {
+              role: dbUser.role as UserRole,
+              subscriptionTier: dbUser.subscriptionTier,
+              onboardingComplete: dbUser.onboardingComplete,
+              image: dbUser.image,
+              email: dbUser.email,
+            });
           }
         } catch {
           // token may hydrate on next JWT pass
         }
       }
 
-      await reconcileJwtUserIdWithDb(token);
-
       const uid =
         typeof token.id === "string" ? token.id : typeof token.sub === "string" ? token.sub : null;
-      /** Keep tier, role & photo in sync with the DB on every JWT refresh. */
+
+      /** Client called `session.update()` — always pull fresh role / onboarding from DB. */
+      if (trigger === "update" && typeof uid === "string") {
+        const synced = await forceSyncTokenFromDb(token, uid);
+        if (synced === null) return null;
+        const patch = sessionPatch as Record<string, unknown> | undefined;
+        if (patch?.onboardingComplete === true) {
+          synced.onboardingComplete = true;
+        }
+        if (typeof patch?.role === "string") {
+          synced.role = patch.role as UserRole;
+        }
+        return synced;
+      }
+
       if (typeof uid === "string") {
-        const row = await hydrateTokenFromDb(uid);
-        if (row) {
-          token.role = row.role;
-          token.subscriptionTier = row.subscriptionTier;
-          token.onboardingComplete = row.onboardingComplete;
-          token.picture = row.image ?? undefined;
-          if (typeof row.email === "string" && row.email.includes("@")) {
-            token.email = row.email.trim();
-          }
+        const now = Date.now();
+        const lastSync = typeof token.lastDbSync === "number" ? token.lastDbSync : 0;
+        const needsSync = now - lastSync >= JWT_DB_SYNC_MS;
+
+        if (needsSync) {
+          const synced = await forceSyncTokenFromDb(token, uid);
+          if (synced === null) return null;
+          return synced;
+        }
+
+        /** Ghost session after DB wipe — invalidate cookie even between sync windows. */
+        try {
+          const prisma = getPrisma();
+          const exists = await prisma.user.findUnique({
+            where: { id: uid },
+            select: { id: true },
+          });
+          if (!exists) return null;
+        } catch {
+          /* keep token on transient DB errors */
         }
       }
 
@@ -212,20 +253,40 @@ export const authConfig: NextAuthConfig = {
     },
 
     async session({ session, token }) {
-      if (session.user) {
-        session.user.id = token.id as string;
-        if (typeof token.email === "string" && token.email.trim().length > 0) {
-          session.user.email = token.email.trim();
-        }
-        session.user.role = (token.role as UserRole) ?? UserRole.JOBSEEKER;
-        session.user.subscriptionTier = (token.subscriptionTier as PrismaSubscriptionTier) ?? "FREE";
-        /** Absent JWT field ⇒ legacy accounts (treat as already onboarded). Explicit `false` ⇒ first-run onboarding. */
-        session.user.onboardingComplete =
-          token.onboardingComplete == null ? true : Boolean(token.onboardingComplete);
-        {
+      const uid = typeof token?.id === "string" ? token.id : null;
+      if (!uid) {
+        return { ...session, user: undefined };
+      }
+
+      const { row, reachable } = await hydrateTokenFromDb(uid);
+      if (!reachable) {
+        if (session.user) {
+          session.user.id = uid;
+          if (typeof token.email === "string" && token.email.trim().length > 0) {
+            session.user.email = token.email.trim();
+          }
+          session.user.role = (token.role as UserRole) ?? UserRole.JOBSEEKER;
+          session.user.subscriptionTier =
+            (token.subscriptionTier as PrismaSubscriptionTier) ?? "FREE";
+          session.user.onboardingComplete =
+            token.onboardingComplete == null ? true : Boolean(token.onboardingComplete);
           const pic = token.picture;
           session.user.image = pic != null && pic !== "" ? String(pic) : null;
         }
+        return session;
+      }
+
+      if (!row) {
+        return { ...session, user: undefined };
+      }
+
+      if (session.user) {
+        session.user.id = uid;
+        session.user.email = row.email.trim();
+        session.user.role = row.role;
+        session.user.subscriptionTier = row.subscriptionTier;
+        session.user.onboardingComplete = row.onboardingComplete;
+        session.user.image = row.image;
       }
       return session;
     },
@@ -255,14 +316,29 @@ export const authConfig: NextAuthConfig = {
       }
       return true;
     },
+
+    redirect({ url, baseUrl }) {
+      if (url.startsWith("/")) return `${baseUrl}${url}`;
+      try {
+        if (new URL(url).origin === new URL(baseUrl).origin) return url;
+      } catch {
+        /* ignore */
+      }
+      return baseUrl;
+    },
   },
 
   pages: {
-    signIn: "/ar/auth/login",
-    error: "/ar/auth/login",
+    signIn: "/auth/login",
+    error: "/auth/login",
+    newUser: "/onboarding",
   },
 
-  session: { strategy: "jwt" },
+  session: {
+    strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60,
+    updateAge: 24 * 60 * 60,
+  },
 };
 
 export const { handlers, auth, signIn, signOut } = NextAuth({

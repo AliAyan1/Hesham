@@ -10,6 +10,7 @@ import { mergeExperienceDescriptionFromRecord } from "@/lib/cv/experience-descri
 import { ErrorState } from "@/components/ui/ErrorState";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { Button } from "@/components/ui/Button";
+import { OfferUploadSection } from "@/components/employer/OfferUploadSection";
 
 function pickStr(obj: Record<string, unknown>, ...keys: string[]): string | undefined {
   for (const k of keys) {
@@ -251,6 +252,14 @@ export function CandidateViewClient({ applicationId }: { applicationId: string }
         </Link>
       </div>
 
+      {(data.applicationStatus === ApplicationStatus.SHORTLISTED ||
+        data.applicationStatus === ApplicationStatus.HIRED) && (
+        <OfferUploadSection
+          applicationId={applicationId}
+          candidateName={c.name?.trim() || c.email || "Candidate"}
+        />
+      )}
+
       <section className="rounded-xl border bg-white p-6 shadow-sm">
         <h2 className="font-bold text-[#0D2137]">{tec("applicationStatus")}</h2>
         <select
@@ -274,25 +283,71 @@ export function CandidateViewClient({ applicationId }: { applicationId: string }
         <h2 className="font-bold text-[#0D2137]">{tec("assessmentSection")}</h2>
         {data.sharedAssessment && data.sharedAssessment.totalScore != null ? (
           <div className="mt-3 space-y-3 text-sm">
-            <p className="text-2xl font-bold text-brand-teal">{data.sharedAssessment.totalScore}/100</p>
-            <p className="text-xs text-[#6B7280]">
-              Skills {data.sharedAssessment.skillsScore ?? "—"} · Comm {data.sharedAssessment.communicationScore ?? "—"}{" "}
-              · Beh {data.sharedAssessment.behavioralScore ?? "—"} · Industry {data.sharedAssessment.industryFitScore ?? "—"}
+            <p className="text-2xl font-bold text-brand-teal">
+              {Math.round(data.sharedAssessment.overallScore ?? data.sharedAssessment.totalScore ?? 0)}% {tec("overallFit")}
             </p>
+            <div className="grid gap-2 sm:grid-cols-3">
+              <div className="rounded-lg bg-[#F9FAFB] p-3 text-center">
+                <p className="text-xs text-[#6B7280]">{tec("thinkingFit")}</p>
+                <p className="font-bold text-[#0F4C75]">
+                  {data.sharedAssessment.thinkingStyleScore != null
+                    ? `${Math.round(data.sharedAssessment.thinkingStyleScore)}%`
+                    : "—"}
+                </p>
+              </div>
+              <div className="rounded-lg bg-[#F9FAFB] p-3 text-center">
+                <p className="text-xs text-[#6B7280]">{tec("behavioralFit")}</p>
+                <p className="font-bold text-[#0F4C75]">
+                  {data.sharedAssessment.behavioralScore != null
+                    ? `${Math.round(data.sharedAssessment.behavioralScore)}%`
+                    : "—"}
+                </p>
+              </div>
+              <div className="rounded-lg bg-[#F9FAFB] p-3 text-center">
+                <p className="text-xs text-[#6B7280]">{tec("interestsFit")}</p>
+                <p className="font-bold text-[#0F4C75]">
+                  {data.sharedAssessment.interestsScore != null
+                    ? `${Math.round(data.sharedAssessment.interestsScore)}%`
+                    : "—"}
+                </p>
+              </div>
+            </div>
+            {Array.isArray(data.sharedAssessment.topJobMatches) &&
+            (data.sharedAssessment.topJobMatches as { role?: string; fitPercentage?: number }[]).length > 0 ? (
+              <p className="text-sm text-[#374151]">
+                {tec("recommendedRole")}:{" "}
+                {(data.sharedAssessment.topJobMatches as { role?: string; fitPercentage?: number }[])[0]?.role ?? "—"}{" "}
+                (
+                {(data.sharedAssessment.topJobMatches as { fitPercentage?: number }[])[0]?.fitPercentage ?? "—"}%)
+              </p>
+            ) : null}
             <p className="inline-flex rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800">
               {tec("verifiedAssessment")}
             </p>
             <ul className="mt-2 list-inside list-disc space-y-1 text-[#374151]">
-              {Array.isArray(data.sharedAssessment.strengths)
-                ? (data.sharedAssessment.strengths as { title?: string; description?: string }[])
-                    .slice(0, 5)
-                    .map((s, i) => (
-                      <li key={`${s.title ?? i}`}>
-                        {(s.title ?? "").trim()}: {(s.description ?? "").trim()}
-                      </li>
-                    ))
-                : null}
+              {(() => {
+                const report = data.sharedAssessment.writtenReport as {
+                  overallProfile?: { keyStrengths?: string[] };
+                } | null;
+                const fromReport = report?.overallProfile?.keyStrengths?.slice(0, 3) ?? [];
+                if (fromReport.length) return fromReport.map((s) => <li key={s}>{s}</li>);
+                return Array.isArray(data.sharedAssessment.strengths)
+                  ? (data.sharedAssessment.strengths as { title?: string; description?: string }[])
+                      .slice(0, 3)
+                      .map((s, i) => (
+                        <li key={`${s.title ?? i}`}>
+                          {(s.title ?? "").trim()}: {(s.description ?? "").trim()}
+                        </li>
+                      ))
+                  : null;
+              })()}
             </ul>
+            <a
+              href={`/api/assessment/download-report?id=${encodeURIComponent(data.sharedAssessment.id)}`}
+              className="inline-flex min-h-10 items-center justify-center rounded-lg bg-[#0F4C75] px-4 text-xs font-semibold text-white"
+            >
+              {tec("downloadAssessmentReport")}
+            </a>
           </div>
         ) : (
           <p className="mt-2 text-sm text-[#6B7280]">{tec("noSharedAssessment")}</p>

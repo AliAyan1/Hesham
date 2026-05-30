@@ -2,6 +2,11 @@
  * Object-shaped `href` values so next-intl `Link` keeps query params when prefixing the locale
  * (plain strings like `/path?x=1` have been unreliable with localized routing).
  */
+export const hrefRegisterEmployer = {
+  pathname: "/auth/register",
+  query: { plan: "free", role: "employer" },
+} as const;
+
 export const hrefRegisterFree = {
   pathname: "/auth/register",
   query: { plan: "free" },

@@ -10,6 +10,10 @@ import { hasAccess } from "@/lib/subscription";
 import { useProctoring } from "@/hooks/useProctoring";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { ErrorState } from "@/components/ui/ErrorState";
+import { InterviewRunScreen } from "@/components/interview/InterviewRunScreen";
+import { useInterviewAutoAnswer } from "@/hooks/useInterviewAutoAnswer";
+import { useLaraTts } from "@/hooks/useLaraTts";
+import { getLaraIntro, normalizeInterviewLocale, pickQuestionText } from "@/lib/interview/locale-language";
 
 type QuestionItem = {
   id: string;
@@ -34,41 +38,8 @@ function pickRecorderMime(): string {
   if (typeof MediaRecorder === "undefined") return "";
   if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) return "audio/webm;codecs=opus";
   if (MediaRecorder.isTypeSupported("audio/webm")) return "audio/webm";
+  if (MediaRecorder.isTypeSupported("audio/mp4")) return "audio/mp4";
   return "";
-}
-
-function getSpeechRecognitionCtor(): (new () => SpeechRecognition) | null {
-  if (typeof window === "undefined") return null;
-  return window.SpeechRecognition ?? window.webkitSpeechRecognition ?? null;
-}
-
-async function recordClip(stream: MediaStream, maxMs: number): Promise<Blob> {
-  const mime = pickRecorderMime();
-  const rec = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
-  const chunks: BlobPart[] = [];
-  rec.ondataavailable = (e) => {
-    if (e.data.size) chunks.push(e.data);
-  };
-  return await new Promise((resolve, reject) => {
-    rec.onerror = () => reject(new Error("record"));
-    rec.onstop = () => {
-      stream.getTracks().forEach((t) => t.stop());
-      resolve(new Blob(chunks, { type: mime || "audio/webm" }));
-    };
-    try {
-      rec.start();
-    } catch {
-      reject(new Error("record"));
-      return;
-    }
-    window.setTimeout(() => {
-      try {
-        rec.stop();
-      } catch {
-        reject(new Error("record"));
-      }
-    }, maxMs);
-  });
 }
 
 export default function InterviewSessionClient({
@@ -91,13 +62,12 @@ export default function InterviewSessionClient({
     rawTier === "PROFESSIONAL" || rawTier === "PREMIUM" ? (rawTier as SubscriptionTier) : "FREE";
   const can = hasAccess(tier, "ai_assessment");
 
-  const [phase, setPhase] = useState<"prep" | "run" | "report" | "readonly">("prep");
+  const [phase, setPhase] = useState<"prep" | "run" | "report" | "readonly" | "suspended">("prep");
   const [interviewId, setInterviewId] = useState<string | null>(null);
   const [questions, setQuestions] = useState<QuestionItem[]>([]);
   const [idx, setIdx] = useState(0);
   const [transcripts, setTranscripts] = useState<Record<string, string>>({});
   const [liveTranscript, setLiveTranscript] = useState("");
-  const [listeningOn, setListeningOn] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [camOk, setCamOk] = useState(false);
@@ -109,11 +79,17 @@ export default function InterviewSessionClient({
   const [displayStream, setDisplayStream] = useState<MediaStream | null>(null);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const micStreamRef = useRef<MediaStream | null>(null);
+  const displayStreamRef = useRef<MediaStream | null>(null);
+  const cameraStreamRef = useRef<MediaStream | null>(null);
   const fullRecorderRef = useRef<MediaRecorder | null>(null);
   const fullCloneRef = useRef<MediaStream | null>(null);
   const fullChunksRef = useRef<BlobPart[]>([]);
-  const speechStopRef = useRef<(() => void) | null>(null);
-  const speechFinalRef = useRef("");
+  const answerRecorderRef = useRef<MediaRecorder | null>(null);
+  const answerChunksRef = useRef<BlobPart[]>([]);
+  const introPlayedRef = useRef(false);
+  const proctoringStopRef = useRef<() => void>(() => {});
+
+  const { status: laraTtsStatus, speak: laraSpeak, stop: laraStop, unlockAudio } = useLaraTts(locale);
 
   const [submitPack, setSubmitPack] = useState<AnalysisPack | null>(null);
   const [share, setShare] = useState(true);
@@ -121,10 +97,22 @@ export default function InterviewSessionClient({
   const [loadErr, setLoadErr] = useState(false);
   const [readonlyPack, setReadonlyPack] = useState<AnalysisPack | null>(null);
   const [shareLocked, setShareLocked] = useState(false);
-  const [speechSupported, setSpeechSupported] = useState(true);
   const [processingAnswer, setProcessingAnswer] = useState(false);
+  const [voiceUnavailable, setVoiceUnavailable] = useState(false);
+  const [voiceNeedsTap, setVoiceNeedsTap] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordError, setRecordError] = useState<string | null>(null);
+  const [suspendedUntil, setSuspendedUntil] = useState<string | null>(null);
+  const [isListening, setIsListening] = useState(false);
+  const [answerRecorded, setAnswerRecorded] = useState(false);
+  const [muted, setMuted] = useState(false);
+  const [elapsedSec, setElapsedSec] = useState(0);
+  const [scheduledJobs, setScheduledJobs] = useState<
+    Array<{ id: string; jobId: string; jobTitle: string | null }>
+  >([]);
 
   const procRef = useRef(false);
+  const advancingRef = useRef(false);
 
   const proctoring = useProctoring({
     enabled: phase === "run" && Boolean(interviewId),
@@ -137,9 +125,15 @@ export default function InterviewSessionClient({
     },
   });
 
+  proctoringStopRef.current = proctoring.stopSession;
+
   useEffect(() => {
-    setSpeechSupported(getSpeechRecognitionCtor() != null);
-  }, []);
+    displayStreamRef.current = displayStream;
+  }, [displayStream]);
+
+  useEffect(() => {
+    cameraStreamRef.current = cameraStream;
+  }, [cameraStream]);
 
   useEffect(() => {
     if (phase !== "run" || !interviewId || procRef.current) return;
@@ -156,20 +150,30 @@ export default function InterviewSessionClient({
   }, [phase, timeLeft]);
 
   useEffect(() => {
+    if (phase !== "run" || !startedAt) return;
+    const id = window.setInterval(() => {
+      setElapsedSec(Math.floor((Date.now() - startedAt) / 1000));
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [phase, startedAt]);
+
+  useEffect(() => {
     return () => {
-      speechStopRef.current?.();
-      displayStream?.getTracks().forEach((tr) => tr.stop());
-      cameraStream?.getTracks().forEach((tr) => tr.stop());
+      laraStop();
+      displayStreamRef.current?.getTracks().forEach((tr) => tr.stop());
+      cameraStreamRef.current?.getTracks().forEach((tr) => tr.stop());
       micStreamRef.current?.getTracks().forEach((tr) => tr.stop());
       fullCloneRef.current?.getTracks().forEach((tr) => tr.stop());
       try {
         fullRecorderRef.current?.stop();
+        answerRecorderRef.current?.stop();
       } catch {
         /* ignore */
       }
-      void proctoring.stopSession();
+      proctoringStopRef.current();
     };
-  }, [cameraStream, displayStream, proctoring]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- teardown streams only on unmount
+  }, []);
 
   const verifyDevices = useCallback(async () => {
     try {
@@ -264,106 +268,257 @@ export default function InterviewSessionClient({
     };
   }, [kind, jobId, forceRetake]);
 
+  useEffect(() => {
+    if (phase !== "report" || kind !== "practice") return;
+    let cancel = false;
+    void fetch("/api/interview/summary", { credentials: "include" })
+      .then((r) => r.json() as Promise<{
+        success?: boolean;
+        data?: {
+          interviews: Array<{
+            id: string;
+            jobId: string | null;
+            jobTitle: string | null;
+            status: string;
+            interviewKind: string | null;
+          }>;
+        };
+      }>)
+      .then((j) => {
+        if (cancel || !j.success || !j.data?.interviews) return;
+        setScheduledJobs(
+          j.data.interviews
+            .filter(
+              (row) =>
+                row.interviewKind === "job" &&
+                (row.status === "PENDING" || row.status === "IN_PROGRESS") &&
+                row.jobId,
+            )
+            .map((row) => ({
+              id: row.id,
+              jobId: row.jobId as string,
+              jobTitle: row.jobTitle,
+            })),
+        );
+      })
+      .catch(() => {
+        if (!cancel) setScheduledJobs([]);
+      });
+    return () => {
+      cancel = true;
+    };
+  }, [phase, kind]);
+
   const isRtl = locale === "ar" || locale === "ur";
   const q = questions[idx];
-  const qText = isRtl && q?.questionAr ? q.questionAr : (q?.question ?? "");
+  const qText = q ? pickQuestionText(q, locale) : "";
 
-  const stopSpeechOnly = useCallback(() => {
-    speechStopRef.current?.();
-    speechStopRef.current = null;
-    setListeningOn(false);
-  }, []);
+  const autoAnswerStopRef = useRef<() => void>(() => {});
+  const autoAnswerStartRef = useRef<() => void>(() => {});
+
+  async function nextQuestionInner(finalTextOverride?: string) {
+    if (!q || !interviewId) return;
+    laraStop();
+    autoAnswerStopRef.current();
+    const finalText = (finalTextOverride ?? (liveTranscript.trim() || transcripts[q.id] || "")).trim();
+    setTranscripts((prev) => ({ ...prev, [q.id]: finalText }));
+
+    const nextIdx = idx + 1;
+    if (nextIdx >= questions.length) {
+      await finalizeInterview();
+      return;
+    }
+    setIdx(nextIdx);
+    setLiveTranscript(transcripts[questions[nextIdx].id] ?? "");
+    setTimeLeft(questions[nextIdx]?.timeLimit ?? 120);
+    setAnswerRecorded(false);
+  }
+
+  const autoAnswer = useInterviewAutoAnswer({
+    locale,
+    micStream: micStreamRef.current,
+    muted,
+    onTranscriptUpdate: setLiveTranscript,
+    onFinalize: async (text) => {
+      if (advancingRef.current || !questions[idx]) return;
+      advancingRef.current = true;
+      autoAnswerStopRef.current();
+      const current = questions[idx];
+      const trimmed = text.trim() || t("emptyAnswerPlaceholder");
+      setTranscripts((prev) => ({ ...prev, [current.id]: trimmed }));
+      setLiveTranscript(trimmed);
+      setIsListening(false);
+      setAnswerRecorded(true);
+      await new Promise((r) => setTimeout(r, 1500));
+      advancingRef.current = false;
+      await nextQuestionInner(trimmed);
+    },
+  });
+
+  autoAnswerStopRef.current = autoAnswer.stopCapture;
+  autoAnswerStartRef.current = autoAnswer.startCapture;
+
+  const speakQuestionWithAutoListen = useCallback(
+    async (questionIndex: number, list: QuestionItem[]) => {
+      const item = list[questionIndex];
+      if (!item) return;
+      setAnswerRecorded(false);
+      setIsListening(false);
+      autoAnswerStopRef.current();
+      const text = pickQuestionText(item, locale);
+      setVoiceUnavailable(false);
+      setVoiceNeedsTap(false);
+      const ok = await laraSpeak(text);
+      if (!ok) {
+        setVoiceUnavailable(true);
+        setVoiceNeedsTap(true);
+        return;
+      }
+      if (!muted && micStreamRef.current) {
+        setIsListening(true);
+        autoAnswerStartRef.current();
+      }
+    },
+    [locale, laraSpeak, muted],
+  );
 
   useEffect(() => {
     if (phase !== "run" || !questions[idx]) return;
-    stopSpeechOnly();
     const curId = questions[idx].id;
     setLiveTranscript(transcripts[curId] ?? "");
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only reset when navigating questions / entering run phase
-  }, [idx, phase, questions, stopSpeechOnly]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sync transcript when question changes
+  }, [idx, phase, questions]);
 
-  async function playQuestionAudio() {
-    if (!qText.trim()) return;
-    try {
-      const res = await fetch("/api/interview/text-to-speech", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: qText.slice(0, 4000), locale }),
-      });
-      if (!res.ok) return;
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
-      audio.onended = () => URL.revokeObjectURL(url);
-      await audio.play();
-    } catch {
-      /* ignore */
+  const currentQuestionId = questions[idx]?.id ?? "";
+
+  useEffect(() => {
+    if (phase !== "run" || idx === 0 || !questions[idx]) return;
+    let cancelled = false;
+
+    void (async () => {
+      if (!cancelled) await speakQuestionWithAutoListen(idx, questions);
+    })();
+
+    return () => {
+      cancelled = true;
+      laraStop();
+    };
+  }, [phase, idx, currentQuestionId, laraStop, speakQuestionWithAutoListen, questions]);
+
+  async function replayQuestionAudio() {
+    if (!qText.trim() || laraTtsStatus === "preparing" || laraTtsStatus === "speaking") return;
+    setVoiceUnavailable(false);
+    setVoiceNeedsTap(false);
+    await unlockAudio();
+    const ok = await laraSpeak(qText);
+    if (!ok) {
+      setVoiceUnavailable(true);
+      setVoiceNeedsTap(true);
     }
   }
 
-  function startBrowserListening() {
-    const Ctor = getSpeechRecognitionCtor();
-    if (!Ctor || !q) return;
-    stopSpeechOnly();
-    speechFinalRef.current = transcripts[q.id] ?? "";
-    const rec = new Ctor();
-    rec.lang = locale === "ar" || locale === "ur" ? "ar-SA" : "en-US";
-    rec.continuous = true;
-    rec.interimResults = true;
-    rec.onresult = (ev: SpeechRecognitionEvent) => {
-      let interim = "";
-      for (let i = ev.resultIndex; i < ev.results.length; i++) {
-        const piece = ev.results[i][0].transcript;
-        if (ev.results[i].isFinal) {
-          speechFinalRef.current = `${speechFinalRef.current} ${piece}`.trim();
-        } else {
-          interim += piece;
-        }
-      }
-      setLiveTranscript(`${speechFinalRef.current} ${interim}`.trim());
-    };
-    try {
-      rec.start();
-    } catch {
+  async function playIntroAndFirstQuestion(list: QuestionItem[]) {
+    setVoiceNeedsTap(false);
+    setVoiceUnavailable(false);
+    await unlockAudio();
+    const introOk = await laraSpeak(getLaraIntro(locale, list.length));
+    if (!introOk) {
+      setVoiceUnavailable(true);
+      setVoiceNeedsTap(true);
       return;
     }
-    speechStopRef.current = () => {
-      try {
-        rec.stop();
-      } catch {
-        /* ignore */
-      }
-    };
-    setListeningOn(true);
+    await speakQuestionWithAutoListen(0, list);
   }
 
-  async function transcribeWithAiClip() {
-    if (!q || !micStreamRef.current || processingAnswer) return;
-    setProcessingAnswer(true);
-    stopSpeechOnly();
+  function startAnswerRecording() {
+    if (!micStreamRef.current || processingAnswer || proctoring.isFlagged) return;
+    const track = micStreamRef.current.getAudioTracks()[0];
+    if (!track || track.readyState !== "live") {
+      setRecordError(t("micNotReady"));
+      return;
+    }
+    setRecordError(null);
+    void unlockAudio();
+    answerChunksRef.current = [];
+    const mime = pickRecorderMime();
     try {
-      const clone = micStreamRef.current.clone();
-      const blob = await recordClip(clone, Math.min((q.timeLimit ?? 120) * 1000, 120_000));
+      const rec = mime
+        ? new MediaRecorder(micStreamRef.current, { mimeType: mime })
+        : new MediaRecorder(micStreamRef.current);
+      answerRecorderRef.current = rec;
+      rec.ondataavailable = (e) => {
+        if (e.data.size > 0) answerChunksRef.current.push(e.data);
+      };
+      rec.onerror = () => {
+        setIsRecording(false);
+        setRecordError(t("recordFailed"));
+      };
+      rec.start(250);
+      setIsRecording(true);
+    } catch {
+      setRecordError(t("recordFailed"));
+    }
+  }
+
+  async function stopAndTranscribeAnswer() {
+    const rec = answerRecorderRef.current;
+    if (!rec || rec.state === "inactive" || !q) return;
+    setProcessingAnswer(true);
+    setRecordError(null);
+    try {
+      await new Promise<void>((resolve) => {
+        rec.onstop = () => resolve();
+        try {
+          rec.stop();
+        } catch {
+          resolve();
+        }
+      });
+      answerRecorderRef.current = null;
+      setIsRecording(false);
+
+      const mime = pickRecorderMime();
+      const blob = new Blob(answerChunksRef.current, {
+        type: mime ? mime.split(";")[0] : "audio/webm",
+      });
+      answerChunksRef.current = [];
+      if (blob.size < 500) {
+        setRecordError(t("recordTooShort"));
+        return;
+      }
+
       const fd = new FormData();
-      fd.append("file", blob, "clip.webm");
+      fd.append("file", blob, "answer.webm");
       fd.append("locale", locale);
       const res = await fetch("/api/interview/transcribe", { method: "POST", body: fd, credentials: "include" });
-      const j = (await res.json()) as { success?: boolean; data?: { text: string } };
-      if (!res.ok || !j.success || !j.data?.text) throw new Error("x");
+      const j = (await res.json()) as { success?: boolean; data?: { text: string }; error?: string };
+      if (!res.ok || !j.success || !j.data?.text?.trim()) {
+        setRecordError(j.error === "Transcription failed" ? t("transcribeFailed") : t("recordFailed"));
+        return;
+      }
       const text = j.data.text.trim();
       setTranscripts((prev) => ({ ...prev, [q.id]: text }));
       setLiveTranscript(text);
     } catch {
-      setLoadErr(true);
+      setRecordError(t("recordFailed"));
+      setIsRecording(false);
     } finally {
       setProcessingAnswer(false);
+    }
+  }
+
+  function toggleAnswerRecording() {
+    if (isRecording) {
+      void stopAndTranscribeAnswer();
+    } else {
+      startAnswerRecording();
     }
   }
 
   async function begin() {
     if (!camOk || !micOk || !screenOk || !netOk || !agree || !dataConsent) return;
     if (kind === "job" && !jobId) return;
+    void unlockAudio();
     setLoading(true);
     setLoadErr(false);
     let dispLocal: MediaStream | null = null;
@@ -416,6 +571,7 @@ export default function InterviewSessionClient({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           kind,
+          locale,
           ...(kind === "job" && jobId ? { jobId } : {}),
         }),
       });
@@ -423,18 +579,49 @@ export default function InterviewSessionClient({
         success?: boolean;
         data?: { interviewId: string; questions: QuestionItem[] };
         error?: string;
+        cooldownUntil?: string;
       };
+      if (gen.status === 403 && gj.error === "proctoring_suspended") {
+        setSuspendedUntil(gj.cooldownUntil ?? null);
+        setPhase("suspended");
+        try {
+          fullRecorderRef.current?.stop();
+        } catch {
+          /* ignore */
+        }
+        fullRecorderRef.current = null;
+        fullCloneRef.current?.getTracks().forEach((tr) => tr.stop());
+        fullCloneRef.current = null;
+        micStreamRef.current?.getTracks().forEach((tr) => tr.stop());
+        micStreamRef.current = null;
+        dispLocal?.getTracks().forEach((tr) => tr.stop());
+        camLocal?.getTracks().forEach((tr) => tr.stop());
+        cloneLocal?.getTracks().forEach((tr) => tr.stop());
+        setDisplayStream(null);
+        setCameraStream(null);
+        return;
+      }
       if (!gen.ok || !gj.success || !gj.data) {
         if (gen.status === 403 && gj.error === "consent_required") throw new Error("consent_required");
         throw new Error(gj.error ?? "generate");
       }
+      const loadedQuestions = gj.data.questions;
       setInterviewId(gj.data.interviewId);
-      setQuestions(gj.data.questions);
+      setQuestions(loadedQuestions);
       setIdx(0);
       setTranscripts({});
+      introPlayedRef.current = true;
+      setVoiceUnavailable(false);
+      setVoiceNeedsTap(false);
+      setRecordError(null);
       setStartedAt(Date.now());
-      setTimeLeft(gj.data.questions[0]?.timeLimit ?? 120);
+      setTimeLeft(loadedQuestions[0]?.timeLimit ?? 120);
       setPhase("run");
+      if (kind === "practice") {
+        void speakQuestionWithAutoListen(0, loadedQuestions);
+      } else {
+        void playIntroAndFirstQuestion(loadedQuestions);
+      }
     } catch {
       setLoadErr(true);
       try {
@@ -459,7 +646,8 @@ export default function InterviewSessionClient({
 
   async function finalizeInterview() {
     if (!interviewId || !q) return;
-    stopSpeechOnly();
+    laraStop();
+    autoAnswerStopRef.current();
     const finalText = (liveTranscript.trim() || transcripts[q.id] || "").trim();
     setTranscripts((prev) => ({ ...prev, [q.id]: finalText }));
 
@@ -510,6 +698,7 @@ export default function InterviewSessionClient({
           durationSeconds: durationSec,
           isFlagged: proctoring.isFlagged,
           proctoringFlags: { warnings: proctoring.warningCount },
+          locale,
         }),
       });
       const j = (await res.json()) as {
@@ -546,22 +735,6 @@ export default function InterviewSessionClient({
     }
   }
 
-  async function nextQuestion() {
-    if (!q || !interviewId) return;
-    stopSpeechOnly();
-    const finalText = (liveTranscript.trim() || transcripts[q.id] || "").trim();
-    setTranscripts((prev) => ({ ...prev, [q.id]: finalText }));
-
-    const nextIdx = idx + 1;
-    if (nextIdx >= questions.length) {
-      await finalizeInterview();
-      return;
-    }
-    setIdx(nextIdx);
-    setLiveTranscript(transcripts[questions[nextIdx].id] ?? "");
-    setTimeLeft(questions[nextIdx]?.timeLimit ?? 120);
-  }
-
   async function patchShare(next: boolean) {
     if (!interviewId) return;
     await fetch("/api/assessment/share", {
@@ -585,6 +758,23 @@ export default function InterviewSessionClient({
     );
   }
 
+  if (phase === "suspended") {
+    const untilLabel = suspendedUntil
+      ? new Date(suspendedUntil).toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" })
+      : "";
+    return (
+      <div className="mx-auto max-w-2xl space-y-4 rounded-xl border border-[#FDE68A] bg-[#FFFBEB] p-6" dir={isRtl ? "rtl" : "ltr"}>
+        <p className="font-semibold text-[#0D2137]">{ta("proctoring.suspendedTitle")}</p>
+        <p className="text-sm text-[#374151]">
+          {ta("proctoring.suspendedHome", { datetime: untilLabel || "—" })}
+        </p>
+        <Link href="/dashboard/job-seeker/interview" className="text-sm font-semibold text-brand-teal underline">
+          {tc("back")}
+        </Link>
+      </div>
+    );
+  }
+
   if (loadErr) {
     return <ErrorState title={tc("error")} retryLabel={tc("retry")} onRetry={() => window.location.reload()} />;
   }
@@ -599,7 +789,9 @@ export default function InterviewSessionClient({
         {pack.clarityScore} · {t("relevance")} {pack.relevanceScore}
       </p>
       <p className="text-sm whitespace-pre-wrap text-[#374151]">
-        {isRtl && pack.overallFeedbackAr.trim() ? pack.overallFeedbackAr : pack.overallFeedback}
+        {normalizeInterviewLocale(locale) === "ar" && pack.overallFeedbackAr.trim()
+          ? pack.overallFeedbackAr
+          : pack.overallFeedback}
       </p>
     </div>
   );
@@ -620,7 +812,7 @@ export default function InterviewSessionClient({
     return (
       <div className="mx-auto max-w-2xl space-y-6" dir={isRtl ? "rtl" : "ltr"}>
         <h1 className="text-xl font-bold text-[#0D2137]">{ta("preTitle")}</h1>
-        <p className="text-sm text-[#374151]">{t("prepVoiceHint")}</p>
+        <p className="text-sm text-[#374151]">{t("prepLaraIntro")}</p>
         <ul className="list-inside list-disc space-y-2 text-sm text-[#374151]">
           <li>{ta("ruleTab")}</li>
           <li>{ta("ruleFace")}</li>
@@ -669,6 +861,42 @@ export default function InterviewSessionClient({
   }
 
   if (phase === "report" && submitPack) {
+    if (kind === "practice") {
+      return (
+        <div className="mx-auto max-w-xl space-y-6 rounded-xl border bg-white p-8 shadow-sm" dir={isRtl ? "rtl" : "ltr"}>
+          <h2 className="text-xl font-bold text-[#0D2137]">{t("practiceCompleteTitle")}</h2>
+          <p className="text-sm text-[#6B7280]">{t("practiceCompleteBody")}</p>
+          {scheduledJobs.length > 0 ? (
+            <ul className="space-y-3">
+              {scheduledJobs.map((row) => (
+                <li key={row.id}>
+                  <Link
+                    href={{
+                      pathname: "/dashboard/job-seeker/interview/job",
+                      query: { jobId: row.jobId },
+                    }}
+                    className="inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-[#0F4C75] px-4 text-sm font-semibold text-white"
+                  >
+                    {t("startRealInterview")} — {row.jobTitle ?? t("scheduledJobFallback")}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <Link
+              href="/dashboard/job-seeker/jobs"
+              className="inline-flex min-h-11 items-center justify-center rounded-lg bg-brand-teal px-6 text-sm font-semibold text-white"
+            >
+              {t("startRealInterview")} →
+            </Link>
+          )}
+          <Link href="/dashboard/job-seeker/interview" className="block text-sm font-semibold text-brand-teal underline">
+            {tc("back")}
+          </Link>
+        </div>
+      );
+    }
+
     return (
       <div className="space-y-6" dir={isRtl ? "rtl" : "ltr"}>
         {reportView(submitPack)}
@@ -686,73 +914,67 @@ export default function InterviewSessionClient({
   }
 
   if (phase === "run" && q) {
+    const progressPct = questions.length > 0 ? ((idx + 1) / questions.length) * 100 : 0;
+    const proctoringWarning = proctoring.warningMessage
+      ? ta(`proctoring.${proctoring.warningMessage}` as "proctoring.tab_switch")
+      : null;
+
     return (
-      <div className="space-y-4" dir={isRtl ? "rtl" : "ltr"}>
-        {proctoring.warningMessage ? (
-          <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            {ta(`proctoring.${proctoring.warningMessage}` as "proctoring.tab_switch")}
-          </div>
-        ) : null}
-        {proctoring.isFlagged ? (
-          <div className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-900">
-            {ta("proctoring.flagged")}
-          </div>
-        ) : null}
-        <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-[#6B7280]">
-          <span>
-            {ta("progress", { current: String(idx + 1), total: String(questions.length) })}
-          </span>
-          <span>{ta("timer", { sec: String(timeLeft) })}</span>
-        </div>
-        <div className="rounded-xl border bg-white p-6 shadow-sm">
-          <p className="text-lg font-semibold text-[#0D2137]">{qText}</p>
-          {q.tips ? <p className="mt-2 text-xs text-[#6B7280]">{q.tips}</p> : null}
-          <div className="mt-4 flex flex-wrap gap-2">
+      <div className="-mx-4 -my-6 sm:-mx-6">
+        {voiceNeedsTap ? (
+          <div className="px-4 pt-4">
             <button
               type="button"
-              className="rounded-lg border border-[#E5E7EB] px-3 py-2 text-sm font-medium text-[#0D2137] hover:bg-[#F9FAFB]"
-              onClick={() => void playQuestionAudio()}
+              className="w-full rounded-lg border border-brand-teal bg-[#ECFDF5] px-4 py-3 text-sm font-semibold text-brand-teal"
+              onClick={() => void replayQuestionAudio()}
             >
               {t("playQuestion")}
             </button>
-            {speechSupported ? (
-              <button
-                type="button"
-                disabled={Boolean(proctoring.isFlagged)}
-                className="rounded-lg bg-[#0F4C75] px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
-                onClick={() => (listeningOn ? stopSpeechOnly() : startBrowserListening())}
-              >
-                {listeningOn ? t("stopListening") : t("startListening")}
-              </button>
-            ) : (
-              <span className="text-xs text-amber-800">{t("speechNotSupported")}</span>
-            )}
-            <button
-              type="button"
-              disabled={processingAnswer || Boolean(proctoring.isFlagged)}
-              className="rounded-lg border border-brand-teal px-3 py-2 text-sm font-semibold text-brand-teal disabled:opacity-50"
-              onClick={() => void transcribeWithAiClip()}
-            >
-              {processingAnswer ? t("processing") : t("transcribeWithAi")}
-            </button>
           </div>
-          <label className="mt-4 block text-xs font-medium text-[#374151]">{t("yourAnswerLabel")}</label>
-          <textarea
-            className="mt-1 w-full rounded-lg border p-3 text-sm"
-            rows={5}
-            value={liveTranscript}
-            onChange={(e) => setLiveTranscript(e.target.value)}
-            placeholder={t("answerPlaceholder")}
-          />
-        </div>
-        <button
-          type="button"
-          disabled={loading || Boolean(proctoring.isFlagged)}
-          onClick={() => void nextQuestion()}
-          className="inline-flex min-h-11 items-center justify-center rounded-lg bg-brand-teal px-6 text-sm font-semibold text-white disabled:opacity-50"
-        >
-          {loading ? tc("loading") : idx + 1 >= questions.length ? t("finishInterview") : tc("next")}
-        </button>
+        ) : null}
+        {recordError ? (
+          <p className="px-4 pt-2 text-center text-sm text-red-300">{recordError}</p>
+        ) : null}
+        <InterviewRunScreen
+          locale={locale}
+          isRtl={isRtl}
+          laraTtsStatus={laraTtsStatus}
+          isListening={isListening}
+          answerRecorded={answerRecorded}
+          liveTranscript={liveTranscript}
+          processingAnswer={processingAnswer}
+          questionEn={q.question}
+          questionAr={q.questionAr}
+          questionIndex={idx}
+          questionTotal={questions.length}
+          elapsedSec={elapsedSec}
+          progressPct={progressPct}
+          proctoringWarning={proctoringWarning}
+          muted={muted}
+          onToggleMute={() => {
+            const next = !muted;
+            setMuted(next);
+            if (next) {
+              autoAnswerStopRef.current();
+              setIsListening(false);
+            }
+          }}
+          onEndInterview={() => void finalizeInterview()}
+          endDisabled={loading || Boolean(proctoring.isFlagged)}
+          labels={{
+            laraName: t("laraName"),
+            laraSubtitle: t("laraSubtitleBrand"),
+            laraSpeaking: t("laraSpeaking"),
+            listening: t("listening"),
+            yourAnswer: t("yourAnswerLabel"),
+            processing: t("processing"),
+            answerRecorded: t("answerRecorded"),
+            questionOf: t("questionProgress"),
+            endInterview: t("endInterview"),
+            mute: t("muteMic"),
+            unmute: t("unmuteMic"),
+          }}
+        />
       </div>
     );
   }

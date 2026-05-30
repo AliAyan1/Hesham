@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { AssessmentStatus, InterviewStatus, UserRole } from "@prisma/client";
+import { ApplicationStatus, AssessmentStatus, InterviewStatus, UserRole } from "@prisma/client";
 import { getServerSession } from "@/lib/get-server-session";
 import { getPrisma } from "@/lib/db";
 import type { EmployerDashboardPayload } from "@/types/dashboard";
@@ -71,10 +71,15 @@ export async function GET(
         where: { job: { employerId } },
         orderBy: { createdAt: "desc" },
         take: 5,
-        include: {
+        select: {
+          id: true,
+          jobId: true,
+          status: true,
+          offerAcceptedAt: true,
+          createdAt: true,
           job: { select: { id: true, title: true } },
           jobSeeker: {
-            select: { name: true, email: true },
+            select: { id: true, name: true, email: true, image: true, role: true },
           },
         },
       }),
@@ -85,16 +90,20 @@ export async function GET(
     ]);
 
     const recentApplications: EmployerDashboardPayload["recentApplications"] =
-      recent.map((a) => ({
-        id: a.id,
-        jobId: a.jobId,
-        status: a.status,
-        createdAt: a.createdAt.toISOString(),
-        jobTitle: a.job.title,
-        candidateName: a.jobSeeker.name,
-        candidateEmail: a.jobSeeker.email,
-        matchScore: null,
-      }));
+      recent.map((a) => {
+        const contactUnlocked =
+          a.status === ApplicationStatus.HIRED || a.offerAcceptedAt != null;
+        return {
+          id: a.id,
+          jobId: a.jobId,
+          status: a.status,
+          createdAt: a.createdAt.toISOString(),
+          jobTitle: a.job.title,
+          candidateName: a.jobSeeker.name,
+          candidateEmail: contactUnlocked ? a.jobSeeker.email : "",
+          matchScore: null,
+        };
+      });
 
     const seekerRows = await prisma.application.findMany({
       where: { job: { employerId } },
@@ -110,7 +119,6 @@ export async function GET(
         where: {
           userId: { in: seekerIds },
           status: AssessmentStatus.COMPLETED,
-          shareWithEmployers: true,
         },
       });
       candidatesWithSharedAssessment = ag.length;
@@ -120,7 +128,6 @@ export async function GET(
         where: {
           userId: { in: seekerIds },
           status: InterviewStatus.COMPLETED,
-          shareWithEmployers: true,
         },
       });
       applicantsWithSharedInterview = ig.length;

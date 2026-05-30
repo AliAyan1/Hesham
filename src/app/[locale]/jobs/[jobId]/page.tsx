@@ -42,7 +42,7 @@ export default async function PublicJobDetailPage({ params }: Props) {
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900" dir={isRTL ? "rtl" : "ltr"}>
-      <PublicNavbar locale={locale} />
+      <PublicNavbar locale={locale} guestOnly />
       <main className="mx-auto max-w-3xl px-6 py-14">
         <JobPublicDetailClient />
       </main>

@@ -1,11 +1,13 @@
 import type { ComponentProps } from "react";
 import { getTranslations } from "next-intl/server";
+import { redirectAuthenticatedUserFromMarketing } from "@/lib/public-page-auth";
 import { PublicNavbar } from "@/components/layout/PublicNavbar";
 import { Footer } from "@/components/layout/Footer";
 import { TrustedAssessmentsSection } from "@/components/landing/TrustedAssessmentsSection";
 import { Link } from "@/i18n/navigation";
 import {
   hrefRegisterFree,
+  hrefRegisterEmployer,
   hrefRegisterPremium,
   hrefRegisterProfessional,
 } from "@/lib/i18n-hrefs";
@@ -29,6 +31,7 @@ export default async function LocaleHomePage({
   params: Promise<{ locale: string }>;
 }) {
   const { locale } = await params;
+  await redirectAuthenticatedUserFromMarketing(locale);
   const t = await getTranslations({ locale, namespace: "landing" });
   const isRTL = locale === "ar" || locale === "ur";
 
@@ -59,7 +62,7 @@ export default async function LocaleHomePage({
 
   return (
     <div className="min-h-screen bg-white text-gray-900" dir={isRTL ? "rtl" : "ltr"}>
-      <PublicNavbar locale={locale} />
+      <PublicNavbar locale={locale} guestOnly />
 
       <main>
         {/* Hero */}
@@ -248,7 +251,7 @@ export default async function LocaleHomePage({
                   t("employersBullet6"),
                 ]}
                 ctaLabel={t("audienceCtaEmployers")}
-                ctaHref={hrefRegisterFree}
+                ctaHref={hrefRegisterEmployer}
               />
             </div>
           </div>
@@ -277,7 +280,7 @@ export default async function LocaleHomePage({
                 {t("finalCtaPrimary")}
               </Link>
               <Link
-                href="/auth/register"
+                href={hrefRegisterEmployer}
                 className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-white/20 bg-transparent px-8 py-4 text-lg font-semibold text-white transition-colors hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal"
               >
                 {t("finalCtaSecondary")}

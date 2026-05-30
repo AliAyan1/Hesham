@@ -112,12 +112,17 @@ export type EmployerCandidatePayload = {
   sharedAssessment: {
     id: string;
     totalScore: number | null;
+    overallScore: number | null;
+    thinkingStyleScore: number | null;
+    behavioralScore: number | null;
+    interestsScore: number | null;
     skillsScore: number | null;
     communicationScore: number | null;
-    behavioralScore: number | null;
     industryFitScore: number | null;
     strengths: unknown;
     weaknesses: unknown;
+    writtenReport: unknown;
+    topJobMatches: unknown;
     isFlagged: boolean;
   } | null;
   sharedInterview: {

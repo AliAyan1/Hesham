@@ -132,12 +132,24 @@ export default async function middleware(request: NextRequest) {
         return NextResponse.redirect(new URL(`/${pathnameLocale}/auth/login`, request.url));
       }
 
-      /** First login wizard (only block dashboard root; deeper routes remain usable). */
-      if (
-        token.onboardingComplete === false &&
-        (pathWithoutLocale === "/dashboard/job-seeker" ||
-          pathWithoutLocale === "/dashboard/employer")
-      ) {
+      /** Re-check onboarding from DB when JWT may be stale (e.g. just finished onboarding). */
+      const jobSeekerDash = pathWithoutLocale.startsWith("/dashboard/job-seeker");
+      const employerDash = pathWithoutLocale.startsWith("/dashboard/employer");
+      if (token.onboardingComplete === false && (jobSeekerDash || employerDash)) {
+        try {
+          const statusRes = await fetch(new URL("/api/profile/onboarding", request.url), {
+            headers: { cookie: request.headers.get("cookie") ?? "" },
+          });
+          const statusJson = (await statusRes.json()) as {
+            success?: boolean;
+            data?: { onboardingComplete?: boolean };
+          };
+          if (statusRes.ok && statusJson.success && statusJson.data?.onboardingComplete === true) {
+            return nextWithIntlLocale(request, pathnameLocale);
+          }
+        } catch {
+          /* fall through to onboarding redirect */
+        }
         return NextResponse.redirect(new URL(`/${pathnameLocale}/onboarding`, request.url));
       }
 
@@ -148,6 +160,7 @@ export default async function middleware(request: NextRequest) {
       const userRole: MiddlewareUserRole =
         normalized === "JOBSEEKER" ||
         normalized === "EMPLOYER" ||
+        normalized === "MENTOR" ||
         normalized === "ADMIN"
           ? normalized
           : "JOBSEEKER";
@@ -160,6 +173,7 @@ export default async function middleware(request: NextRequest) {
       const allowedPrefixes: Record<MiddlewareUserRole, string> = {
         JOBSEEKER: MIDDLEWARE_DASHBOARD_ROUTES.JOBSEEKER,
         EMPLOYER: MIDDLEWARE_DASHBOARD_ROUTES.EMPLOYER,
+        MENTOR: MIDDLEWARE_DASHBOARD_ROUTES.MENTOR,
         ADMIN: MIDDLEWARE_DASHBOARD_ROUTES.ADMIN,
       };
 
@@ -169,7 +183,18 @@ export default async function middleware(request: NextRequest) {
     }
 
     return nextWithIntlLocale(request, pathnameLocale);
-  } catch {
+  } catch (err) {
+    console.error("[middleware]", err);
+    const pathnameLocale = getLocaleFromPath(request.nextUrl.pathname);
+    const pathWithoutLocale =
+      pathnameLocale != null
+        ? request.nextUrl.pathname.slice(`/${pathnameLocale}`.length) || "/"
+        : request.nextUrl.pathname;
+    if (pathWithoutLocale.startsWith("/dashboard") && pathnameLocale) {
+      return NextResponse.redirect(
+        new URL(`/${pathnameLocale}/auth/login`, request.url),
+      );
+    }
     return NextResponse.next();
   }
 }

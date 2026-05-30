@@ -5,7 +5,9 @@ import { getServerSession } from "@/lib/get-server-session";
 import { getPrisma } from "@/lib/db";
 import { fetchClaudeJsonText } from "@/lib/ai/claude-json";
 import { parseJsonFromModel } from "@/lib/ai/parse-model-json";
-import { buildAssessmentQuestionPrompt } from "@/lib/assessment/question-prompts";
+import { getQuestionsData } from "@/lib/assessment/assessment-data";
+import { buildProfileXtQuestionPrompt } from "@/lib/assessment/profilext-prompts";
+import type { ProfileXtQuestion } from "@/lib/assessment/profilext-types";
 import {
   isValidStep,
   stepConfig,
@@ -23,8 +25,9 @@ const bodySchema = z.object({
 
 const questionItemSchema = z.object({
   id: z.string(),
-  type: z.enum(["multiple_choice", "text", "rating", "scenario"]),
-  category: z.enum(["skills", "communication", "behavioral", "industry"]),
+  trait: z.string(),
+  category: z.enum(["thinking", "behavioral", "interests", "situational"]),
+  type: z.enum(["mcq", "likert", "forced_choice", "rating"]),
   question: z.string(),
   questionAr: z.string(),
   options: z.array(z.string()).nullable(),
@@ -39,7 +42,7 @@ export async function POST(
   NextResponse<
     ApiResponse<{
       assessmentId: string;
-      questions: z.infer<typeof questionItemSchema>[];
+      questions: ProfileXtQuestion[];
       step: number;
       stepTimeLimitSec: number;
     }>
@@ -75,7 +78,7 @@ export async function POST(
 
   const userRow = await prisma.user.findUnique({
     where: { id: userId },
-    select: { dataConsentAssessmentAt: true },
+    select: { dataConsentAssessmentAt: true, name: true },
   });
   if (!userRow?.dataConsentAssessmentAt) {
     return NextResponse.json({ success: false, error: "consent_required" }, { status: 403 });
@@ -97,9 +100,9 @@ export async function POST(
   }
 
   const stepScores = parseStepScores(assessment?.stepScores);
-  const overall = assessment?.totalScore ?? null;
+  const overall = assessment?.overallScore ?? assessment?.totalScore ?? null;
 
-  if (stepScores[stepKey(step)] && !canStartStep(stepScores, step, { forceRetake: parsed.data.forceRetake, overallScore: overall })) {
+  if (stepScores[stepKey(step)] && !canStartStep(stepScores, step, { forceRetake: parsed.data.forceRetake, overallScore: overall != null ? Math.round(overall) : null })) {
     return NextResponse.json(
       { success: false, error: "Step already completed. Use retake to try again." },
       { status: 409 },
@@ -109,16 +112,15 @@ export async function POST(
   if (
     assessment?.status === AssessmentStatus.IN_PROGRESS &&
     assessment.currentStep === step &&
-    assessment.questions &&
     !parsed.data.forceRetake
   ) {
-    const existingQs = assessment.questions as unknown[];
-    if (Array.isArray(existingQs) && existingQs.length > 0) {
+    const existingQs = getQuestionsData(assessment);
+    if (existingQs.length > 0) {
       return NextResponse.json({
         success: true,
         data: {
           assessmentId: assessment.id,
-          questions: existingQs as z.infer<typeof questionItemSchema>[],
+          questions: existingQs,
           step,
           stepTimeLimitSec: cfg.stepTimeLimitSec,
         },
@@ -126,15 +128,12 @@ export async function POST(
     }
   }
 
-  const { system, user: userPrompt } = buildAssessmentQuestionPrompt(step, cfg, {
+  const { system, user: userPrompt } = buildProfileXtQuestionPrompt(step, cfg, {
     retake: Boolean(parsed.data.forceRetake || stepScores[stepKey(step)]),
+    candidateName: userRow.name ?? undefined,
   });
 
-  const claude = await fetchClaudeJsonText({
-    system,
-    user: userPrompt,
-    maxTokens: 12000,
-  });
+  const claude = await fetchClaudeJsonText({ system, user: userPrompt, maxTokens: 16000 });
 
   if (!claude.ok) {
     const msg =
@@ -144,17 +143,17 @@ export async function POST(
     return NextResponse.json({ success: false, error: msg }, { status: 503 });
   }
 
-  let questions: z.infer<typeof questionItemSchema>[];
+  let questions: ProfileXtQuestion[];
   try {
     const json = parseJsonFromModel(claude.text);
     const arr = (json as { questions?: unknown }).questions;
     if (!Array.isArray(arr)) {
       return NextResponse.json({ success: false, error: "Invalid AI response shape" }, { status: 502 });
     }
-    const validated: z.infer<typeof questionItemSchema>[] = [];
-    for (const item of arr.slice(0, cfg.questionCount + 2)) {
+    const validated: ProfileXtQuestion[] = [];
+    for (const item of arr.slice(0, cfg.questionCount + 5)) {
       const v = questionItemSchema.safeParse(item);
-      if (v.success) validated.push(v.data);
+      if (v.success) validated.push(v.data as ProfileXtQuestion);
     }
     if (validated.length < Math.min(5, cfg.questionCount)) {
       return NextResponse.json({ success: false, error: "Not enough valid questions" }, { status: 502 });
@@ -164,25 +163,22 @@ export async function POST(
     return NextResponse.json({ success: false, error: "Could not parse AI response" }, { status: 502 });
   }
 
+  const questionPayload = questions as object[];
+
   if (assessment?.id && assessment.status === AssessmentStatus.IN_PROGRESS) {
     const updated = await prisma.assessment.update({
       where: { id: assessment.id },
       data: {
-        questions: questions as object[],
+        questionsData: questionPayload,
         currentStep: step,
         startedAt: assessment.startedAt ?? new Date(),
-        answers: Prisma.DbNull,
+        answersData: Prisma.DbNull,
       },
       select: { id: true },
     });
     return NextResponse.json({
       success: true,
-      data: {
-        assessmentId: updated.id,
-        questions,
-        step,
-        stepTimeLimitSec: cfg.stepTimeLimitSec,
-      },
+      data: { assessmentId: updated.id, questions, step, stepTimeLimitSec: cfg.stepTimeLimitSec },
     });
   }
 
@@ -191,23 +187,20 @@ export async function POST(
       where: { id: assessment.id },
       data: {
         status: AssessmentStatus.IN_PROGRESS,
-        questions: questions as object[],
+        questionsData: questionPayload,
         currentStep: step,
         startedAt: new Date(),
-        answers: Prisma.DbNull,
+        answersData: Prisma.DbNull,
         isFlagged: false,
         flagReason: null,
+        retakeCount: { increment: 1 },
+        lastRetakeAt: new Date(),
       },
       select: { id: true },
     });
     return NextResponse.json({
       success: true,
-      data: {
-        assessmentId: updated.id,
-        questions,
-        step,
-        stepTimeLimitSec: cfg.stepTimeLimitSec,
-      },
+      data: { assessmentId: updated.id, questions, step, stepTimeLimitSec: cfg.stepTimeLimitSec },
     });
   }
 
@@ -216,7 +209,7 @@ export async function POST(
       userId,
       type: AssessmentType.GENERAL,
       status: AssessmentStatus.IN_PROGRESS,
-      questions: questions as object[],
+      questionsData: questionPayload,
       currentStep: step,
       stepsCompleted: countCompletedSteps(parseStepScores(assessment?.stepScores)),
       stepScores: assessment?.stepScores ?? undefined,
@@ -228,12 +221,7 @@ export async function POST(
   return NextResponse.json(
     {
       success: true,
-      data: {
-        assessmentId: created.id,
-        questions,
-        step,
-        stepTimeLimitSec: cfg.stepTimeLimitSec,
-      },
+      data: { assessmentId: created.id, questions, step, stepTimeLimitSec: cfg.stepTimeLimitSec },
     },
     { status: 201 },
   );

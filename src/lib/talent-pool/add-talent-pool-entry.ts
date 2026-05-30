@@ -166,6 +166,18 @@ export async function addTalentPoolEntry(params: {
 
   await markUserInTalentPool(params.userId, entry.reason, entry.createdAt);
 
+  const user = await prisma.user.findUnique({
+    where: { id: params.userId },
+    select: { email: true, name: true },
+  });
+  if (user?.email) {
+    const { onTalentPoolAdded } = await import("@/lib/email-triggers");
+    await onTalentPoolAdded({
+      userId: params.userId,
+      email: user.email,
+      name: user.name ?? "there",
+      reason: String(entry.reason),
+    });
+  }
 }
-
 

@@ -123,7 +123,6 @@ export async function GET(
   const sharedAssessment = await prisma.assessment.findFirst({
     where: {
       userId,
-      shareWithEmployers: true,
       status: { in: [AssessmentStatus.COMPLETED, AssessmentStatus.FLAGGED] },
     },
     orderBy: { completedAt: "desc" },

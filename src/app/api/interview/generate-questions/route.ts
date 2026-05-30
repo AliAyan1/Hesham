@@ -8,11 +8,14 @@ import { parseJsonFromModel } from "@/lib/ai/parse-model-json";
 import { hasAccess } from "@/lib/subscription";
 import { getProctoringSuspensionPayload } from "@/lib/assessment/check-proctoring-suspension";
 import type { ApiResponse, SubscriptionTier } from "@/types";
+import { getQuestionGenerationLanguageInstruction } from "@/lib/interview/locale-language";
+import { PRACTICE_INTERVIEW_QUESTIONS } from "@/lib/interview/practice-questions";
 
 const bodySchema = z.object({
   kind: z.enum(["practice", "competency", "job"]),
   jobId: z.string().optional(),
   interviewId: z.string().optional(),
+  locale: z.string().max(8).optional(),
 });
 
 const qSchema = z.object({
@@ -59,12 +62,15 @@ export async function POST(
 
   const userId = session.user.id;
 
-  const suspension = await getProctoringSuspensionPayload(userId);
-  if (suspension) {
-    return NextResponse.json(
-      { success: false, error: suspension.error, cooldownUntil: suspension.cooldownUntil },
-      { status: 403 },
-    );
+  /** Practice mode is a warm-up — do not block on account-level proctoring cooldown. */
+  if (parsed.data.kind !== "practice") {
+    const suspension = await getProctoringSuspensionPayload(userId);
+    if (suspension) {
+      return NextResponse.json(
+        { success: false, error: suspension.error, cooldownUntil: suspension.cooldownUntil },
+        { status: 403 },
+      );
+    }
   }
 
   if (parsed.data.interviewId) {
@@ -145,6 +151,27 @@ export async function POST(
     return NextResponse.json({ success: false, error: "consent_required" }, { status: 403 });
   }
 
+  if (parsed.data.kind === "practice") {
+    const practiceQuestions = [...PRACTICE_INTERVIEW_QUESTIONS];
+    const createdPractice = await prisma.videoInterview.create({
+      data: {
+        userId,
+        interviewKind: "practice",
+        status: InterviewStatus.IN_PROGRESS,
+        questions: practiceQuestions as object[],
+        startedAt: new Date(),
+      },
+      select: { id: true },
+    });
+    return NextResponse.json(
+      {
+        success: true,
+        data: { interviewId: createdPractice.id, questions: practiceQuestions },
+      },
+      { status: 201 },
+    );
+  }
+
   const cv = await prisma.cV.findUnique({ where: { userId: session.user.id } });
   const job =
     parsed.data.kind === "job" && parsed.data.jobId
@@ -155,7 +182,10 @@ export async function POST(
       : null;
 
   const role = cv?.professionalTitle ?? "Professional";
+  const locale = parsed.data.locale ?? "en";
+  const langInstr = getQuestionGenerationLanguageInstruction(locale);
   const prompt =
+    `${langInstr}\n` +
     `Generate 5–7 professional interview questions for a ${parsed.data.kind} interview.\n` +
     `Candidate target role: ${role}.\n` +
     (job

@@ -11,8 +11,9 @@ import { ErrorState } from "@/components/ui/ErrorState";
 
 type QuestionItem = {
   id: string;
-  type: "multiple_choice" | "text" | "rating" | "scenario";
+  type: "mcq" | "likert" | "forced_choice" | "rating";
   category: string;
+  trait?: string;
   question: string;
   questionAr: string;
   options: string[] | null;
@@ -26,8 +27,6 @@ type StepResult = {
   allStepsComplete: boolean;
   overallScore: number | null;
   passed: boolean;
-  strengths: Array<{ title: string; description: string }>;
-  weaknesses: Array<{ title: string; tip: string }>;
   stepFeedback: string;
   stepFeedbackAr: string;
 };
@@ -382,9 +381,17 @@ export default function AssessmentStepClient({ stepNumber }: { stepNumber: numbe
         </div>
         <p className="text-sm text-[#6B7280]">{feedback}</p>
         {submitPack.allStepsComplete ? (
-          <p className="font-semibold text-brand-teal">
-            {t("allStepsDone", { score: submitPack.overallScore ?? 0 })}
-          </p>
+          <>
+            <p className="font-semibold text-brand-teal">
+              {t("allStepsDone", { score: submitPack.overallScore ?? 0 })}
+            </p>
+            <Link
+              href="/dashboard/job-seeker/assessment/report"
+              className="inline-flex min-h-11 items-center justify-center rounded-lg bg-[#0F4C75] px-6 text-sm font-semibold text-white"
+            >
+              {t("report.viewFull")}
+            </Link>
+          </>
         ) : (
           <p className="text-sm text-[#374151]">{t("nextStepHint")}</p>
         )}
@@ -434,7 +441,7 @@ export default function AssessmentStepClient({ stepNumber }: { stepNumber: numbe
         </div>
         <div className="rounded-xl border bg-white p-6 shadow-sm">
           <p className="text-lg font-semibold text-[#0D2137]">{qText}</p>
-          {q.type === "multiple_choice" && q.options ? (
+          {(q.type === "mcq" || q.type === "forced_choice") && q.options ? (
             <div className="mt-4 space-y-2">
               {(isRtl && q.optionsAr ? q.optionsAr : q.options).map((opt) => (
                 <label key={opt} className="flex items-center gap-2 text-sm">
@@ -449,17 +456,35 @@ export default function AssessmentStepClient({ stepNumber }: { stepNumber: numbe
               ))}
             </div>
           ) : null}
-          {q.type === "text" || q.type === "scenario" ? (
-            <textarea
-              className="mt-4 w-full rounded-lg border p-3 text-sm"
-              rows={5}
-              value={String(answers[q.id] ?? "")}
-              onChange={(e) => {
-                const prev = String(answers[q.id] ?? "");
-                proctoring.onAnswerInput(e.target.value.slice(prev.length));
-                setAnswers((a) => ({ ...a, [q.id]: e.target.value }));
-              }}
-            />
+          {(q.type === "likert" || q.type === "rating") && q.options ? (
+            <div className="mt-4 space-y-2">
+              {(isRtl && q.optionsAr ? q.optionsAr : q.options).map((opt, i) => (
+                <label key={opt} className="flex items-center gap-2 text-sm">
+                  <input
+                    type="radio"
+                    name={q.id}
+                    checked={answers[q.id] === i + 1}
+                    onChange={() => setAnswers((a) => ({ ...a, [q.id]: i + 1 }))}
+                  />
+                  {opt}
+                </label>
+              ))}
+            </div>
+          ) : null}
+          {(q.type === "likert" || q.type === "rating") && !q.options ? (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {[1, 2, 3, 4, 5].map((n) => (
+                <label key={n} className="flex flex-col items-center gap-1 text-xs">
+                  <input
+                    type="radio"
+                    name={q.id}
+                    checked={answers[q.id] === n}
+                    onChange={() => setAnswers((a) => ({ ...a, [q.id]: n }))}
+                  />
+                  {n}
+                </label>
+              ))}
+            </div>
           ) : null}
         </div>
         <button

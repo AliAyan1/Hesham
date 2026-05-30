@@ -105,6 +105,16 @@ export async function createTalentPoolInvite(params: {
     link: "/dashboard/job-seeker/invites",
   });
 
+  if (candidate.email) {
+    const { onTalentPoolNominated } = await import("@/lib/email-triggers");
+    void onTalentPoolNominated({
+      userId: params.candidateId,
+      email: candidate.email,
+      company,
+      jobTitle: job.title,
+    });
+  }
+
   return { inviteId: invite.id, status: invite.status };
 }
 
@@ -235,6 +245,7 @@ export async function acceptTalentPoolInvite(params: {
     select: { id: true },
   });
 
+  const createdNew = !existing;
   const applicationId =
     existing?.id ??
     (
@@ -264,6 +275,27 @@ export async function acceptTalentPoolInvite(params: {
   });
   const candidateName =
     seeker?.name?.trim() || seeker?.email?.split("@")[0] || "Candidate";
+
+  if (createdNew && seeker?.email) {
+    const employerUser = await prisma.user.findUnique({
+      where: { id: invite.employerId },
+      select: { email: true },
+    });
+    if (employerUser?.email) {
+      const { onApplicationSubmitted } = await import("@/lib/email-triggers");
+      void onApplicationSubmitted({
+        applicationId,
+        jobId: invite.jobId,
+        jobTitle: invite.job.title,
+        company,
+        seekerId: params.candidateId,
+        seekerEmail: seeker.email,
+        seekerName: candidateName,
+        employerId: invite.employerId,
+        employerEmail: employerUser.email,
+      });
+    }
+  }
 
   await createUserNotification({
     userId: invite.employerId,

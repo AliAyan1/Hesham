@@ -107,11 +107,9 @@ export default function AssessmentTypeClient({
   const [displayStream, setDisplayStream] = useState<MediaStream | null>(null);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [submitPack, setSubmitPack] = useState<ScorePack | null>(null);
-  const [share, setShare] = useState(true);
   const [loading, setLoading] = useState(false);
   const [loadErr, setLoadErr] = useState(false);
   const [readonlyDetail, setReadonlyDetail] = useState<ScorePack | null>(null);
-  const [shareLocked, setShareLocked] = useState(false);
 
   const procRef = useRef(false);
 
@@ -203,8 +201,6 @@ export default function AssessmentTypeClient({
         };
         if (!d.ok || !dj.success || !dj.data || cancel) return;
         setReadonlyDetail(coerceDetailPack(dj.data));
-        setShare(Boolean(dj.data.shareWithEmployers));
-        setShareLocked(true);
         setPhase("readonly");
       } catch {
         /* ignore */
@@ -332,17 +328,6 @@ export default function AssessmentTypeClient({
     }
   }
 
-  async function patchShare(next: boolean) {
-    if (!assessmentId) return;
-    await fetch("/api/assessment/share", {
-      method: "PATCH",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ kind: "assessment", id: assessmentId, share: next }),
-    });
-    setShare(next);
-  }
-
   if (!session.data?.user) return <LoadingSpinner size="full" label={tc("loading")} />;
   if (!can) {
     return (
@@ -429,12 +414,7 @@ export default function AssessmentTypeClient({
     return (
       <div className="space-y-6" dir={isRtl ? "rtl" : "ltr"}>
         <ReportView t={t} pack={submitPack} />
-        {!shareLocked ? (
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={share} onChange={(e) => void patchShare(e.target.checked)} />
-            {t("shareWithEmployers")}
-          </label>
-        ) : null}
+        <p className="text-xs text-[#6B7280]">{t("autoSharedWithEmployers")}</p>
         <Link href="/dashboard/job-seeker/assessment" className="text-sm font-semibold text-brand-teal underline">
           {tc("back")}
         </Link>

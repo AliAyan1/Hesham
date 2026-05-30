@@ -49,6 +49,29 @@ model User {
   messageThreadsAsEmployer MessageThread[] @relation("EmployerThreads")
   messageThreadsAsSeeker   MessageThread[] @relation("SeekerThreads")
   messagesSent             Message[]       @relation("MessageSender")
+  mentorMessagesSent       MentorMessage[] @relation("MentorMessageSender")
+  obligationsAsEmployer    ObligationLetter[] @relation("EmployerObligation")
+  obligationsAsCandidate   ObligationLetter[] @relation("CandidateObligation")
+  offersAsEmployer         OfferLetter[]      @relation("EmployerOffer")
+  offersAsCandidate        OfferLetter[]      @relation("CandidateOffer")
+  recruitmentPayments      RecruitmentPayment[]
+  auditLogs                AuditLog[]
+  mentorProfile            Mentor?
+  mentorSessionsAsMentee   MentorSession[]    @relation("MenteeSessions")
+  profileReminderSentAt    DateTime?
+  welcomeEmailSentAt         DateTime?
+  passwordResetTokens      PasswordResetToken[]
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 enum SubscriptionTier {
@@ -60,6 +83,7 @@ enum SubscriptionTier {
 enum UserRole {
   JOBSEEKER
   EMPLOYER
+  MENTOR
   ADMIN
 }
 
@@ -192,6 +216,8 @@ model Job {
   savedBy      SavedJob[]
   autoShortlist JobAutoShortlist?
   talentPoolInvites TalentPoolInvite[]
+  obligationLetters ObligationLetter[]
+  offerLetters      OfferLetter[]
 }
 
 model InterviewTemplate {
@@ -299,8 +325,11 @@ enum NotificationType {
   JOB_MATCH
   APPLICATION_UPDATE
   ASSESSMENT_READY
+  ASSESSMENT_COMPLETE
   ASSESSMENT_FLAGGED
   INTERVIEW_READY
+  INTERVIEW_INVITED
+  INTERVIEW_COMPLETE
   EMPLOYER_CANDIDATE_INSIGHT
   SESSION_REMINDER
   SYSTEM
@@ -310,7 +339,18 @@ enum NotificationType {
   MESSAGE_RECEIVED
   TALENT_POOL_INVITE
   TALENT_POOL_ACTIVE
+  TALENT_POOL_NOMINATED
   TALENT_POOL_INVITE_UPDATE
+  OFFER_RECEIVED
+  MENTOR_APPLICATION
+  MENTOR_APPROVED
+  MENTOR_REJECTED
+  MENTOR_SESSION_REQUEST
+  MENTOR_SESSION_CONFIRMED
+  MENTOR_SESSION_COMPLETED
+  SESSION_COMPLETE
+  PAYOUT_REQUESTED
+  PAYOUT_PAID
 }
 
 enum TalentPoolReason {
@@ -432,30 +472,42 @@ model Assessment {
   user                 User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   type                 AssessmentType    @default(GENERAL)
   status               AssessmentStatus  @default(NOT_STARTED)
+
+  /// ProfileXT psychometric scores
+  thinkingStyleScore   Float?
+  behavioralScore      Float?
+  interestsScore       Float?
+  overallScore         Float?
+  traitScores          Json?
+  interestScores       Json?
+  writtenReport        Json?
+  jobFitScores         Json?
+  topJobMatches        Json?
+  questionsData        Json?
+  answersData          Json?
+
+  /// Legacy denormalized (synced for employer filters / backward compat)
   totalScore           Int?
   skillsScore          Int?
   communicationScore   Int?
-  behavioralScore      Int?
   industryFitScore     Int?
   strengths            Json?
   weaknesses           Json?
   recommendations      Json?
   detailedReport       Json?
-  questions            Json?
-  answers              Json?
+
   startedAt            DateTime?
   completedAt          DateTime?
   duration             Int?
   proctoringFlags      Json?
   isFlagged            Boolean           @default(false)
   flagReason           String?
-  shareWithEmployers   Boolean           @default(false)
-  /// Per-step scores: { step1: { score, completedAt }, ... step5 }
+  shareWithEmployers   Boolean           @default(true)
   stepScores           Json?
-  /// Active step (1–5) when status is IN_PROGRESS
   currentStep          Int?
-  /// Count of completed steps (0–5)
   stepsCompleted       Int               @default(0)
+  retakeCount          Int               @default(0)
+  lastRetakeAt         DateTime?
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
   videoInterview       VideoInterview?
@@ -537,4 +589,252 @@ model Contact {
   subject   String
   message   String
   createdAt DateTime @default(now())
+}
+
+enum ObligationStatus {
+  PENDING
+  SIGNED
+  EXPIRED
+  CANCELLED
+}
+
+enum OfferStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum SessionStatus {
+  PENDING
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+model ObligationLetter {
+  id             String           @id @default(cuid())
+  employerId     String
+  candidateId    String
+  jobId          String
+  employer       User             @relation("EmployerObligation", fields: [employerId], references: [id], onDelete: Cascade)
+  candidate      User             @relation("CandidateObligation", fields: [candidateId], references: [id], onDelete: Cascade)
+  job            Job              @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  recruitmentFee Float
+  currency       String           @default("SAR")
+  status         ObligationStatus @default(PENDING)
+  signedAt       DateTime?
+  signedByName   String?
+  terms          String
+  generatedAt    DateTime         @default(now())
+  expiresAt      DateTime
+  payment        RecruitmentPayment?
+  offerLetter    OfferLetter?
+
+  @@index([employerId])
+  @@index([candidateId])
+}
+
+model OfferLetter {
+  id                String      @id @default(cuid())
+  employerId        String
+  candidateId       String
+  jobId             String
+  obligationId      String?     @unique
+  employer          User        @relation("EmployerOffer", fields: [employerId], references: [id], onDelete: Cascade)
+  candidate         User        @relation("CandidateOffer", fields: [candidateId], references: [id], onDelete: Cascade)
+  job               Job         @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  obligation        ObligationLetter? @relation(fields: [obligationId], references: [id], onDelete: SetNull)
+  fileUrl           String
+  fileName          String
+  status            OfferStatus @default(PENDING)
+  candidateResponse String?
+  declineReason     String?
+  sentAt            DateTime    @default(now())
+  respondedAt       DateTime?
+  expiresAt         DateTime
+
+  @@index([candidateId, status])
+  @@index([employerId])
+}
+
+model RecruitmentPayment {
+  id            String        @id @default(cuid())
+  obligationId  String        @unique
+  obligation    ObligationLetter @relation(fields: [obligationId], references: [id], onDelete: Cascade)
+  employerId    String
+  employer      User          @relation(fields: [employerId], references: [id], onDelete: Cascade)
+  amount        Float
+  currency      String        @default("SAR")
+  vatAmount     Float
+  totalAmount   Float
+  status        PaymentStatus @default(PENDING)
+  paidAt        DateTime?
+  receiptNumber String?
+  createdAt     DateTime      @default(now())
+
+  @@index([employerId])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action    String
+  entity    String
+  entityId  String?
+  oldData   Json?
+  newData   Json?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([entity, entityId])
+  @@index([createdAt])
+}
+
+model Mentor {
+  id              String    @id @default(cuid())
+  userId          String    @unique
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title           String?
+  titleAr         String?
+  bio             String?
+  bioAr           String?
+  expertise       Json?
+  industries      Json?
+  languages       Json?
+  hourlyRate      Float?
+  currency        String    @default("SAR")
+  isApproved      Boolean   @default(false)
+  isActive        Boolean   @default(true)
+  approvedAt      DateTime?
+  approvedBy      String?
+  rejectedReason  String?
+  totalSessions   Int       @default(0)
+  averageRating   Float     @default(0)
+  totalEarnings   Float     @default(0)
+  pendingPayout   Float     @default(0)
+  linkedinUrl     String?
+  yearsExperience Int?
+  sessions        MentorSession[]
+  availability    MentorAvailability[]
+  certifications  MentorCertification[]
+  payoutRequests  MentorPayoutRequest[]
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model MentorCertification {
+  id        String    @id @default(cuid())
+  mentorId  String
+  mentor    Mentor    @relation(fields: [mentorId], references: [id], onDelete: Cascade)
+  name      String
+  issuer    String?
+  issuedAt  DateTime?
+  fileUrl   String
+  fileName  String
+  mimeType  String?
+  createdAt DateTime  @default(now())
+
+  @@index([mentorId])
+}
+
+model MentorSession {
+  id              String        @id @default(cuid())
+  mentorId        String
+  menteeId        String
+  mentor          Mentor        @relation(fields: [mentorId], references: [id], onDelete: Cascade)
+  mentee          User          @relation("MenteeSessions", fields: [menteeId], references: [id], onDelete: Cascade)
+  status          SessionStatus @default(PENDING)
+  duration        Int           @default(60)
+  topic           String?
+  notes           String?
+  scheduledAt     DateTime?
+  startedAt       DateTime?
+  endedAt         DateTime?
+  price           Float         @default(0)
+  platformFee     Float         @default(0)
+  mentorEarning   Float         @default(0)
+  dailyRoomName   String?
+  dailyRoomUrl    String?
+  recordingId     String?
+  recordingUrl    String?
+  rating          Int?
+  review          String?
+  reviewedAt      DateTime?
+  payoutStatus    String        @default("PENDING")
+  payoutDate      DateTime?
+  payoutReference String?
+  reminderOneHourSentAt    DateTime?
+  reminderFifteenMinSentAt DateTime?
+  messageThread   MentorMessageThread?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([mentorId])
+  @@index([menteeId])
+  @@index([status])
+  @@index([scheduledAt])
+}
+
+model MentorMessageThread {
+  id              String          @id @default(cuid())
+  mentorSessionId String          @unique
+  mentorSession   MentorSession   @relation(fields: [mentorSessionId], references: [id], onDelete: Cascade)
+  messages        MentorMessage[]
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+}
+
+model MentorMessage {
+  id        String              @id @default(cuid())
+  threadId  String
+  thread    MentorMessageThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  senderId  String
+  sender    User                @relation("MentorMessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  body      String
+  readAt    DateTime?
+  createdAt DateTime            @default(now())
+
+  @@index([threadId, createdAt])
+}
+
+model MentorPayoutRequest {
+  id              String   @id @default(cuid())
+  mentorId        String
+  mentor          Mentor   @relation(fields: [mentorId], references: [id], onDelete: Cascade)
+  amount          Float
+  bankName        String
+  accountHolder   String
+  iban            String
+  status          String   @default("REQUESTED")
+  reference       String?
+  createdAt       DateTime @default(now())
+  processedAt     DateTime?
+
+  @@index([mentorId])
+  @@index([status])
+}
+
+model MentorAvailability {
+  id        String  @id @default(cuid())
+  mentorId  String
+  mentor    Mentor  @relation(fields: [mentorId], references: [id], onDelete: Cascade)
+  dayOfWeek Int
+  startTime String
+  endTime   String
+  isActive  Boolean @default(true)
+
+  @@index([mentorId])
 }

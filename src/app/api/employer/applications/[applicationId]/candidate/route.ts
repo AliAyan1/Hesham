@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getServerSession } from "@/lib/get-server-session";
 import { getPrisma } from "@/lib/db";
 import type { ApiResponse, EmployerCandidatePayload } from "@/types";
+import { sanitizeUserForEmployer } from "@/lib/sanitize-user";
 
 export async function GET(
   _request: NextRequest,
@@ -32,6 +33,7 @@ export async function GET(
           name: true,
           email: true,
           image: true,
+          role: true,
           profile: {
             select: {
               bio: true,
@@ -68,19 +70,23 @@ export async function GET(
   const sharedAssessment = await prisma.assessment.findFirst({
     where: {
       userId: seekerId,
-      shareWithEmployers: true,
       status: { in: [AssessmentStatus.COMPLETED, AssessmentStatus.FLAGGED] },
     },
     orderBy: { completedAt: "desc" },
     select: {
       id: true,
       totalScore: true,
+      overallScore: true,
+      thinkingStyleScore: true,
+      behavioralScore: true,
+      interestsScore: true,
       skillsScore: true,
       communicationScore: true,
-      behavioralScore: true,
       industryFitScore: true,
       strengths: true,
       weaknesses: true,
+      writtenReport: true,
+      topJobMatches: true,
       isFlagged: true,
     },
   });
@@ -88,7 +94,6 @@ export async function GET(
   const sharedInterview = await prisma.videoInterview.findFirst({
     where: {
       userId: seekerId,
-      shareWithEmployers: true,
       status: { in: [InterviewStatus.COMPLETED, InterviewStatus.FLAGGED] },
     },
     orderBy: { completedAt: "desc" },
@@ -155,23 +160,31 @@ export async function GET(
   const contactUnlocked =
     row.status === ApplicationStatus.HIRED || row.offerAcceptedAt != null;
 
-  const rawSeeker = row.jobSeeker;
-  const maskedSeeker = contactUnlocked
-    ? rawSeeker
-    : {
-        ...rawSeeker,
-        email: "",
-        profile: rawSeeker.profile
-          ? { ...rawSeeker.profile, phone: null as string | null }
-          : null,
-        cv: rawSeeker.cv
-          ? {
-              ...rawSeeker.cv,
-              linkedinUrl: null as string | null,
-              portfolioUrl: null as string | null,
-            }
-          : null,
-      };
+  const publicCandidate = sanitizeUserForEmployer(row.jobSeeker, contactUnlocked);
+  const maskedSeeker = {
+    ...row.jobSeeker,
+    email: publicCandidate.email ?? "",
+    name: publicCandidate.name,
+    image: publicCandidate.image,
+    profile: row.jobSeeker.profile
+      ? {
+          ...row.jobSeeker.profile,
+          phone: publicCandidate.phone ?? null,
+          bio: publicCandidate.profile?.bio ?? row.jobSeeker.profile.bio,
+          location: publicCandidate.profile?.location ?? row.jobSeeker.profile.location,
+          skills: publicCandidate.profile?.skills ?? null,
+        }
+      : null,
+    cv: contactUnlocked
+      ? row.jobSeeker.cv
+      : row.jobSeeker.cv
+        ? {
+            ...row.jobSeeker.cv,
+            linkedinUrl: null as string | null,
+            portfolioUrl: null as string | null,
+          }
+        : null,
+  };
 
   const payload: EmployerCandidatePayload = {
     applicationId: row.id,
@@ -182,13 +195,18 @@ export async function GET(
     sharedAssessment: sharedAssessment
       ? {
           id: sharedAssessment.id,
-          totalScore: sharedAssessment.totalScore,
+          totalScore: sharedAssessment.totalScore ?? (sharedAssessment.overallScore != null ? Math.round(sharedAssessment.overallScore) : null),
+          overallScore: sharedAssessment.overallScore ?? sharedAssessment.totalScore,
+          thinkingStyleScore: sharedAssessment.thinkingStyleScore,
+          behavioralScore: sharedAssessment.behavioralScore,
+          interestsScore: sharedAssessment.interestsScore,
           skillsScore: sharedAssessment.skillsScore,
           communicationScore: sharedAssessment.communicationScore,
-          behavioralScore: sharedAssessment.behavioralScore,
           industryFitScore: sharedAssessment.industryFitScore,
           strengths: sharedAssessment.strengths,
           weaknesses: sharedAssessment.weaknesses,
+          writtenReport: sharedAssessment.writtenReport,
+          topJobMatches: sharedAssessment.topJobMatches,
           isFlagged: sharedAssessment.isFlagged,
         }
       : null,

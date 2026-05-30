@@ -11,6 +11,7 @@ import {
 import { useLocale, useTranslations } from "next-intl";
 import type { NotificationDto } from "@/types/dashboard";
 import { Bell } from "lucide-react";
+import { NotificationTypeIcon } from "@/components/notifications/NotificationTypeIcon";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { cn } from "@/lib/cn";
 import { Link } from "@/i18n/navigation";
@@ -20,42 +21,6 @@ type NotificationBellProps = {
   /** Tighter toolbar target (dashboard header). */
   compact?: boolean;
 };
-
-function TypeIcon({ type }: { type: NotificationDto["type"] }) {
-  switch (type) {
-    case "JOB_MATCH":
-      return (
-        <span className="text-brand-teal" aria-hidden>
-          💼
-        </span>
-      );
-    case "APPLICATION_UPDATE":
-      return (
-        <span className="text-brand-blue" aria-hidden>
-          📋
-        </span>
-      );
-    case "ASSESSMENT_READY":
-      return (
-        <span className="text-brand-teal" aria-hidden>
-          🧠
-        </span>
-      );
-    case "SESSION_REMINDER":
-      return (
-        <span className="text-yellow-600" aria-hidden>
-          ⏰
-        </span>
-      );
-    case "SYSTEM":
-    default:
-      return (
-        <span className="text-gray-600" aria-hidden>
-          🔔
-        </span>
-      );
-  }
-}
 
 const PANEL_MAX_W = 352;
 const VIEWPORT_GUTTER = 16;
@@ -248,7 +213,7 @@ export function NotificationBell({ locale, compact = false }: NotificationBellPr
                 <li key={n.id} className="px-4 py-3">
                   <div className="flex gap-3">
                     <span className="mt-1 shrink-0">
-                      <TypeIcon type={n.type} />
+                      <NotificationTypeIcon type={n.type} />
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-brand-blue">{displayTitle(n)}</p>

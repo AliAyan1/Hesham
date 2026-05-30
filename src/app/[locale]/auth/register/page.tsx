@@ -1,19 +1,28 @@
 "use client";
 
-import { Briefcase, Building2, Check, Crown, Sparkles } from "lucide-react";
-import { useEffect, useMemo, useState, useTransition } from "react";
-import { signIn, signOut, useSession } from "next-auth/react";
+import { Briefcase, Building2, Check, Crown, GraduationCap, Sparkles } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import axios from "axios";
+import { ClearSessionButton } from "@/components/auth/ClearSessionButton";
+import { RegisterRolePickModal } from "@/components/auth/RegisterRolePickModal";
+import { signIn, useSession } from "next-auth/react";
 import { useLocale, useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import { Link } from "@/i18n/navigation";
 import { useRouter } from "@/i18n/navigation";
-import axios from "axios";
 import { registerSchema } from "@/lib/validations";
 import { BRAND_COLORS } from "@/lib/constants";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { GoogleIcon } from "@/components/auth/GoogleIcon";
 import { UserRole } from "@/types";
 import type { RegisterFormData } from "@/types";
+import {
+  finishGoogleSignup,
+  hardNavigate,
+  signOutThenNavigate,
+  type SignupPlanChoice,
+} from "@/lib/auth-redirect";
+import { signInWithGoogle } from "@/lib/google-oauth";
 import { dashboardPathForRole } from "@/lib/subscription";
 import { hrefUpgradePremium, hrefUpgradeProfessional } from "@/lib/i18n-hrefs";
 import type { ZodIssue } from "zod";
@@ -45,14 +54,20 @@ function planFromUrl(raw: string | null): PlanChoice | null {
 export default function RegisterPage() {
   const t = useTranslations();
   const tAuth = useTranslations("auth");
-  const tNav = useTranslations("nav");
+  const tm = useTranslations("mentor");
   const router = useRouter();
   const locale = useLocale();
   const searchParams = useSearchParams();
   const isRTL = locale === "ar" || locale === "ur";
-  const { data: session, status: sessionStatus } = useSession();
+  const { data: session, status: sessionStatus, update } = useSession();
 
   const urlPlan = useMemo(() => planFromUrl(searchParams.get("plan")), [searchParams]);
+  const pickRoleAfterGoogle = searchParams.get("pickRole") === "1";
+  const pendingGoogleRole = searchParams.get("pendingRole");
+  const pendingGooglePlan = useMemo(
+    () => planFromUrl(searchParams.get("plan")),
+    [searchParams],
+  );
 
   /** If `/api/auth/session` never resolves (network / dev HMR), unblock the register UI. */
   const [sessionFetchTimedOut, setSessionFetchTimedOut] = useState(false);
@@ -74,29 +89,53 @@ export default function RegisterPage() {
     typeof session.user.id === "string" &&
     session.user.id.trim().length > 0;
 
+  /** After signup sign-in, skip signed-in gate until hard navigation completes. */
+  const [postSignupRedirect, setPostSignupRedirect] = useState(false);
+
+  const registerReturnPath = useMemo(() => {
+    const qs = searchParams.toString();
+    return `/auth/register${qs ? `?${qs}` : ""}`;
+  }, [searchParams]);
+
   useEffect(() => {
-    if (!loggedInReady || !session?.user) return;
+    if (!loggedInReady || !session?.user || !pickRoleAfterGoogle) return;
+    if (session.user.onboardingComplete) {
+      const role = (session.user.role as UserRole | undefined) ?? UserRole.JOBSEEKER;
+      hardNavigate(dashboardPathForRole(role), locale);
+    }
+  }, [loggedInReady, session?.user, pickRoleAfterGoogle, locale]);
+
+  useEffect(() => {
+    if (!loggedInReady || !session?.user || postSignupRedirect) return;
+    if (pickRoleAfterGoogle || pendingGoogleRole) return;
     if (urlPlan === "professional") {
       router.replace(hrefUpgradeProfessional);
       return;
     }
     if (urlPlan === "premium") {
       router.replace(hrefUpgradePremium);
-      return;
     }
-    /** Free / no plan: do not auto-send to dashboard — a stale JWT hits middleware and bounces to login. */
-  }, [loggedInReady, session?.user, urlPlan, router]);
-
-  const registerReturnUrl = useMemo(() => {
-    const qs = searchParams.toString();
-    return `/${locale}/auth/register${qs ? `?${qs}` : ""}`;
-  }, [locale, searchParams]);
+    /** Logged-in + free plan: show signup form or signed-in gate — never auto-redirect. */
+  }, [
+    loggedInReady,
+    session?.user,
+    urlPlan,
+    pickRoleAfterGoogle,
+    pendingGoogleRole,
+    postSignupRedirect,
+    router,
+  ]);
 
   const redirectingToPaidUpgrade =
     loggedInReady && (urlPlan === "professional" || urlPlan === "premium");
 
-  const showSignedInFreeChoice =
-    loggedInReady && (urlPlan === "free" || urlPlan === null);
+  const showSignedInGate =
+    loggedInReady &&
+    !postSignupRedirect &&
+    !pickRoleAfterGoogle &&
+    !pendingGoogleRole &&
+    urlPlan !== "professional" &&
+    urlPlan !== "premium";
 
   const [phase, setPhase] = useState<FlowPhase>("role");
   const [pickedPlan, setPickedPlan] = useState<PlanChoice | null>(urlPlan);
@@ -111,11 +150,23 @@ export default function RegisterPage() {
   const [serverError, setServerError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
+  const urlRole = searchParams.get("role")?.toUpperCase();
+
   useEffect(() => {
     if (urlPlan) {
       setPickedPlan(urlPlan);
+      if (urlRole === "MENTOR" || urlRole === "EMPLOYER") {
+        setPhase("account");
+      }
     }
-  }, [urlPlan]);
+  }, [urlPlan, urlRole]);
+  useEffect(() => {
+    if (urlRole === "MENTOR") {
+      setFormData((prev) => ({ ...prev, role: UserRole.MENTOR }));
+    } else if (urlRole === "EMPLOYER") {
+      setFormData((prev) => ({ ...prev, role: UserRole.EMPLOYER }));
+    }
+  }, [urlRole]);
 
   const pwdMeter = passwordStrengthMeter(formData.password);
 
@@ -134,6 +185,11 @@ export default function RegisterPage() {
   }
 
   function continueFromRole() {
+    if (formData.role === UserRole.MENTOR) {
+      setPickedPlan("free");
+      setPhase("account");
+      return;
+    }
     if (urlPlan) {
       setPickedPlan(urlPlan);
       setPhase("account");
@@ -165,17 +221,53 @@ export default function RegisterPage() {
   const signupPlanBanner = resolvedPlan();
 
   const canUseGoogleSignup =
-    formData.role === UserRole.JOBSEEKER && resolvedPlan() === "free";
+    (formData.role === UserRole.JOBSEEKER && resolvedPlan() === "free") ||
+    formData.role === UserRole.MENTOR ||
+    formData.role === UserRole.EMPLOYER;
 
   async function handleGoogleRegister() {
     startTransition(async () => {
       try {
-        await signIn("google", { callbackUrl: `/${locale}/onboarding` });
+        const roleParam =
+          formData.role === UserRole.MENTOR
+            ? "MENTOR"
+            : formData.role === UserRole.EMPLOYER
+              ? "EMPLOYER"
+              : "JOBSEEKER";
+        const callbackUrl = `/${locale}/auth/register?pendingRole=${roleParam}`;
+        await signIn("google", { callbackUrl });
       } catch {
         setServerError(t("common.error"));
       }
     });
   }
+
+  const pendingRoleApplied = useRef(false);
+  useEffect(() => {
+    if (!loggedInReady || !session?.user || pendingRoleApplied.current) return;
+    const pending = pendingGoogleRole?.toUpperCase();
+    if (pending !== "MENTOR" && pending !== "EMPLOYER" && pending !== "JOBSEEKER") return;
+    pendingRoleApplied.current = true;
+    void (async () => {
+      try {
+        /** Existing Google account on register — show signed-in gate, not dashboard. */
+        if (session.user.onboardingComplete) {
+          hardNavigate("/auth/register?plan=free", locale);
+          return;
+        }
+        await axios.post("/api/account/role-choice", { role: pending });
+        await finishGoogleSignup(
+          pending,
+          update,
+          locale,
+          pendingGooglePlan as SignupPlanChoice | null,
+        );
+      } catch {
+        pendingRoleApplied.current = false;
+        setServerError(t("common.error"));
+      }
+    })();
+  }, [loggedInReady, pendingGoogleRole, pendingGooglePlan, session?.user, locale, t, update]);
 
   if (sessionStatus === "loading" && !sessionFetchTimedOut) {
     return (
@@ -193,31 +285,70 @@ export default function RegisterPage() {
     );
   }
 
-  if (showSignedInFreeChoice && session?.user) {
-    const role = (session.user.role as UserRole | undefined) ?? UserRole.JOBSEEKER;
-    const dash = dashboardPathForRole(role);
+  if (postSignupRedirect) {
     return (
       <AuthShell isRtl={isRTL} slogan={t("common.slogan")}>
-        <p className="text-center text-sm leading-relaxed text-gray-300">
-          {tAuth("registerFlow.signedInFreePlanHint")}
+        <p className="py-12 text-center text-sm text-gray-400">{t("common.loading")}</p>
+      </AuthShell>
+    );
+  }
+
+  if (showSignedInGate && session?.user) {
+    const role = (session.user.role as UserRole | undefined) ?? UserRole.JOBSEEKER;
+    const dash = dashboardPathForRole(role);
+    const continueTarget = session.user.onboardingComplete ? dash : "/onboarding";
+    return (
+      <AuthShell isRtl={isRTL} slogan={t("common.slogan")}>
+        <h2 className="text-center text-lg font-semibold text-white">{tAuth("registerFlow.alreadySignedInTitle")}</h2>
+        <p className="mt-3 text-center text-sm text-gray-400">
+          {tAuth("registerFlow.alreadySignedInBody", { email: session.user.email ?? "" })}
         </p>
         <Link
-          href={dash}
+          href={continueTarget}
           className="mt-6 flex min-h-11 w-full items-center justify-center rounded-lg py-3 text-center text-sm font-semibold text-white transition-opacity hover:opacity-90"
           style={{ backgroundColor: BRAND_COLORS.accent }}
         >
-          {tAuth("registerFlow.goToDashboard")}
+          {session.user.onboardingComplete
+            ? tAuth("registerFlow.goToDashboard")
+            : tAuth("registerFlow.continueOnboarding")}
         </Link>
         <button
           type="button"
           className="mt-4 w-full text-center text-sm text-gray-400 underline decoration-gray-500 underline-offset-4 hover:text-white"
-          onClick={() => void signOut({ callbackUrl: registerReturnUrl })}
+          onClick={() => void signOutThenNavigate(registerReturnPath, locale)}
         >
-          {tNav("logout")}
+          {tAuth("registerFlow.signOutAndRegister")}
         </button>
       </AuthShell>
     );
   }
+
+  if (loggedInReady && pickRoleAfterGoogle && session?.user) {
+    const role = (session.user.role as UserRole | undefined) ?? UserRole.JOBSEEKER;
+    if (session.user.onboardingComplete) {
+      return (
+        <AuthShell isRtl={isRTL} slogan={t("common.slogan")}>
+          <p className="py-12 text-center text-sm text-gray-400">{t("common.loading")}</p>
+        </AuthShell>
+      );
+    }
+    /** Only shown when Google sign-in has no pre-selected role (legacy / direct link). */
+    return (
+      <AuthShell isRtl={isRTL} slogan={t("common.slogan")}>
+        <RegisterRolePickModal open />
+      </AuthShell>
+    );
+  }
+
+  if (loggedInReady && pendingGoogleRole) {
+    return (
+      <AuthShell isRtl={isRTL} slogan={t("common.slogan")}>
+        <p className="py-12 text-center text-sm text-gray-400">{tAuth("registerFlow.googleFinishing")}</p>
+      </AuthShell>
+    );
+  }
+
+  /** Signed-in users see gate above; sign out to access the signup form. */
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -252,8 +383,13 @@ export default function RegisterPage() {
           return;
         }
 
-        router.push("/onboarding");
-        router.refresh();
+        await update();
+        setPostSignupRedirect(true);
+        if (parsed.data.role === UserRole.MENTOR) {
+          hardNavigate("/dashboard/mentor", locale);
+        } else {
+          hardNavigate("/onboarding", locale);
+        }
       } catch (err: unknown) {
         if (axios.isAxiosError(err) && err.response?.status === 409) {
           setServerError(t("auth.emailTaken"));
@@ -279,12 +415,21 @@ export default function RegisterPage() {
       label: t("auth.jobSeeker"),
       hint: tAuth("registerFlow.roleJobSeekerHint"),
       Icon: Briefcase,
+      mentorStyle: false,
     },
     {
       value: UserRole.EMPLOYER,
       label: t("auth.employer"),
       hint: tAuth("registerFlow.roleEmployerHint"),
       Icon: Building2,
+      mentorStyle: false,
+    },
+    {
+      value: UserRole.MENTOR,
+      label: tm("iAmMentor"),
+      hint: locale === "ar" ? "شارك خبرتك واكسب من خلال تدريب المحترفين" : "Share your expertise and earn by coaching professionals",
+      Icon: GraduationCap,
+      mentorStyle: true,
     },
   ];
 
@@ -363,18 +508,32 @@ export default function RegisterPage() {
           <p className="text-center text-lg font-semibold text-white">{tAuth("registerFlow.roleTitle")}</p>
           <p className="text-center text-sm text-gray-400">{tAuth("registerFlow.roleSubtitle")}</p>
           <div className="grid gap-3">
-            {roleCards.map(({ value, label, hint, Icon }) => (
+            {roleCards.map(({ value, label, hint, Icon, mentorStyle }) => {
+              const selected = formData.role === value;
+              const mentorSelected = mentorStyle && selected;
+              return (
               <button
                 key={value}
                 type="button"
                 onClick={() => handleRoleSelect(value)}
-                className={`flex items-start gap-4 rounded-xl border px-4 py-4 text-left transition-all ${
-                  formData.role === value
-                    ? "border-brand-teal bg-brand-lightTeal/20 ring-1 ring-brand-teal"
-                    : "border-[#444] text-gray-200 hover:border-[#666]"
+                className={`relative flex items-start gap-4 rounded-xl border px-4 py-4 text-left transition-all ${
+                  mentorSelected
+                    ? "border-[#C9973A] bg-[#FDF3E3]/10 ring-1 ring-[#C9973A]"
+                    : selected
+                      ? "border-brand-teal bg-brand-lightTeal/20 ring-1 ring-brand-teal"
+                      : "border-[#444] text-gray-200 hover:border-[#666]"
                 }`}
               >
-                <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#333] text-brand-teal">
+                {mentorSelected ? (
+                  <span className="absolute end-3 top-3 flex h-6 w-6 items-center justify-center rounded-full bg-[#C9973A] text-xs font-bold text-white">
+                    ✓
+                  </span>
+                ) : null}
+                <span
+                  className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#333] ${
+                    mentorStyle ? "text-[#C9973A]" : "text-brand-teal"
+                  }`}
+                >
                   <Icon className="h-5 w-5" aria-hidden />
                 </span>
                 <span>
@@ -382,7 +541,8 @@ export default function RegisterPage() {
                   <span className="mt-1 block text-xs text-gray-400">{hint}</span>
                 </span>
               </button>
-            ))}
+            );
+            })}
           </div>
           <button
             type="button"
@@ -563,7 +723,11 @@ export default function RegisterPage() {
           <p className="mt-6 text-center text-sm text-gray-400">
             {t("auth.hasAccount")}{" "}
             <Link
-              href="/auth/login"
+              href={
+                urlPlan
+                  ? { pathname: "/auth/login", query: { plan: urlPlan } }
+                  : "/auth/login"
+              }
               className="font-medium hover:underline"
               style={{ color: BRAND_COLORS.accent }}
             >
@@ -572,6 +736,10 @@ export default function RegisterPage() {
           </p>
         </form>
       ) : null}
+
+      <div className="mt-6 flex justify-center border-t border-[#333] pt-4">
+        <ClearSessionButton locale={locale} className="text-amber-400/90" />
+      </div>
     </AuthShell>
   );
 }

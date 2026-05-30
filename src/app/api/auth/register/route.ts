@@ -7,9 +7,9 @@ import type { ApiResponse, IUser } from "@/types";
 import jwt from "jsonwebtoken";
 import { getAuthSecret } from "@/lib/auth-secret";
 import { tierFromPlan } from "@/lib/subscription";
-import { UserRole, NotificationType } from "@prisma/client";
-import { createUserNotification } from "@/lib/notifications/create-user-notification";
-import { sendTransactionalEmail } from "@/lib/email/send-transactional";
+import { UserRole } from "@prisma/client";
+import { onEmployerRegistered, onJobSeekerRegistered } from "@/lib/email-triggers";
+import { defaultMentorProfileCreate } from "@/lib/mentor/default-mentor-create";
 
 /**
  * POST /api/auth/register
@@ -45,7 +45,8 @@ export async function POST(
     }
 
     const { name, email, password, role, plan } = parsed.data;
-    const subscriptionTier = tierFromPlan(plan);
+    const subscriptionTier =
+      role === UserRole.MENTOR ? ("FREE" as const) : tierFromPlan(plan);
 
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
@@ -79,31 +80,30 @@ export async function POST(
                 create: {},
               }
             : undefined,
+        mentorProfile:
+          role === UserRole.MENTOR
+            ? {
+                create: defaultMentorProfileCreate,
+              }
+            : undefined,
       },
       select: { id: true, email: true, name: true, role: true },
     });
 
-    if (role === UserRole.JOBSEEKER) {
-      try {
-        await createUserNotification({
-          userId: user.id,
-          type: NotificationType.ASSESSMENT_INVITE,
-          title: "Complete your AI assessment",
-          titleAr: "أكمل تقييمك الذكي",
-          message:
-            "Welcome to QudrahTech. Complete at least one AI assessment to unlock job applications and stand out to employers.",
-          messageAr:
-            "مرحبًا بك في قدرتك. أكمل تقييمًا ذكيًا واحدًا على الأقل لفتح التقديم على الوظائف.",
-          link: "/dashboard/job-seeker/assessment",
+    try {
+      if (role === UserRole.JOBSEEKER) {
+        await onJobSeekerRegistered({ userId: user.id, email: user.email, name: name || "there" });
+      } else if (role === UserRole.EMPLOYER) {
+        await onEmployerRegistered({ userId: user.id, email: user.email, name: name || "there" });
+      } else if (role === UserRole.MENTOR) {
+        const { notifyAdminsNewMentorApplication } = await import("@/lib/mentor/notifications");
+        await notifyAdminsNewMentorApplication({
+          mentorName: name || user.email,
+          mentorUserId: user.id,
         });
-        await sendTransactionalEmail({
-          to: user.email,
-          subject: "Welcome — complete your QudrahTech assessment",
-          html: `<p>Hi ${name || "there"},</p><p>Complete at least one AI assessment on QudrahTech to apply for jobs.</p><p><a href="${process.env.NEXTAUTH_URL ?? "https://qudrahtech.com"}/dashboard/job-seeker/assessment">Open assessments</a></p>`,
-        });
-      } catch (sideEffectErr) {
-        console.error("[register] post-create welcome steps failed:", sideEffectErr);
       }
+    } catch (sideEffectErr) {
+      console.error("[register] welcome email failed:", sideEffectErr);
     }
 
     const secret = getAuthSecret();

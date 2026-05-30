@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
+import { containsContactInfo, MESSAGE_FILTER_ERROR } from "@/lib/message-filter";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 
@@ -32,6 +33,7 @@ export function MessagesPageClient() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(false);
   const [sending, setSending] = useState(false);
+  const [filterErr, setFilterErr] = useState<string | null>(null);
 
   const loadThreads = useCallback(async () => {
     setLoading(true);
@@ -89,17 +91,29 @@ export function MessagesPageClient() {
     const rid = selected?.otherUserId || recipientId.trim();
     const body = draft.trim();
     if (!rid || !body) return;
+    if (containsContactInfo(body)) {
+      setFilterErr(t("filterWarning"));
+      return;
+    }
+    setFilterErr(null);
     setSending(true);
     try {
-      const res = await axios.post<{ success: boolean; data: { threadId: string } }>("/api/messages", {
-        recipientId: rid,
-        body,
-      });
-      if (res.data?.success) {
-        setDraft("");
-        await loadThreads();
-        setSelectedId(res.data.data.threadId);
+      const res = await axios.post<{ success: boolean; error?: string; data: { threadId: string } }>(
+        "/api/messages",
+        {
+          recipientId: rid,
+          body,
+        },
+      );
+      if (!res.data?.success) {
+        setFilterErr(
+          res.data?.error === MESSAGE_FILTER_ERROR ? t("filterWarning") : (res.data?.error ?? t("sendFailed")),
+        );
+        return;
       }
+      setDraft("");
+      await loadThreads();
+      setSelectedId(res.data.data.threadId);
     } finally {
       setSending(false);
     }
@@ -167,6 +181,7 @@ export function MessagesPageClient() {
             onChange={(e) => setDraft(e.target.value)}
             placeholder={t("composePlaceholder")}
           />
+          {filterErr ? <p className="mb-2 text-xs text-red-600">{filterErr}</p> : null}
           <div className="mt-2 flex justify-end">
             <Button type="button" className="min-h-10" loading={sending} onClick={() => void send()}>
               {t("send")}

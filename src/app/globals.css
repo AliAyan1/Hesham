@@ -28,8 +28,106 @@
   }
 }
 
+@keyframes lara-wave {
+  0%,
+  100% {
+    transform: scaleY(0.45);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes interview-wave {
+  0%,
+  100% {
+    height: 8px;
+  }
+  50% {
+    height: 32px;
+  }
+}
+
+@keyframes lara-avatar-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.8;
+  }
+}
+
+@keyframes lara-mic-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.65;
+    transform: scale(1.12);
+  }
+}
+
+.lara-wave-bar {
+  animation: lara-wave 0.7s ease-in-out infinite;
+  transform-origin: bottom;
+}
+
+.lara-wave-bar-delay-1 {
+  animation-delay: 0.15s;
+}
+
+.lara-wave-bar-delay-2 {
+  animation-delay: 0.3s;
+}
+
+.lara-mic-pulse {
+  display: inline-flex;
+  animation: lara-mic-pulse 1s ease-in-out infinite;
+}
+
 @media (max-width: 374px) {
   body {
     overflow-x: clip;
   }
+}
+
+/* Mentor marketplace dual price range sliders */
+.mentor-range-input {
+  pointer-events: none;
+}
+
+.mentor-range-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  pointer-events: auto;
+  height: 18px;
+  width: 18px;
+  border-radius: 9999px;
+  border: 2px solid #fff;
+  background: #1d9e75;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.2);
+  cursor: grab;
+}
+
+.mentor-range-input::-moz-range-thumb {
+  pointer-events: auto;
+  height: 18px;
+  width: 18px;
+  border-radius: 9999px;
+  border: 2px solid #fff;
+  background: #1d9e75;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.2);
+  cursor: grab;
+}
+
+.mentor-range-input::-webkit-slider-runnable-track {
+  background: transparent;
+}
+
+.mentor-range-input::-moz-range-track {
+  background: transparent;
 }

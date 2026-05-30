@@ -6,6 +6,12 @@ import { getPrisma } from "@/lib/db";
 import type { ApiResponse } from "@/types";
 import { createUserNotification } from "@/lib/notifications/create-user-notification";
 import { NotificationType } from "@prisma/client";
+import { containsContactInfo, MESSAGE_FILTER_ERROR } from "@/lib/message-filter";
+import {
+  canMessageEmployerAndSeeker,
+  messagingRoleAllowed,
+} from "@/lib/messaging/permissions";
+import { sanitizeUserForPublic } from "@/lib/sanitize-user";
 
 const postSchema = z.object({
   recipientId: z.string(),
@@ -30,8 +36,11 @@ export async function GET(): Promise<
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
   }
   const role = session.user.role;
-  if (role !== UserRole.EMPLOYER && role !== UserRole.JOBSEEKER) {
+  if (!messagingRoleAllowed(role)) {
     return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+  }
+  if (role === UserRole.MENTOR) {
+    return NextResponse.json({ success: true, data: { threads: [] } }, { status: 200 });
   }
 
   const prisma = getPrisma();
@@ -54,12 +63,13 @@ export async function GET(): Promise<
 
   const out = threads.map((t) => {
     const isEm = role === UserRole.EMPLOYER;
-    const other = isEm ? t.jobSeeker : t.employer;
+    const otherRaw = isEm ? t.jobSeeker : t.employer;
+    const other = sanitizeUserForPublic(otherRaw);
     const last = t.messages[0];
     return {
       id: t.id,
       otherUserId: other.id,
-      otherName: other.name?.trim() || other.email.split("@")[0] || "User",
+      otherName: other.name?.trim() || "User",
       lastBody: last?.body ?? "",
       lastAt: (last?.createdAt ?? t.updatedAt).toISOString(),
     };
@@ -74,14 +84,22 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespon
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
   }
   const role = session.user.role;
-  if (role !== UserRole.EMPLOYER && role !== UserRole.JOBSEEKER) {
+  if (!messagingRoleAllowed(role)) {
     return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+  }
+  if (role === UserRole.MENTOR) {
+    return NextResponse.json({ success: false, error: "Use mentor session messaging" }, { status: 400 });
   }
 
   const raw: unknown = await request.json().catch(() => null);
   const parsed = postSchema.safeParse(raw);
   if (!parsed.success) {
     return NextResponse.json({ success: false, error: "Validation failed" }, { status: 400 });
+  }
+
+  const body = parsed.data.body.trim();
+  if (containsContactInfo(body)) {
+    return NextResponse.json({ success: false, error: MESSAGE_FILTER_ERROR }, { status: 400 });
   }
 
   const prisma = getPrisma();
@@ -109,6 +127,14 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespon
     employerId = recipient.id;
   }
 
+  const allowed = await canMessageEmployerAndSeeker(employerId, jobSeekerId);
+  if (!allowed) {
+    return NextResponse.json(
+      { success: false, error: "Messaging is available after shortlisting only" },
+      { status: 403 },
+    );
+  }
+
   const thread = await prisma.messageThread.upsert({
     where: {
       employerId_jobSeekerId: { employerId, jobSeekerId },
@@ -122,7 +148,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespon
     data: {
       threadId: thread.id,
       senderId: session.user.id,
-      body: parsed.data.body.trim(),
+      body,
     },
     select: { id: true },
   });
@@ -137,7 +163,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespon
   const selfName = session.user.name?.trim() || session.user.email?.split("@")[0] || "User";
   const otherUser = await prisma.user.findUnique({
     where: { id: otherId },
-    select: { role: true },
+    select: { role: true, email: true },
   });
   const msgLink =
     otherUser?.role === UserRole.EMPLOYER
@@ -152,6 +178,18 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespon
     messageAr: `${selfName} أرسل لك رسالة.`,
     link: msgLink,
   });
+
+  if (otherUser?.email) {
+    const { onNewMessage } = await import("@/lib/email-triggers");
+    await onNewMessage({
+      recipientId: otherId,
+      recipientEmail: otherUser.email,
+      recipientRole: otherUser.role,
+      senderName: selfName,
+      preview: body,
+      threadId: thread.id,
+    });
+  }
 
   return NextResponse.json({ success: true, data: { threadId: thread.id } }, { status: 201 });
 }
