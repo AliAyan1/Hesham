@@ -1,37 +1,15 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { UserRole, Prisma } from "@prisma/client";
-import { z } from "zod";
 import { getServerSession } from "@/lib/get-server-session";
 import { getPrisma } from "@/lib/db";
 import type { ApiResponse } from "@/types";
-import { jobCategorySchema, jobTypeSchema, hiringMetaSchema } from "@/lib/jobs/constants";
+import { createJobSchema, createJobValidationMessage } from "@/lib/jobs/create-job-schema";
 import { runAutoShortlistForJob } from "@/lib/jobs/run-auto-shortlist";
 import { notifyJobSeekersOnNewJob } from "@/lib/jobs/notify-job-matches";
 
 function toInputJson(value: unknown): Prisma.InputJsonValue {
   return value as Prisma.InputJsonValue;
 }
-
-const createSchema = z.object({
-  title: z.string().min(3).max(200),
-  titleAr: z.string().max(200).optional(),
-  description: z.string().min(20).max(12000),
-  descriptionAr: z.string().max(12000).optional(),
-  category: jobCategorySchema,
-  type: jobTypeSchema,
-  location: z.string().max(200).optional(),
-  locationAr: z.string().max(200).optional(),
-  isRemote: z.boolean().optional(),
-  salaryMin: z.number().int().min(0).optional(),
-  salaryMax: z.number().int().min(0).optional(),
-  currency: z.string().max(8).optional(),
-  requirements: z.array(z.string().max(800)).max(80).optional(),
-  benefits: z.array(z.string().max(800)).max(80).optional(),
-  skills: z.array(z.string().max(120)).max(60).optional(),
-  hiringMeta: hiringMetaSchema,
-  expiresAt: z.string().datetime().optional(),
-  isFeatured: z.boolean().optional(),
-});
 
 export async function POST(
   request: NextRequest,
@@ -42,9 +20,14 @@ export async function POST(
   }
 
   const raw: unknown = await request.json().catch(() => null);
-  const parsed = createSchema.safeParse(raw);
+  const parsed = createJobSchema.safeParse(raw);
   if (!parsed.success) {
-    return NextResponse.json({ success: false, error: "Validation failed" }, { status: 400 });
+    const error = createJobValidationMessage(parsed.error.issues, {
+      titleMin: "Job title must be at least 3 characters.",
+      locationRequired: "Work location is required for on-site jobs.",
+      generic: "Validation failed",
+    });
+    return NextResponse.json({ success: false, error }, { status: 400 });
   }
 
   const b = parsed.data;

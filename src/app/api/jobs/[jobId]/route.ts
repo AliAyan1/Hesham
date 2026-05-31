@@ -11,7 +11,7 @@ import { runAutoShortlistForJob } from "@/lib/jobs/run-auto-shortlist";
 const updateBodySchema = z.object({
   title: z.string().min(3).max(200).optional(),
   titleAr: z.string().max(200).optional(),
-  description: z.string().min(20).max(12000).optional(),
+  description: z.string().max(12000).optional(),
   descriptionAr: z.string().max(12000).optional(),
   category: jobCategorySchema.optional(),
   type: jobTypeSchema.optional(),

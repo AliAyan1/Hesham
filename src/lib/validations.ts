@@ -66,7 +66,6 @@ export const jobSchema = z.object({
   titleAr: z.string().max(200).optional(),
   description: z
     .string()
-    .min(20, "Description must be at least 20 characters")
     .max(5000, "Description must be under 5000 characters"),
   descriptionAr: z.string().max(5000).optional(),
   category: z.string().min(1, "Category is required"),

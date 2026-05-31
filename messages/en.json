@@ -713,7 +713,9 @@
       "expLead": "Lead",
       "remoteSummary": "Remote",
       "locationSummary": "{location}",
-      "aiRemoteHint": "Remote"
+      "aiRemoteHint": "Remote",
+      "validationTitleMin": "Job title must be at least 3 characters.",
+      "validationLocationRequired": "Work location is required for on-site jobs."
     }
   },
   "profile": {

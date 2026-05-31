@@ -659,7 +659,9 @@
       "locationSummary": "{location}",
       "aiRemoteHint": "Remote",
       "jobTypeRequired": "Job type *",
-      "locationRequired": "Work location *"
+      "locationRequired": "Work location *",
+      "validationTitleMin": "يجب أن يكون عنوان الوظيفة 3 أحرف على الأقل.",
+      "validationLocationRequired": "موقع العمل مطلوب للوظائف غير عن بُعد."
     }
   },
   "profile": {

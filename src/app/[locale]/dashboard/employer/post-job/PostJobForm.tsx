@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import { Link, useRouter } from "@/i18n/navigation";
 import { useCallback, useMemo, useState } from "react";
 import { JOB_CATEGORIES } from "@/lib/jobs/constants";
+import { createJobSchema, createJobValidationMessage } from "@/lib/jobs/create-job-schema";
 import { hrefUpgradeProfessional } from "@/lib/i18n-hrefs";
 import { Button } from "@/components/ui/Button";
 
@@ -130,6 +131,22 @@ export function PostJobForm({
         },
         expiresAt: expiresAt ? new Date(expiresAt).toISOString() : undefined,
       };
+
+      const validation = createJobSchema.safeParse(payload);
+      if (!validation.success) {
+        setErr(
+          createJobValidationMessage(validation.error.issues, {
+            titleMin: pw("validationTitleMin"),
+            locationRequired: pw("validationLocationRequired"),
+            generic: tc("error"),
+          }),
+        );
+        if (validation.error.issues.some((i) => i.path[0] === "title" || i.path[0] === "location")) {
+          setStep(1);
+        }
+        return;
+      }
+
       const res = await axios.post<{ success: boolean; data?: { id: string } }>("/api/jobs/create", payload);
       if (res.data.success && res.data.data?.id) {
         router.push(`/dashboard/employer/jobs?poolJob=${encodeURIComponent(res.data.data.id)}`);
@@ -140,6 +157,21 @@ export function PostJobForm({
     } finally {
       setSubmitting(false);
     }
+  }
+
+  function validateStep(current: WizardStep): boolean {
+    if (current === 1) {
+      if (title.trim().length < 3) {
+        setErr(pw("validationTitleMin"));
+        return false;
+      }
+      if (!isRemote && !location.trim()) {
+        setErr(pw("validationLocationRequired"));
+        return false;
+      }
+    }
+    setErr(null);
+    return true;
   }
 
   return (
@@ -213,7 +245,7 @@ export function PostJobForm({
             {pw("deadline")}
             <input value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} type="datetime-local" className="mt-1 w-full rounded border px-3 py-2" />
           </label>
-          <Button type="button" variant="primary" className="min-h-11" onClick={() => setStep(2)}>
+          <Button type="button" variant="primary" className="min-h-11" onClick={() => validateStep(1) && setStep(2)}>
             {tc("next")}
           </Button>
         </section>
