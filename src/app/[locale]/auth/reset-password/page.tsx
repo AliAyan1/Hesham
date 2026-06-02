@@ -57,7 +57,7 @@ export default function ResetPasswordPage() {
           setError(body.error === "Invalid or expired reset link" ? t("resetPasswordInvalidLink") : t("resetPasswordError"));
           return;
         }
-        router.push("/auth/login?reset=1");
+        router.push("/login?reset=1");
       } catch {
         setError(t("resetPasswordError"));
       }
@@ -70,7 +70,7 @@ export default function ResetPasswordPage() {
         <h2 className="mb-1 text-xl font-semibold text-white">{t("resetPasswordTitle")}</h2>
         <p className="mb-4 text-sm text-gray-400">{t("resetPasswordSubtitle")}</p>
         <p className="text-sm text-red-400">{t("resetPasswordInvalidLink")}</p>
-        <Link href="/auth/forgot-password" className="mt-4 inline-block text-sm text-brand-teal hover:underline">
+        <Link href="/forgot-password" className="mt-4 inline-block text-sm text-brand-teal hover:underline">
           {t("forgotPasswordTitle")}
         </Link>
       </AuthShell>

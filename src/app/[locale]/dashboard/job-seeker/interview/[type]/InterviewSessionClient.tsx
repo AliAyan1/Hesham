@@ -79,6 +79,7 @@ export default function InterviewSessionClient({
   const [displayStream, setDisplayStream] = useState<MediaStream | null>(null);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const micStreamRef = useRef<MediaStream | null>(null);
+  const [micStreamForAuto, setMicStreamForAuto] = useState<MediaStream | null>(null);
   const displayStreamRef = useRef<MediaStream | null>(null);
   const cameraStreamRef = useRef<MediaStream | null>(null);
   const fullRecorderRef = useRef<MediaRecorder | null>(null);
@@ -125,7 +126,9 @@ export default function InterviewSessionClient({
     },
   });
 
-  proctoringStopRef.current = proctoring.stopSession;
+  useEffect(() => {
+    proctoringStopRef.current = proctoring.stopSession;
+  }, [proctoring.stopSession]);
 
   useEffect(() => {
     displayStreamRef.current = displayStream;
@@ -336,7 +339,7 @@ export default function InterviewSessionClient({
 
   const autoAnswer = useInterviewAutoAnswer({
     locale,
-    micStream: micStreamRef.current,
+    micStream: micStreamForAuto,
     muted,
     onTranscriptUpdate: setLiveTranscript,
     onFinalize: async (text) => {
@@ -355,8 +358,10 @@ export default function InterviewSessionClient({
     },
   });
 
-  autoAnswerStopRef.current = autoAnswer.stopCapture;
-  autoAnswerStartRef.current = autoAnswer.startCapture;
+  useEffect(() => {
+    autoAnswerStopRef.current = autoAnswer.stopCapture;
+    autoAnswerStartRef.current = autoAnswer.startCapture;
+  }, [autoAnswer.stopCapture, autoAnswer.startCapture]);
 
   const speakQuestionWithAutoListen = useCallback(
     async (questionIndex: number, list: QuestionItem[]) => {
@@ -553,6 +558,7 @@ export default function InterviewSessionClient({
         video: false,
       });
       micStreamRef.current = micLocal;
+      setMicStreamForAuto(micLocal);
 
       const mime = pickRecorderMime();
       cloneLocal = micLocal.clone();
@@ -594,6 +600,7 @@ export default function InterviewSessionClient({
         fullCloneRef.current = null;
         micStreamRef.current?.getTracks().forEach((tr) => tr.stop());
         micStreamRef.current = null;
+        setMicStreamForAuto(null);
         dispLocal?.getTracks().forEach((tr) => tr.stop());
         camLocal?.getTracks().forEach((tr) => tr.stop());
         cloneLocal?.getTracks().forEach((tr) => tr.stop());
@@ -634,6 +641,7 @@ export default function InterviewSessionClient({
       fullCloneRef.current = null;
       micStreamRef.current?.getTracks().forEach((tr) => tr.stop());
       micStreamRef.current = null;
+      setMicStreamForAuto(null);
       dispLocal?.getTracks().forEach((tr) => tr.stop());
       camLocal?.getTracks().forEach((tr) => tr.stop());
       cloneLocal?.getTracks().forEach((tr) => tr.stop());
@@ -709,6 +717,7 @@ export default function InterviewSessionClient({
 
       micStreamRef.current?.getTracks().forEach((tr) => tr.stop());
       micStreamRef.current = null;
+      setMicStreamForAuto(null);
 
       displayStream?.getTracks().forEach((tr) => tr.stop());
       cameraStream?.getTracks().forEach((tr) => tr.stop());

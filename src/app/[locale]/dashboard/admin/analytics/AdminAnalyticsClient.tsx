@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import {
   Bar,
   BarChart,
@@ -58,18 +59,18 @@ export default function AdminAnalyticsClient() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-[#0D2137]">Platform analytics</h1>
         <div className="flex flex-wrap gap-2">
-          <a
+          <Link
             href="/api/admin/analytics/export?type=stats"
             className="rounded-lg border border-brand-blue px-3 py-2 text-sm font-medium text-brand-blue hover:bg-brand-lightBlue/30"
           >
             Export stats CSV
-          </a>
-          <a
+          </Link>
+          <Link
             href="/api/admin/analytics/export?type=audit"
             className="rounded-lg bg-brand-teal px-3 py-2 text-sm font-semibold text-white hover:opacity-90"
           >
             Export audit log CSV
-          </a>
+          </Link>
         </div>
       </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

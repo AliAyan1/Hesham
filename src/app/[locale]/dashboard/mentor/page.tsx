@@ -13,7 +13,7 @@ export default async function MentorDashboardPage({
 }) {
   const { locale } = await params;
   const session = await auth();
-  if (!session?.user) redirect(`/${locale}/auth/login`);
+  if (!session?.user) redirect(`/${locale}/login`);
   if (session.user.role !== UserRole.MENTOR) redirect(`/${locale}/dashboard`);
 
   const tb = await getTranslations({ locale, namespace: "breadcrumb" });

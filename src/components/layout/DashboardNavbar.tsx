@@ -17,7 +17,6 @@ import {
 } from "@/lib/dashboard-nav";
 import { DASHBOARD_ROUTES } from "@/lib/constants";
 import { useDashboardUI } from "@/components/layout/dashboard-ui";
-import { ClearSessionButton } from "@/components/auth/ClearSessionButton";
 import { ChevronDown, Menu, Search } from "lucide-react";
 
 type DashboardNavbarProps = {
@@ -79,6 +78,7 @@ export function DashboardNavbar({ locale }: DashboardNavbarProps): ReactNode {
           <Logo
             variant="light"
             size="sm"
+            href="/"
             className="shrink-0 [&_img]:h-9 [&_img]:!w-auto [&_img]:max-h-9 [&_img]:min-h-0"
             priority
           />
@@ -236,10 +236,6 @@ function DashboardUserMenu({
               {settingsLabel}
             </Link>
           ) : null}
-          <div className="my-1 h-px bg-gray-100" role="presentation" />
-          <div className="px-3 py-2" role="none">
-            <ClearSessionButton locale={locale} variant="button" className="w-full" />
-          </div>
           <div className="my-1 h-px bg-gray-100" role="presentation" />
           <button
             type="button"

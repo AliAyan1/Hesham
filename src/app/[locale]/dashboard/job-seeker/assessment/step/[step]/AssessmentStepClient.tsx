@@ -94,13 +94,6 @@ export default function AssessmentStepClient({ stepNumber }: { stepNumber: numbe
   }, [phase, timeLeft]);
 
   useEffect(() => {
-    if (phase === "run" && timeLeft === 0 && startedAt && questions.length > 0 && assessmentId) {
-      void finish();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeLeft, phase, startedAt]);
-
-  useEffect(() => {
     return () => {
       displayStream?.getTracks().forEach((tr) => tr.stop());
       cameraStream?.getTracks().forEach((tr) => tr.stop());
@@ -275,6 +268,13 @@ export default function AssessmentStepClient({ stepNumber }: { stepNumber: numbe
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    if (phase === "run" && timeLeft === 0 && startedAt && questions.length > 0 && assessmentId) {
+      void finish();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timeLeft, phase, startedAt, assessmentId, questions.length]);
 
   if (!session.data?.user) return <LoadingSpinner size="full" label={tc("loading")} />;
   if (loadErr) {

@@ -157,12 +157,12 @@ export function Navbar({ locale, variant = "public" }: NavbarProps): ReactNode {
             </Link>
           ) : (
             <div className="hidden items-center gap-2 lg:flex">
-              <Link href="/auth/login">
+              <Link href="/login">
                 <Button variant="outline" size="sm" type="button">
                   {t("login")}
                 </Button>
               </Link>
-              <Link href="/auth/register">
+              <Link href="/register">
                 <Button variant="primary" size="sm" type="button">
                   {t("register")}
                 </Button>
@@ -186,12 +186,12 @@ export function Navbar({ locale, variant = "public" }: NavbarProps): ReactNode {
         />
         {!authenticated ? (
           <div className="mt-4 flex gap-3 px-1">
-            <Link href="/auth/login" className="flex-1">
+            <Link href="/login" className="flex-1">
               <Button variant="outline" className="w-full" size="md" type="button">
                 {t("login")}
               </Button>
             </Link>
-            <Link href="/auth/register" className="flex-1">
+            <Link href="/register" className="flex-1">
               <Button variant="primary" className="w-full" size="md" type="button">
                 {t("register")}
               </Button>

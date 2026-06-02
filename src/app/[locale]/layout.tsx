@@ -73,7 +73,7 @@ export default async function LocaleLayout({
 
   setRequestLocale(locale);
 
-  const messages = await getMessages({ locale });
+  const messages = await getMessages();
   const isRTL = RTL_LOCALES.includes(locale as Locale);
   const rawSession = await auth();
   const session =

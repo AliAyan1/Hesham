@@ -49,7 +49,7 @@ export default function EmployerDashboardClient({
       });
       if (!res.ok) {
         if (res.status === 401) {
-          void signOut({ callbackUrl: `/${locale}/auth/login` });
+          void signOut({ callbackUrl: `/${locale}/login` });
         }
         setStatus("error");
         return;

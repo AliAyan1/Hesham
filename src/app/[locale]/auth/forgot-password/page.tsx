@@ -79,7 +79,7 @@ export default function ForgotPasswordPage() {
         </form>
       )}
       <p className="mt-6 text-center text-sm">
-        <Link href="/auth/login" className="text-brand-teal hover:underline">
+        <Link href="/login" className="text-brand-teal hover:underline">
           {t("forgotPasswordBackToLogin")}
         </Link>
       </p>

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState, useTransition, useEffect } from "react";
 import { signIn, useSession } from "next-auth/react";
 import { signInWithGoogle } from "@/lib/google-oauth";
@@ -8,12 +9,9 @@ import { useSearchParams } from "next/navigation";
 import { Link } from "@/i18n/navigation";
 import { loginSchema } from "@/lib/validations";
 import { BRAND_COLORS } from "@/lib/constants";
-import { AuthShell } from "@/components/auth/AuthShell";
 import { ClientHydrationGate } from "@/components/ui/ClientHydrationGate";
-import { ClearSessionButton } from "@/components/auth/ClearSessionButton";
 import { GoogleIcon } from "@/components/auth/GoogleIcon";
-import { fetchPostAuthPath, hardNavigate, markOnboardingComplete } from "@/lib/auth-redirect";
-import { dashboardPathForRole } from "@/lib/subscription";
+import { fetchPostAuthPath, hardNavigate } from "@/lib/auth-redirect";
 import type { LoginFormData } from "@/types";
 import type { ZodIssue } from "zod";
 
@@ -52,6 +50,7 @@ type FieldErrors = Partial<Record<keyof LoginFormData, string>>;
 
 export default function LoginPage() {
   const t = useTranslations();
+  const tAuth = useTranslations("auth.loginRedesign");
   const locale = useLocale();
   const searchParams = useSearchParams();
   const { status: sessionStatus, update } = useSession();
@@ -63,17 +62,7 @@ export default function LoginPage() {
     if (!oauthReturn || sessionStatus !== "authenticated") return;
     void (async () => {
       await update();
-      let path = await fetchPostAuthPath();
-      if (path === "/onboarding") {
-        try {
-          await markOnboardingComplete(update);
-          const res = await fetch("/api/auth/session", { credentials: "include", cache: "no-store" });
-          const json = (await res.json()) as { user?: { role?: string } };
-          path = dashboardPathForRole(String(json.user?.role ?? "JOBSEEKER"));
-        } catch {
-          /* keep onboarding path */
-        }
-      }
+      const path = await fetchPostAuthPath();
       hardNavigate(path, locale);
     })();
   }, [oauthReturn, sessionStatus, locale, update]);
@@ -133,9 +122,7 @@ export default function LoginPage() {
   async function handleGoogleSignIn() {
     startTransition(async () => {
       try {
-        await signInWithGoogle({
-          callbackUrl: `/${locale}/auth/login?from=oauth`,
-        });
+        await signInWithGoogle({ callbackUrl: `/${locale}/auth/login?from=oauth` });
       } catch {
         setServerError(t("common.error"));
       }
@@ -143,107 +130,140 @@ export default function LoginPage() {
   }
 
   return (
-    <AuthShell isRtl={isRTL} slogan={t("common.slogan")}>
-      <h2 className="mb-1 text-xl font-semibold text-white">{t("auth.login")}</h2>
-      <p className="mb-6 text-sm text-gray-400">{t("auth.subtitleLogin")}</p>
+    <div className="min-h-[100dvh]" dir={isRTL ? "rtl" : "ltr"}>
+      <div className="grid min-h-[100dvh] lg:grid-cols-2">
+        {/* Left panel (desktop) */}
+        <div className="hidden items-center justify-center bg-gradient-to-br from-[#0F4C75] to-[#0D2137] p-10 text-white lg:flex">
+          <div className="w-full max-w-md">
+            <div className="flex justify-center">
+              <Image src="/logo.png" alt="QudrahTech" width={220} height={70} priority className="h-auto w-auto" />
+            </div>
+            <p className="mt-8 text-center text-xl font-semibold">{tAuth("tagline")}</p>
+            <p className="mt-2 text-center text-sm text-white/70">{tAuth("taglineAr")}</p>
 
-      {serverError ? (
-        <div className="mb-4 rounded-lg border border-red-700 bg-red-900/30 p-3 text-sm text-red-400">
-          {serverError}
+            <div className="mt-10 grid gap-3 rounded-2xl border border-white/15 bg-white/5 p-6 text-sm">
+              <StatLine value={tAuth("stat1Value")} label={tAuth("stat1Label")} />
+              <StatLine value={tAuth("stat2Value")} label={tAuth("stat2Label")} />
+              <StatLine value={tAuth("stat3Value")} label={tAuth("stat3Label")} />
+            </div>
+          </div>
         </div>
-      ) : null}
 
-      <ClientHydrationGate
-        fallback={
-          <div className="space-y-4" aria-hidden>
-            <div className="h-[4.5rem] animate-pulse rounded-lg bg-[#333]" />
-            <div className="h-[4.5rem] animate-pulse rounded-lg bg-[#333]" />
-            <div className="h-10 animate-pulse rounded-lg bg-[#333]" />
-          </div>
-        }
-      >
-        <form onSubmit={handleSubmit} noValidate className="space-y-4" suppressHydrationWarning>
-          <div suppressHydrationWarning>
-            <label className="mb-1 block text-sm text-gray-300">{t("auth.email")}</label>
-            <input
-              type="email"
-              name="email"
-              value={formData.email}
-              onChange={handleChange}
-              disabled={isPending}
-              autoComplete="email"
-              className="w-full rounded-lg border border-[#444] bg-brand-primary px-4 py-2.5 text-white placeholder-gray-600 transition-colors focus:border-brand-accent focus:outline-none disabled:opacity-50"
-              placeholder={t("auth.placeholderEmail")}
-            />
-            {fieldErrors.email ? <p className="mt-1 text-xs text-red-400">{fieldErrors.email}</p> : null}
-          </div>
+        {/* Right panel */}
+        <div className="flex items-center justify-center bg-white p-6">
+          <div className="w-full max-w-md">
+            <div className="mb-8 lg:hidden">
+              <Image src="/logo.png" alt="QudrahTech" width={180} height={58} priority className="h-auto w-auto" />
+            </div>
 
-          <div>
-            <label className="mb-1 block text-sm text-gray-300">{t("auth.password")}</label>
-            <input
-              type="password"
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              disabled={isPending}
-              autoComplete="current-password"
-              className="w-full rounded-lg border border-[#444] bg-brand-primary px-4 py-2.5 text-white placeholder-gray-600 transition-colors focus:border-brand-accent focus:outline-none disabled:opacity-50"
-              placeholder={t("auth.placeholderPassword")}
-            />
-            {fieldErrors.password ? (
-              <p className="mt-1 text-xs text-red-400">{fieldErrors.password}</p>
+            <h1 className="text-2xl font-black text-[#0D2137]">{tAuth("title")}</h1>
+            <p className="mt-2 text-sm text-[#6B7280]">{tAuth("subtitle")}</p>
+
+            {serverError ? (
+              <div className="mt-5 rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-medium text-red-700">
+                {serverError}
+              </div>
             ) : null}
-            <p className="mt-2 text-end">
-              <Link href="/auth/forgot-password" className="text-xs text-brand-teal hover:underline">
-                {t("auth.forgotPasswordLink")}
+
+            <div className="mt-6">
+              <ClientHydrationGate
+                fallback={
+                  <div className="space-y-4" aria-hidden>
+                    <div className="h-12 animate-pulse rounded-xl bg-gray-100" />
+                    <div className="h-12 animate-pulse rounded-xl bg-gray-100" />
+                    <div className="h-11 animate-pulse rounded-xl bg-gray-100" />
+                  </div>
+                }
+              >
+                <form onSubmit={handleSubmit} noValidate className="space-y-4" suppressHydrationWarning>
+                  <div>
+                    <label className="mb-1 block text-sm font-semibold text-[#0D2137]">{t("auth.email")}</label>
+                    <input
+                      type="email"
+                      name="email"
+                      value={formData.email}
+                      onChange={handleChange}
+                      disabled={isPending}
+                      autoComplete="email"
+                      className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-[#0D2137] placeholder-gray-400 focus:border-[#0F4C75] focus:outline-none disabled:opacity-50"
+                      placeholder={t("auth.placeholderEmail")}
+                    />
+                    {fieldErrors.email ? <p className="mt-1 text-xs text-red-600">{fieldErrors.email}</p> : null}
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <label className="mb-1 block text-sm font-semibold text-[#0D2137]">{t("auth.password")}</label>
+                      <Link href="/forgot-password" className="text-xs font-semibold text-[#0F4C75] hover:underline">
+                        {t("auth.forgotPasswordLink")}
+                      </Link>
+                    </div>
+                    <input
+                      type="password"
+                      name="password"
+                      value={formData.password}
+                      onChange={handleChange}
+                      disabled={isPending}
+                      autoComplete="current-password"
+                      className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-[#0D2137] placeholder-gray-400 focus:border-[#0F4C75] focus:outline-none disabled:opacity-50"
+                      placeholder={t("auth.placeholderPassword")}
+                    />
+                    {fieldErrors.password ? <p className="mt-1 text-xs text-red-600">{fieldErrors.password}</p> : null}
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isPending}
+                    className="flex w-full items-center justify-center rounded-xl py-3 font-semibold text-white transition-opacity hover:opacity-95 disabled:opacity-50"
+                    style={{ backgroundColor: BRAND_COLORS.accent }}
+                  >
+                    {isPending ? tAuth("signingIn") : t("auth.login")}
+                  </button>
+                </form>
+
+                <div className="my-6 flex items-center gap-3">
+                  <div className="h-px flex-1 bg-gray-200" />
+                  <span className="text-xs text-gray-500">{t("auth.orContinueWith")}</span>
+                  <div className="h-px flex-1 bg-gray-200" />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => void handleGoogleSignIn()}
+                  disabled={isPending}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white py-3 font-semibold text-[#0D2137] hover:bg-gray-50 disabled:opacity-50"
+                >
+                  <GoogleIcon />
+                  {t("auth.loginWithGoogle")}
+                </button>
+              </ClientHydrationGate>
+            </div>
+
+            <div className="mt-8 border-t border-gray-100 pt-6">
+              <p className="text-center text-sm text-[#6B7280]">{t("auth.noAccount")}</p>
+              <Link
+                href={
+                  urlPlan === "free" || urlPlan === "professional" || urlPlan === "premium"
+                    ? { pathname: "/register", query: { plan: urlPlan } }
+                    : "/register"
+                }
+                className="mt-3 flex w-full items-center justify-center rounded-xl border-2 border-[#0F4C75] py-3 text-sm font-semibold text-[#0F4C75] hover:bg-[#EFF6FF]"
+              >
+                {tAuth("getStarted")}
               </Link>
-            </p>
+            </div>
           </div>
-
-          <button
-            type="submit"
-            disabled={isPending}
-            className="w-full rounded-lg py-2.5 font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-            style={{ backgroundColor: BRAND_COLORS.accent }}
-          >
-            {isPending ? t("auth.loggingIn") : t("auth.login")}
-          </button>
-        </form>
-
-        <div className="my-5 flex items-center gap-3">
-          <div className="h-px flex-1 bg-[#333]" />
-          <span className="text-xs text-gray-500">{t("auth.orContinueWith")}</span>
-          <div className="h-px flex-1 bg-[#333]" />
         </div>
-
-        <button
-          type="button"
-          onClick={() => void handleGoogleSignIn()}
-          disabled={isPending}
-          className="flex w-full items-center justify-center gap-2 rounded-lg border border-[#444] py-2.5 font-medium text-white transition-colors hover:bg-[#2a2a2a] disabled:opacity-50"
-        >
-          <GoogleIcon />
-          {t("auth.loginWithGoogle")}
-        </button>
-      </ClientHydrationGate>
-
-      <div className="mt-6 flex justify-center">
-        <ClearSessionButton locale={locale} className="text-amber-400/90" />
       </div>
+    </div>
+  );
+}
 
-      <div className="mt-8 space-y-3 border-t border-[#333] pt-6">
-        <p className="text-center text-sm text-gray-400">{t("auth.noAccount")}</p>
-        <Link
-          href={
-            urlPlan === "free" || urlPlan === "professional" || urlPlan === "premium"
-              ? { pathname: "/auth/register", query: { plan: urlPlan } }
-              : "/auth/register"
-          }
-          className="flex w-full items-center justify-center rounded-lg border-2 border-brand-teal/60 py-2.5 text-sm font-semibold text-brand-teal transition-colors hover:bg-brand-teal/10"
-        >
-          {t("auth.register")}
-        </Link>
-      </div>
-    </AuthShell>
+function StatLine({ value, label }: { value: string; label: string }) {
+  return (
+    <div className="flex items-baseline justify-between">
+      <span className="text-lg font-black">{value}</span>
+      <span className="text-sm text-white/75">{label}</span>
+    </div>
   );
 }

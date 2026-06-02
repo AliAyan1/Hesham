@@ -22,6 +22,11 @@ export const hrefRegisterPremium = {
   query: { plan: "premium" },
 } as const;
 
+export const hrefRegisterMentor = {
+  pathname: "/auth/register",
+  query: { role: "mentor" },
+} as const;
+
 export const hrefUpgradeProfessional = {
   pathname: "/upgrade",
   query: { plan: "professional" },

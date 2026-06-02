@@ -1,16 +1,15 @@
 import type { ComponentProps } from "react";
 import { getTranslations } from "next-intl/server";
-import { redirectAuthenticatedUserFromMarketing } from "@/lib/public-page-auth";
-import { PublicNavbar } from "@/components/layout/PublicNavbar";
 import { Footer } from "@/components/layout/Footer";
 import { TrustedAssessmentsSection } from "@/components/landing/TrustedAssessmentsSection";
 import { Link } from "@/i18n/navigation";
 import {
   hrefRegisterFree,
   hrefRegisterEmployer,
-  hrefRegisterPremium,
-  hrefRegisterProfessional,
 } from "@/lib/i18n-hrefs";
+import { LandingNavbar } from "@/components/landing/LandingNavbar";
+import { MentorLandingSection } from "@/components/landing/MentorLandingSection";
+import { PricingCardsSection } from "@/components/landing/PricingCardsSection";
 import {
   ArrowRight,
   Brain,
@@ -31,7 +30,6 @@ export default async function LocaleHomePage({
   params: Promise<{ locale: string }>;
 }) {
   const { locale } = await params;
-  await redirectAuthenticatedUserFromMarketing(locale);
   const t = await getTranslations({ locale, namespace: "landing" });
   const isRTL = locale === "ar" || locale === "ur";
 
@@ -62,7 +60,7 @@ export default async function LocaleHomePage({
 
   return (
     <div className="min-h-screen bg-white text-gray-900" dir={isRTL ? "rtl" : "ltr"}>
-      <PublicNavbar locale={locale} guestOnly />
+      <LandingNavbar />
 
       <main>
         {/* Hero */}
@@ -73,13 +71,13 @@ export default async function LocaleHomePage({
             backgroundSize: "24px 24px",
           }}
         >
-          <div className="mx-auto w-full max-w-4xl px-6 py-20 text-center">
+          <div className="mx-auto w-full max-w-4xl px-6 py-20 text-center motion-safe:animate-[landing-in_600ms_ease-out]">
             <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-[#0F4C75]/20 bg-[#EFF6FF] px-4 py-1.5 text-sm font-medium text-[#0F4C75]">
               <span aria-hidden>🚀</span>
               <span>{t("heroBadge").replace("🚀 ", "")}</span>
             </div>
 
-            <h1 className="mt-7 text-balance text-5xl font-black tracking-tight text-[#0D2137] sm:text-6xl md:text-7xl lg:text-8xl">
+            <h1 className="mt-7 text-balance text-6xl font-black tracking-tight text-[#0D2137] sm:text-7xl md:text-8xl lg:text-9xl">
               <span className="block">{t("headlineKnowYour")}</span>
               <span className="block text-[#0F4C75]">{t("headlinePotential")}</span>
               <span className="block">{t("headlineShape")}</span>
@@ -90,19 +88,24 @@ export default async function LocaleHomePage({
             </p>
 
             <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
-              <Link
-                href={hrefRegisterFree}
-                prefetch={false}
+              <a
+                href="#pricing"
                 className="inline-flex min-h-11 items-center justify-center rounded-xl bg-[#0F4C75] px-8 py-4 text-lg font-semibold text-white shadow-lg shadow-[#0F4C75]/25 transition-all duration-200 hover:bg-[#0D2137] hover:shadow-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal"
               >
                 {t("ctaPrimary")}
-              </Link>
+              </a>
               <Link
-                href="/pricing"
+                href="/register?role=employer"
                 className="inline-flex min-h-11 items-center justify-center px-4 py-3 text-[#0F4C75] font-semibold hover:underline underline-offset-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal"
               >
                 {t("ctaSecondary")}
               </Link>
+            </div>
+
+            <div className="mt-10 grid gap-4 sm:grid-cols-3">
+              <MiniStatCard tone="blue" title={t("mini.profileTitle")} value={t("mini.profileValue")} />
+              <MiniStatCard tone="teal" title={t("mini.assessmentTitle")} value={t("mini.assessmentValue")} />
+              <MiniStatCard tone="gold" title={t("mini.matchesTitle")} value={t("mini.matchesValue")} />
             </div>
 
             <div className="mt-10 flex flex-wrap items-center justify-center gap-8 text-sm text-[#6B7280]">
@@ -257,9 +260,11 @@ export default async function LocaleHomePage({
           </div>
         </section>
 
+        <MentorLandingSection />
+
         {/* Pricing */}
         <section className="bg-[#F8FAFC] py-24" id="pricing">
-          <PricingSection locale={locale} />
+          <PricingCardsSection locale={locale} className="mx-auto max-w-6xl px-6" />
         </section>
 
         {/* FAQ */}
@@ -404,136 +409,27 @@ function AudienceCard({
   );
 }
 
-async function PricingSection({ locale }: { locale: string }) {
-  const t = await getTranslations({ locale, namespace: "landing" });
-  const tp = await getTranslations({ locale, namespace: "pages.pricing" });
-
-  return (
-    <div className="mx-auto max-w-6xl px-6">
-      <h2 className="text-4xl font-bold text-[#0D2137]">{t("pricingTitle")}</h2>
-      <div className="mt-10 grid gap-6 lg:grid-cols-3">
-        <PriceCard
-          name={t("priceFreeName")}
-          price={t("priceFreeValue")}
-          variant="free"
-          ctaLabel={t("finalCtaPrimary")}
-          ctaHref={hrefRegisterFree}
-          features={[
-            t("priceFreeFeature1"),
-            t("priceFreeFeature2"),
-            t("priceFreeFeature3"),
-            t("priceFreeFeature4"),
-          ]}
-        />
-        <PriceCard
-          name={t("priceProName")}
-          price={t("priceProValue")}
-          variant="pro"
-          badge={t("priceProBadge")}
-          ctaLabel={tp("ctaProfessional")}
-          ctaHref={hrefRegisterProfessional}
-          features={[
-            t("priceProFeature1"),
-            t("priceProFeature2"),
-            t("priceProFeature3"),
-            t("priceProFeature4"),
-          ]}
-        />
-        <PriceCard
-          name={t("pricePremiumName")}
-          price={t("pricePremiumValue")}
-          variant="premium"
-          badge={t("pricePremiumBadge")}
-          ctaLabel={tp("ctaPremium")}
-          ctaHref={hrefRegisterPremium}
-          features={[
-            t("pricePremiumFeature1"),
-            t("pricePremiumFeature2"),
-            t("pricePremiumFeature3"),
-            t("pricePremiumFeature4"),
-          ]}
-        />
-      </div>
-    </div>
-  );
-}
-
-function PriceCard({
-  name,
-  price,
-  variant,
-  badge,
-  features,
-  ctaLabel,
-  ctaHref,
+function MiniStatCard({
+  tone,
+  title,
+  value,
 }: {
-  name: string;
-  price: string;
-  variant: "free" | "pro" | "premium";
-  badge?: string;
-  features: string[];
-  ctaLabel: string;
-  ctaHref: AppLinkHref;
+  tone: "blue" | "teal" | "gold";
+  title: string;
+  value: string;
 }) {
-  const styles =
-    variant === "pro"
-      ? "bg-[#0F4C75] text-white scale-[1.02] shadow-xl"
-      : "bg-white text-[#0D2137]";
-  const border =
-    variant === "premium"
-      ? "border-2 border-[#C9973A]"
-      : "border border-gray-200";
-
+  const map = {
+    blue: { bg: "#EFF6FF", fg: "#0F4C75" },
+    teal: { bg: "#E1F5EE", fg: "#1D9E75" },
+    gold: { bg: "#FDF3E3", fg: "#C9973A" },
+  } as const;
+  const c = map[tone];
   return (
-    <div className={`rounded-2xl p-8 ${border} ${styles}`}>
-      {badge ? (
-        <span
-          className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-            variant === "pro"
-              ? "bg-[#1D9E75] text-white"
-              : "bg-[#C9973A] text-white"
-          }`}
-        >
-          {badge}
-        </span>
-      ) : null}
-      <h3 className="mt-4 text-xl font-bold">{name}</h3>
-      <p className={`mt-2 text-3xl font-black ${variant === "pro" ? "text-white" : ""}`}>
-        {price}
-      </p>
-      <ul
-        className={`mt-6 grid gap-3 text-sm ${
-          variant === "pro" ? "text-white/90" : "text-[#6B7280]"
-        }`}
-      >
-        {features.map((f, idx) => (
-          <li key={idx} className="flex items-start gap-2">
-            <span
-              className={`mt-1 h-2 w-2 shrink-0 rounded-full ${
-                variant === "pro" ? "bg-white/60" : "bg-[#0F4C75]/25"
-              }`}
-              aria-hidden
-            />
-            <span className="min-w-0">{f}</span>
-          </li>
-        ))}
-      </ul>
-
-      <div className="mt-8">
-        <Link
-          href={ctaHref}
-          prefetch={variant === "free" ? false : undefined}
-          className={
-            variant === "pro"
-              ? "inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-white px-6 py-3 text-sm font-semibold text-[#0D2137] transition-colors hover:bg-white/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
-              : variant === "premium"
-                ? "inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-[#0F4C75] px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#0D2137] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal"
-                : "inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-gray-200 bg-white px-6 py-3 text-sm font-semibold text-[#0D2137] transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal"
-          }
-        >
-          {ctaLabel}
-        </Link>
+    <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+      <div className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold" style={{ backgroundColor: c.bg, color: c.fg }}>
+        {title}
       </div>
+      <div className="mt-3 text-2xl font-black text-[#0D2137]">{value}</div>
     </div>
   );
 }

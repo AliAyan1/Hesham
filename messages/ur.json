@@ -30,8 +30,16 @@
     "headlinePotential": "صلاحیت جانیں۔",
     "headlineShape": "اپنا مستقبل بنائیں۔",
     "subheadline": "قدرتک جاب سیکرز کو اے آئی اسیسمنٹ، ATS بہتر CV اور اسمارٹ جاب میچنگ سے جوڑتا ہے۔",
-    "ctaPrimary": "مفت شروع کریں — ابدأ مجاناً",
+    "ctaPrimary": "مفت شروع کریں",
     "ctaSecondary": "آجروں کے لیے →",
+    "mini": {
+      "profileTitle": "Profile Completion",
+      "profileValue": "82%",
+      "assessmentTitle": "AI Assessment Score",
+      "assessmentValue": "78/100",
+      "matchesTitle": "Job Matches",
+      "matchesValue": "12 new"
+    },
     "statsJobSeekers": "10,000+ جاب سیکرز",
     "statsEmployers": "500+ آجر",
     "statsAccuracy": "95% درستگی",
@@ -101,6 +109,83 @@
     "audienceCtaJobSeekers": "شروع کریں",
     "audienceCtaEmployers": "ملازمت کا اشتہار دیں",
     "pricingTitle": "سادہ قیمتیں جو آپ کے ساتھ بڑھیں",
+    "pricingNew": {
+      "title": "Pricing",
+      "subtitle": "Choose a plan that fits your stage. Upgrade anytime.",
+      "vat": "+ 15% VAT",
+      "free": {
+        "badge": "Free Forever",
+        "title": "Free",
+        "price": "SAR 0",
+        "cta": "Get Started Free",
+        "features": {
+          "1": "✅ Create profile & browse jobs",
+          "2": "✅ Basic CV builder",
+          "3": "✅ AI Assessment",
+          "4": "❌ ATS + AI Interview"
+        }
+      },
+      "pro": {
+        "badge": "Most Popular",
+        "title": "Professional",
+        "price": "SAR 99/mo",
+        "cta": "Start Professional",
+        "features": {
+          "1": "✅ Everything in Free",
+          "2": "✅ AI CV + ATS Optimization",
+          "3": "✅ AI Video Interviews",
+          "4": "✅ Smart Job Matching"
+        }
+      },
+      "premium": {
+        "badge": "Best Value",
+        "title": "Premium",
+        "price": "SAR 299/mo",
+        "cta": "Go Premium",
+        "features": {
+          "1": "✅ Everything in Professional",
+          "2": "✅ HR Consultations",
+          "3": "✅ Mentor Sessions (5/month)",
+          "4": "✅ Priority Support"
+        }
+      },
+      "mentor": {
+        "badge": "Earn Money",
+        "title": "I am a Mentor",
+        "subtitle": "For HR & Career Professionals",
+        "titleAr": "أنا مرشد مهني",
+        "price": "Start earning",
+        "cta": "Join as Mentor",
+        "features": {
+          "1": "✅ Set your own rate",
+          "2": "✅ Earn 75% per session",
+          "3": "✅ Sessions via platform"
+        }
+      }
+    },
+    "mentor": {
+      "label": "For Professionals",
+      "title": "Turn your expertise into income",
+      "subtitle": "Join hundreds of HR professionals\nand career coaches earning on QudrahTech",
+      "mentorPromptTitle": "Are you an HR Professional or Career Expert?",
+      "mentorPromptSubtitle": "Join QudrahTech as a Mentor and earn\nby coaching professionals",
+      "benefit1Title": "💰 Earn SAR 150-750 per session",
+      "benefit1Desc": "Set your own rate. Keep 75% of every session.",
+      "benefit2Title": "🎓 Share Your Expertise",
+      "benefit2Desc": "Help professionals grow while building\nyour reputation on the platform.",
+      "benefit3Title": "📅 Work on Your Schedule",
+      "benefit3Desc": "Set your availability. Accept only\nsessions that work for you.",
+      "example1": "👤 HR Consultant — SAR 200/hr → Earns SAR 150",
+      "example2": "👤 Career Coach — SAR 300/hr → Earns SAR 225",
+      "example3": "👤 Industry Expert — SAR 500/hr → Earns SAR 375",
+      "cta": "Join as Mentor →",
+      "calcTitle": "Your Potential Earnings:",
+      "calcSubtitle": "Estimate your monthly earning (after 25% platform fee).",
+      "sessionsPerWeek": "Sessions per week",
+      "ratePerHour": "Rate per hour",
+      "monthlyEarning": "Monthly earning",
+      "afterFee": "After 25% platform fee"
+    },
     "pricingToggleMonthly": "ماہانہ",
     "pricingToggleYearly": "سالانہ (10% رعایت)",
     "priceFreeName": "فری",
@@ -552,6 +637,7 @@
   "common": {
     "loading": "لوڈ ہو رہا ہے…",
     "error": "مسئلہ پیش آ گیا",
+    "friendlyError": "Something went wrong. Please refresh.",
     "save": "محفوظ",
     "cancel": "منسوخ",
     "submit": "جمع کریں",
@@ -573,6 +659,18 @@
     "emDash": "—"
   },
   "footer": {
+    "colPlatform": "Platform",
+    "colCompany": "Company",
+    "colMentors": "For Mentors",
+    "linkJobs": "Jobs",
+    "linkCvBuilder": "CV Builder",
+    "linkAssessment": "Assessment",
+    "linkMentors": "Mentors",
+    "linkBlog": "Blog",
+    "linkCareers": "Careers",
+    "linkJoinMentor": "Join as Mentor",
+    "linkHowItWorks": "How it works",
+    "linkEarnings": "Earnings",
     "about": "ہمارے بارے میں",
     "privacy": "رازداری کی پالیسی",
     "terms": "خدمات کی شرائط",

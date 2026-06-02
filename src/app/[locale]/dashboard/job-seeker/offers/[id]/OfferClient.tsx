@@ -19,6 +19,11 @@ export default function OfferClient() {
   const [row, setRow] = useState<OfferDto | null>(null);
   const [declineReason, setDeclineReason] = useState("");
   const [loading, setLoading] = useState(false);
+  const [nowMs, setNowMs] = useState<number | null>(null);
+
+  useEffect(() => {
+    setNowMs(Date.now());
+  }, []);
 
   useEffect(() => {
     void fetch(`/api/job-seeker/offers/${encodeURIComponent(id)}`, { credentials: "include" })
@@ -43,10 +48,13 @@ export default function OfferClient() {
   if (!row) return <p className="text-sm text-[#6B7280]">Loading…</p>;
 
   const company = row.employer.employerProfile?.companyName ?? "Employer";
-  const daysLeft = Math.max(
-    0,
-    Math.ceil((new Date(row.expiresAt).getTime() - Date.now()) / (24 * 60 * 60 * 1000)),
-  );
+  const daysLeft =
+    nowMs == null
+      ? 0
+      : Math.max(
+          0,
+          Math.ceil((new Date(row.expiresAt).getTime() - nowMs) / (24 * 60 * 60 * 1000)),
+        );
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 rounded-xl border bg-white p-8 shadow-sm">

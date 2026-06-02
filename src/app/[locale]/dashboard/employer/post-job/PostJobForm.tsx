@@ -7,6 +7,7 @@ import { Link, useRouter } from "@/i18n/navigation";
 import { useCallback, useMemo, useState } from "react";
 import { JOB_CATEGORIES } from "@/lib/jobs/constants";
 import { createJobSchema, createJobValidationMessage } from "@/lib/jobs/create-job-schema";
+import { CURRENCIES, formatCurrencyLabel } from "@/lib/currencies";
 import { hrefUpgradeProfessional } from "@/lib/i18n-hrefs";
 import { Button } from "@/components/ui/Button";
 
@@ -46,6 +47,7 @@ export function PostJobForm({
   const [location, setLocation] = useState("");
   const [salaryMin, setSalaryMin] = useState("");
   const [salaryMax, setSalaryMax] = useState("");
+  const [currency, setCurrency] = useState("SAR");
   const [expiresAt, setExpiresAt] = useState("");
   const [description, setDescription] = useState("");
   const [descriptionAr, setDescriptionAr] = useState("");
@@ -118,7 +120,7 @@ export function PostJobForm({
         location: isRemote ? undefined : location.trim() || undefined,
         salaryMin: smin === undefined || Number.isNaN(smin) ? undefined : smin,
         salaryMax: smax === undefined || Number.isNaN(smax) ? undefined : smax,
-        currency: "SAR",
+        currency: currency.trim() || undefined,
         requirements: bullets(reqText),
         benefits: bullets(benText),
         skills: bullets(skillsText),
@@ -239,6 +241,16 @@ export function PostJobForm({
             <label className="text-sm font-medium">
               {pw("salaryMax")}
               <input value={salaryMax} onChange={(e) => setSalaryMax(e.target.value)} className="mt-1 w-full rounded border px-3 py-2" type="number" />
+            </label>
+            <label className="text-sm font-medium">
+              {pw("currency")}
+              <select value={currency} onChange={(e) => setCurrency(e.target.value)} className="mt-1 w-full rounded border px-3 py-2">
+                {CURRENCIES.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {formatCurrencyLabel(c)}
+                  </option>
+                ))}
+              </select>
             </label>
           </div>
           <label className="block text-sm font-medium">

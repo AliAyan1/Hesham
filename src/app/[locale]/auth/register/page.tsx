@@ -1,15 +1,13 @@
 "use client";
 
-import { Briefcase, Building2, Check, Crown, GraduationCap, Sparkles } from "lucide-react";
+import { Briefcase, Building2, Check, Crown, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import axios from "axios";
-import { ClearSessionButton } from "@/components/auth/ClearSessionButton";
 import { RegisterRolePickModal } from "@/components/auth/RegisterRolePickModal";
 import { signIn, useSession } from "next-auth/react";
 import { useLocale, useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import { Link } from "@/i18n/navigation";
-import { useRouter } from "@/i18n/navigation";
 import { registerSchema } from "@/lib/validations";
 import { BRAND_COLORS } from "@/lib/constants";
 import { AuthShell } from "@/components/auth/AuthShell";
@@ -24,11 +22,10 @@ import {
 } from "@/lib/auth-redirect";
 import { signInWithGoogle } from "@/lib/google-oauth";
 import { dashboardPathForRole } from "@/lib/subscription";
-import { hrefUpgradePremium, hrefUpgradeProfessional } from "@/lib/i18n-hrefs";
 import type { ZodIssue } from "zod";
 
 type FieldErrors = Partial<Record<keyof RegisterFormData, string>>;
-type FlowPhase = "role" | "plan" | "account";
+type FlowPhase = "role" | "plan" | "mentorInfo" | "account";
 type PlanChoice = "free" | "professional" | "premium";
 
 function passwordStrengthMeter(password: string): 0 | 1 | 2 | 3 {
@@ -51,23 +48,49 @@ function planFromUrl(raw: string | null): PlanChoice | null {
   return null;
 }
 
+function roleFromUrl(raw: string | null): UserRole | null {
+  const v = raw?.toLowerCase();
+  if (v === "mentor") return UserRole.MENTOR;
+  if (v === "employer") return UserRole.EMPLOYER;
+  if (v === "jobseeker" || v === "job-seeker") return UserRole.JOBSEEKER;
+  return null;
+}
+
+function resolveInitialFlow(
+  urlPlan: PlanChoice | null,
+  urlRole: UserRole | null,
+): { phase: FlowPhase; role: UserRole; plan: PlanChoice | null } {
+  if (urlRole === UserRole.MENTOR) {
+    return { phase: "mentorInfo", role: UserRole.MENTOR, plan: "free" };
+  }
+  if (urlRole === UserRole.EMPLOYER) {
+    return { phase: "account", role: UserRole.EMPLOYER, plan: urlPlan ?? "free" };
+  }
+  return { phase: "role", role: UserRole.JOBSEEKER, plan: urlPlan };
+}
+
 export default function RegisterPage() {
   const t = useTranslations();
   const tAuth = useTranslations("auth");
-  const tm = useTranslations("mentor");
-  const router = useRouter();
   const locale = useLocale();
   const searchParams = useSearchParams();
   const isRTL = locale === "ar" || locale === "ur";
   const { data: session, status: sessionStatus, update } = useSession();
 
   const urlPlan = useMemo(() => planFromUrl(searchParams.get("plan")), [searchParams]);
+  const urlRoleParsed = useMemo(() => roleFromUrl(searchParams.get("role")), [searchParams]);
+  const initialFlow = useMemo(
+    () => resolveInitialFlow(urlPlan, urlRoleParsed),
+    [urlPlan, urlRoleParsed],
+  );
   const pickRoleAfterGoogle = searchParams.get("pickRole") === "1";
   const pendingGoogleRole = searchParams.get("pendingRole");
-  const pendingGooglePlan = useMemo(
-    () => planFromUrl(searchParams.get("plan")),
-    [searchParams],
-  );
+  const pendingGooglePlan = useMemo(() => planFromUrl(searchParams.get("plan")), [searchParams]);
+
+  const isMentorFlow = urlRoleParsed === UserRole.MENTOR;
+  const isPreselectedEmployer = urlRoleParsed === UserRole.EMPLOYER;
+  const hasPreselectedPlan = urlPlan != null && !isMentorFlow && !isPreselectedEmployer;
+  const skipRoleAndPlanSteps = isMentorFlow || isPreselectedEmployer;
 
   /** If `/api/auth/session` never resolves (network / dev HMR), unblock the register UI. */
   const [sessionFetchTimedOut, setSessionFetchTimedOut] = useState(false);
@@ -106,71 +129,61 @@ export default function RegisterPage() {
   }, [loggedInReady, session?.user, pickRoleAfterGoogle, locale]);
 
   useEffect(() => {
-    if (!loggedInReady || !session?.user || postSignupRedirect) return;
-    if (pickRoleAfterGoogle || pendingGoogleRole) return;
-    if (urlPlan === "professional") {
-      router.replace(hrefUpgradeProfessional);
-      return;
-    }
-    if (urlPlan === "premium") {
-      router.replace(hrefUpgradePremium);
-    }
-    /** Logged-in + free plan: show signup form or signed-in gate — never auto-redirect. */
-  }, [
-    loggedInReady,
-    session?.user,
-    urlPlan,
-    pickRoleAfterGoogle,
-    pendingGoogleRole,
-    postSignupRedirect,
-    router,
-  ]);
-
-  const redirectingToPaidUpgrade =
-    loggedInReady && (urlPlan === "professional" || urlPlan === "premium");
+    // No payment integration yet: never redirect to upgrade pages.
+    // Logged-in users are handled by the signed-in gate below.
+    void session;
+  }, [session]);
 
   const showSignedInGate =
     loggedInReady &&
     !postSignupRedirect &&
     !pickRoleAfterGoogle &&
     !pendingGoogleRole &&
-    urlPlan !== "professional" &&
-    urlPlan !== "premium";
+    true;
 
-  const [phase, setPhase] = useState<FlowPhase>("role");
-  const [pickedPlan, setPickedPlan] = useState<PlanChoice | null>(urlPlan);
-  const [formData, setFormData] = useState<RegisterFormData>({
+  const [phase, setPhase] = useState<FlowPhase>(() => initialFlow.phase);
+  const [pickedPlan, setPickedPlan] = useState<PlanChoice | null>(() => initialFlow.plan);
+  const [formData, setFormData] = useState<RegisterFormData>(() => ({
     name: "",
     email: "",
     password: "",
     confirmPassword: "",
-    role: UserRole.JOBSEEKER,
-  });
+    role: initialFlow.role,
+  }));
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [serverError, setServerError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const urlRole = searchParams.get("role")?.toUpperCase();
-
   useEffect(() => {
-    if (urlPlan) {
-      setPickedPlan(urlPlan);
-      if (urlRole === "MENTOR" || urlRole === "EMPLOYER") {
-        setPhase("account");
-      }
-    }
-  }, [urlPlan, urlRole]);
-  useEffect(() => {
-    if (urlRole === "MENTOR") {
-      setFormData((prev) => ({ ...prev, role: UserRole.MENTOR }));
-    } else if (urlRole === "EMPLOYER") {
-      setFormData((prev) => ({ ...prev, role: UserRole.EMPLOYER }));
-    }
-  }, [urlRole]);
+    const flow = resolveInitialFlow(urlPlan, urlRoleParsed);
+    setPhase(flow.phase);
+    setPickedPlan(flow.plan);
+    setFormData((prev) => ({ ...prev, role: flow.role }));
+  }, [urlPlan, urlRoleParsed]);
 
   const pwdMeter = passwordStrengthMeter(formData.password);
 
-  const stepIndex = phase === "role" ? 1 : phase === "plan" ? 2 : 3;
+  const stepTotal = isMentorFlow ? 2 : isPreselectedEmployer ? 1 : hasPreselectedPlan ? 2 : 3;
+  const stepIndex = isMentorFlow
+    ? phase === "mentorInfo"
+      ? 1
+      : 2
+    : isPreselectedEmployer
+      ? 1
+      : hasPreselectedPlan
+        ? phase === "role"
+          ? 1
+          : 2
+        : phase === "role"
+          ? 1
+          : phase === "plan"
+            ? 2
+            : 3;
+
+  function handleRoleSelect(role: UserRole) {
+    setFormData((prev) => ({ ...prev, role }));
+    setServerError(null);
+  }
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const { name, value } = e.target;
@@ -179,13 +192,8 @@ export default function RegisterPage() {
     setServerError(null);
   }
 
-  function handleRoleSelect(role: UserRole) {
-    setFormData((prev) => ({ ...prev, role }));
-    setServerError(null);
-  }
-
   function continueFromRole() {
-    if (formData.role === UserRole.MENTOR) {
+    if (formData.role === UserRole.EMPLOYER) {
       setPickedPlan("free");
       setPhase("account");
       return;
@@ -206,7 +214,16 @@ export default function RegisterPage() {
   function backFromAccount() {
     setServerError(null);
     setFieldErrors({});
-    setPhase(urlPlan ? "role" : "plan");
+    if (isPreselectedEmployer) return;
+    if (formData.role === UserRole.MENTOR) {
+      setPhase("mentorInfo");
+      return;
+    }
+    if (formData.role === UserRole.EMPLOYER || urlPlan || pickedPlan) {
+      setPhase("role");
+      return;
+    }
+    setPhase("plan");
   }
 
   function backFromPlan() {
@@ -220,22 +237,15 @@ export default function RegisterPage() {
 
   const signupPlanBanner = resolvedPlan();
 
-  const canUseGoogleSignup =
-    (formData.role === UserRole.JOBSEEKER && resolvedPlan() === "free") ||
-    formData.role === UserRole.MENTOR ||
-    formData.role === UserRole.EMPLOYER;
+  // No payment integration yet: allow Google signup for all roles and all plans.
+  const canUseGoogleSignup = true;
 
   async function handleGoogleRegister() {
     startTransition(async () => {
       try {
-        const roleParam =
-          formData.role === UserRole.MENTOR
-            ? "MENTOR"
-            : formData.role === UserRole.EMPLOYER
-              ? "EMPLOYER"
-              : "JOBSEEKER";
-        const callbackUrl = `/${locale}/auth/register?pendingRole=${roleParam}`;
-        await signIn("google", { callbackUrl });
+        // Always send the user to the completion screen after OAuth.
+        // Existing users will be redirected from there to their dashboard.
+        await signInWithGoogle({ callbackUrl: `/${locale}/auth/register/complete` });
       } catch {
         setServerError(t("common.error"));
       }
@@ -270,14 +280,6 @@ export default function RegisterPage() {
   }, [loggedInReady, pendingGoogleRole, pendingGooglePlan, session?.user, locale, t, update]);
 
   if (sessionStatus === "loading" && !sessionFetchTimedOut) {
-    return (
-      <AuthShell isRtl={isRTL} slogan={t("common.slogan")}>
-        <p className="py-12 text-center text-sm text-gray-400">{t("common.loading")}</p>
-      </AuthShell>
-    );
-  }
-
-  if (redirectingToPaidUpgrade) {
     return (
       <AuthShell isRtl={isRTL} slogan={t("common.slogan")}>
         <p className="py-12 text-center text-sm text-gray-400">{t("common.loading")}</p>
@@ -324,7 +326,6 @@ export default function RegisterPage() {
   }
 
   if (loggedInReady && pickRoleAfterGoogle && session?.user) {
-    const role = (session.user.role as UserRole | undefined) ?? UserRole.JOBSEEKER;
     if (session.user.onboardingComplete) {
       return (
         <AuthShell isRtl={isRTL} slogan={t("common.slogan")}>
@@ -412,24 +413,15 @@ export default function RegisterPage() {
   const roleCards = [
     {
       value: UserRole.JOBSEEKER,
-      label: t("auth.jobSeeker"),
-      hint: tAuth("registerFlow.roleJobSeekerHint"),
+      label: tAuth("registerFlow.pathJobSeekerTitle"),
+      hint: tAuth("registerFlow.pathJobSeekerDesc"),
       Icon: Briefcase,
-      mentorStyle: false,
     },
     {
       value: UserRole.EMPLOYER,
-      label: t("auth.employer"),
-      hint: tAuth("registerFlow.roleEmployerHint"),
+      label: tAuth("registerFlow.pathEmployerTitle"),
+      hint: tAuth("registerFlow.pathEmployerDesc"),
       Icon: Building2,
-      mentorStyle: false,
-    },
-    {
-      value: UserRole.MENTOR,
-      label: tm("iAmMentor"),
-      hint: locale === "ar" ? "شارك خبرتك واكسب من خلال تدريب المحترفين" : "Share your expertise and earn by coaching professionals",
-      Icon: GraduationCap,
-      mentorStyle: true,
     },
   ];
 
@@ -442,22 +434,22 @@ export default function RegisterPage() {
   }[] = [
     {
       id: "free",
-      label: tAuth("registerFlow.planFree"),
-      hint: tAuth("registerFlow.planFreeHint"),
+      label: tAuth("registerFlow.planFreeLabel"),
+      hint: tAuth("registerFlow.planFreePrice"),
       Icon: Check,
       className: "border-[#0F4C75]/40 bg-[#EFF6FF]/10 text-[#93C5FD]",
     },
     {
       id: "professional",
-      label: tAuth("registerFlow.planProfessional"),
-      hint: tAuth("registerFlow.planProfessionalHint"),
+      label: tAuth("registerFlow.planProLabel"),
+      hint: tAuth("registerFlow.planProPrice"),
       Icon: Sparkles,
       className: "border-[#1D9E75]/40 bg-[#1D9E75]/15 text-[#A7F3D0]",
     },
     {
       id: "premium",
-      label: tAuth("registerFlow.planPremium"),
-      hint: tAuth("registerFlow.planPremiumHint"),
+      label: tAuth("registerFlow.planPremiumLabel"),
+      hint: tAuth("registerFlow.planPremiumPrice"),
       Icon: Crown,
       className: "border-[#C9973A]/35 bg-[#C9973A]/12 text-[#FDE68A]",
     },
@@ -470,9 +462,9 @@ export default function RegisterPage() {
         role="progressbar"
         aria-valuenow={stepIndex}
         aria-valuemin={1}
-        aria-valuemax={3}
+        aria-valuemax={stepTotal}
       >
-        {[1, 2, 3].map((n) => (
+        {Array.from({ length: stepTotal }, (_, i) => i + 1).map((n) => (
           <div
             key={n}
             className={`h-1 flex-1 rounded-full transition-colors ${
@@ -482,20 +474,52 @@ export default function RegisterPage() {
         ))}
       </div>
 
-      <h2 className="mb-1 text-xl font-semibold text-white">{t("auth.register")}</h2>
-      <p className="mb-6 text-sm text-gray-400">{t("auth.subtitleRegister")}</p>
+      <h2 className="mb-1 text-xl font-semibold text-white">
+        {phase === "account"
+          ? formData.role === UserRole.EMPLOYER
+            ? tAuth("registerFlow.accountTitleEmployer")
+            : formData.role === UserRole.MENTOR
+              ? tAuth("registerFlow.accountTitleMentor")
+              : tAuth("registerFlow.accountTitle")
+          : t("auth.register")}
+      </h2>
+      <p className="mb-6 text-sm text-gray-400">
+        {phase === "account" && (skipRoleAndPlanSteps || hasPreselectedPlan)
+          ? tAuth("registerFlow.accountSubtitlePreselected")
+          : t("auth.subtitleRegister")}
+      </p>
 
-      <div className="mb-5 flex flex-wrap gap-x-2 gap-y-1 text-[11px] font-bold uppercase tracking-wider text-[#9CA3AF]">
-        <span className={phase === "role" ? "text-brand-teal" : ""}>
-          1 · {tAuth("registerFlow.roleTitle")}
-        </span>
-        <span className={phase === "plan" ? "text-brand-teal" : ""}>
-          2 · {tAuth("registerFlow.planTitle")}
-        </span>
-        <span className={phase === "account" ? "text-brand-teal" : ""}>
-          3 · {tAuth("registerFlow.accountTitle")}
-        </span>
-      </div>
+      {!skipRoleAndPlanSteps && !hasPreselectedPlan ? (
+        <div className="mb-5 flex flex-wrap gap-x-2 gap-y-1 text-[11px] font-bold uppercase tracking-wider text-[#9CA3AF]">
+          <span className={phase === "role" ? "text-brand-teal" : ""}>
+            1 · {tAuth("registerFlow.roleTitle")}
+          </span>
+          <span className={phase === "plan" ? "text-brand-teal" : ""}>
+            2 · {tAuth("registerFlow.planTitle")}
+          </span>
+          <span className={phase === "account" ? "text-brand-teal" : ""}>
+            3 · {tAuth("registerFlow.accountTitle")}
+          </span>
+        </div>
+      ) : hasPreselectedPlan ? (
+        <div className="mb-5 flex flex-wrap gap-x-2 gap-y-1 text-[11px] font-bold uppercase tracking-wider text-[#9CA3AF]">
+          <span className={phase === "role" ? "text-brand-teal" : ""}>
+            1 · {tAuth("registerFlow.roleTitle")}
+          </span>
+          <span className={phase === "account" ? "text-brand-teal" : ""}>
+            2 · {tAuth("registerFlow.accountTitle")}
+          </span>
+        </div>
+      ) : isMentorFlow ? (
+        <div className="mb-5 flex flex-wrap gap-x-2 gap-y-1 text-[11px] font-bold uppercase tracking-wider text-[#9CA3AF]">
+          <span className={phase === "mentorInfo" ? "text-brand-teal" : ""}>
+            1 · {tAuth("registerFlow.mentorInfoTitle")}
+          </span>
+          <span className={phase === "account" ? "text-brand-teal" : ""}>
+            2 · {tAuth("registerFlow.accountTitleMentor")}
+          </span>
+        </div>
+      ) : null}
 
       {serverError ? (
         <div className="mb-4 rounded-lg border border-red-700 bg-red-900/30 p-3 text-sm text-red-400">
@@ -505,40 +529,63 @@ export default function RegisterPage() {
 
       {phase === "role" ? (
         <div className="space-y-5">
-          <p className="text-center text-lg font-semibold text-white">{tAuth("registerFlow.roleTitle")}</p>
-          <p className="text-center text-sm text-gray-400">{tAuth("registerFlow.roleSubtitle")}</p>
-          <div className="grid gap-3">
-            {roleCards.map(({ value, label, hint, Icon, mentorStyle }) => {
+          <p className="text-center text-lg font-semibold text-white">{tAuth("registerFlow.step1Title")}</p>
+          <p className="text-center text-sm text-gray-400">{tAuth("registerFlow.step1Subtitle")}</p>
+          {urlPlan ? (
+            <p
+              className={`rounded-lg border px-3 py-2 text-center text-xs font-semibold ${
+                urlPlan === "professional"
+                  ? "border-[#1D9E75]/30 bg-[#1D9E75]/10 text-[#A7F3D0]"
+                  : urlPlan === "premium"
+                    ? "border-[#C9973A]/35 bg-[#C9973A]/10 text-[#FDE68A]"
+                    : "border-[#0F4C75]/25 bg-[#EFF6FF]/10 text-[#93C5FD]"
+              }`}
+            >
+              {urlPlan === "professional"
+                ? t("subscription.signupProfessionalBanner")
+                : urlPlan === "premium"
+                  ? t("subscription.signupPremiumBanner")
+                  : t("subscription.signupFreeBanner")}
+            </p>
+          ) : null}
+          <div className="flex flex-col gap-3">
+            {roleCards.map(({ value, label, hint, Icon }) => {
               const selected = formData.role === value;
-              const mentorSelected = mentorStyle && selected;
+              const selectedBorder =
+                selected && value === UserRole.JOBSEEKER
+                  ? "border-[#0F4C75] bg-[#EFF6FF] ring-1 ring-[#0F4C75]"
+                  : selected && value === UserRole.EMPLOYER
+                    ? "border-[#1D9E75] bg-[#E1F5EE] ring-1 ring-[#1D9E75]"
+                    : "border-[#444] bg-transparent hover:border-[#666]";
               return (
               <button
                 key={value}
                 type="button"
                 onClick={() => handleRoleSelect(value)}
-                className={`relative flex items-start gap-4 rounded-xl border px-4 py-4 text-left transition-all ${
-                  mentorSelected
-                    ? "border-[#C9973A] bg-[#FDF3E3]/10 ring-1 ring-[#C9973A]"
-                    : selected
-                      ? "border-brand-teal bg-brand-lightTeal/20 ring-1 ring-brand-teal"
-                      : "border-[#444] text-gray-200 hover:border-[#666]"
-                }`}
+                className={`relative flex w-full min-h-[88px] items-start gap-4 rounded-2xl border p-4 text-left transition-all ${selectedBorder}`}
               >
-                {mentorSelected ? (
-                  <span className="absolute end-3 top-3 flex h-6 w-6 items-center justify-center rounded-full bg-[#C9973A] text-xs font-bold text-white">
-                    ✓
-                  </span>
-                ) : null}
                 <span
-                  className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#333] ${
-                    mentorStyle ? "text-[#C9973A]" : "text-brand-teal"
+                  className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
+                    selected
+                      ? value === UserRole.EMPLOYER
+                        ? "bg-[#1D9E75]/15 text-[#1D9E75]"
+                        : "bg-[#0F4C75]/10 text-[#0F4C75]"
+                      : "bg-[#333] text-brand-teal"
                   }`}
                 >
                   <Icon className="h-5 w-5" aria-hidden />
                 </span>
-                <span>
-                  <span className="block font-bold text-white">{label}</span>
-                  <span className="mt-1 block text-xs text-gray-400">{hint}</span>
+                <span className="min-w-0 flex-1">
+                  <span
+                    className={`block font-bold leading-snug ${selected ? "text-[#0D2137]" : "text-white"}`}
+                  >
+                    {label}
+                  </span>
+                  <span
+                    className={`mt-1 block text-xs leading-relaxed ${selected ? "text-gray-600" : "text-gray-400"}`}
+                  >
+                    {hint}
+                  </span>
                 </span>
               </button>
             );
@@ -550,15 +597,15 @@ export default function RegisterPage() {
             className="w-full rounded-lg py-3 font-semibold text-white transition-opacity hover:opacity-90"
             style={{ backgroundColor: BRAND_COLORS.accent }}
           >
-            {tAuth("registerFlow.continue")}
+            {tAuth("registerFlow.next")}
           </button>
         </div>
       ) : null}
 
       {phase === "plan" ? (
         <div className="space-y-4">
-          <p className="text-center text-lg font-semibold text-white">{tAuth("registerFlow.planTitle")}</p>
-          <p className="text-center text-sm text-gray-400">{tAuth("registerFlow.planSubtitle")}</p>
+          <p className="text-center text-lg font-semibold text-white">{tAuth("registerFlow.step2Title")}</p>
+          <p className="text-center text-sm text-gray-400">{tAuth("registerFlow.step2Subtitle")}</p>
           <p className="rounded-lg border border-emerald-800/40 bg-emerald-900/20 px-3 py-2 text-center text-xs text-emerald-300">
             {tAuth("registerFlow.noPaymentNow")}
           </p>
@@ -588,33 +635,69 @@ export default function RegisterPage() {
         </div>
       ) : null}
 
+      {phase === "mentorInfo" ? (
+        <div className="space-y-4">
+          <p className="text-center text-lg font-semibold text-white">{tAuth("registerFlow.mentorInfoTitle")}</p>
+          <div className="rounded-xl border border-[#C9973A]/40 bg-[#C9973A]/10 p-4 text-sm text-[#FDE68A]">
+            <p className="font-semibold text-white">{tAuth("registerFlow.mentorInfoWelcome")}</p>
+            <ul className="mt-3 list-disc space-y-1 ps-5 text-white/80">
+              <li>{tAuth("registerFlow.mentorInfoBullet1")}</li>
+              <li>{tAuth("registerFlow.mentorInfoBullet2")}</li>
+              <li>{tAuth("registerFlow.mentorInfoBullet3")}</li>
+              <li>{tAuth("registerFlow.mentorInfoBullet4")}</li>
+            </ul>
+          </div>
+          <button
+            type="button"
+            onClick={() => setPhase("account")}
+            className="w-full rounded-lg py-3 font-semibold text-white transition-opacity hover:opacity-90"
+            style={{ backgroundColor: BRAND_COLORS.accent }}
+          >
+            {tAuth("registerFlow.continue")}
+          </button>
+        </div>
+      ) : null}
+
       {phase === "account" ? (
         <form onSubmit={handleSubmit} noValidate className="space-y-4">
-          <div
-            className={`rounded-xl border px-4 py-3 text-sm font-semibold ${
-              signupPlanBanner === "professional"
-                ? "border-[#1D9E75]/30 bg-[#1D9E75]/10 text-[#A7F3D0]"
+          {formData.role === UserRole.MENTOR ? (
+            <div
+              className="rounded-xl border border-[#C9973A]/35 bg-[#C9973A]/10 px-4 py-3 text-sm font-semibold text-[#FDE68A]"
+              role="status"
+            >
+              {tAuth("registerFlow.mentorSignupBanner")}
+            </div>
+          ) : (
+            <div
+              className={`rounded-xl border px-4 py-3 text-sm font-semibold ${
+                signupPlanBanner === "professional"
+                  ? "border-[#1D9E75]/30 bg-[#1D9E75]/10 text-[#A7F3D0]"
+                  : signupPlanBanner === "premium"
+                    ? "border-[#C9973A]/35 bg-[#C9973A]/10 text-[#FDE68A]"
+                    : "border-[#0F4C75]/25 bg-[#EFF6FF]/10 text-[#93C5FD]"
+              }`}
+              role="status"
+            >
+              {signupPlanBanner === "professional"
+                ? t("subscription.signupProfessionalBanner")
                 : signupPlanBanner === "premium"
-                  ? "border-[#C9973A]/35 bg-[#C9973A]/10 text-[#FDE68A]"
-                  : "border-[#0F4C75]/25 bg-[#EFF6FF]/10 text-[#93C5FD]"
-            }`}
-            role="status"
-          >
-            {signupPlanBanner === "professional"
-              ? t("subscription.signupProfessionalBanner")
-              : signupPlanBanner === "premium"
-                ? t("subscription.signupPremiumBanner")
-                : t("subscription.signupFreeBanner")}
-          </div>
+                  ? t("subscription.signupPremiumBanner")
+                  : t("subscription.signupFreeBanner")}
+            </div>
+          )}
 
-          <p className="text-center text-sm font-semibold text-white">
-            {formData.role === UserRole.EMPLOYER
-              ? tAuth("registerFlow.accountTitleEmployer")
-              : tAuth("registerFlow.accountTitle")}
-          </p>
-          <button type="button" onClick={backFromAccount} className="text-xs text-gray-400 hover:text-white">
-            ← {t("common.back")}
-          </button>
+          {!skipRoleAndPlanSteps && !hasPreselectedPlan ? (
+            <p className="text-center text-sm font-semibold text-white">
+              {formData.role === UserRole.EMPLOYER
+                ? tAuth("registerFlow.accountTitleEmployer")
+                : tAuth("registerFlow.accountTitle")}
+            </p>
+          ) : null}
+          {!isPreselectedEmployer ? (
+            <button type="button" onClick={backFromAccount} className="text-xs text-gray-400 hover:text-white">
+              ← {t("common.back")}
+            </button>
+          ) : null}
 
           {canUseGoogleSignup ? (
             <>
@@ -736,10 +819,6 @@ export default function RegisterPage() {
           </p>
         </form>
       ) : null}
-
-      <div className="mt-6 flex justify-center border-t border-[#333] pt-4">
-        <ClearSessionButton locale={locale} className="text-amber-400/90" />
-      </div>
     </AuthShell>
   );
 }

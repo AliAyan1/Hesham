@@ -38,6 +38,8 @@ import { cn } from "@/lib/cn";
 import { hasAccess } from "@/lib/subscription";
 import { MIN_PROFILE_COMPLETION_FOR_AI_JOB_MATCH } from "@/lib/profile-page-completion";
 
+const FREE_UPGRADE_BANNER_KEY = "qt_free_upgrade_banner_dismissed_v1";
+
 type MatchReco = {
   jobId: string;
   title: string;
@@ -57,6 +59,7 @@ export default function JobSeekerDashboardClient({ userName }: { userName: strin
   const [data, setData] = useState<JobSeekerDashboardPayload | null>(null);
   const [status, setStatus] = useState<"loading" | "error" | "ready">("loading");
   const [reco, setReco] = useState<MatchReco[]>([]);
+  const [hideUpgradeBanner, setHideUpgradeBanner] = useState(true);
 
   const loadDashboard = useCallback(async (silent = false) => {
     if (!silent) setStatus((s) => (s === "ready" ? "ready" : "loading"));
@@ -89,6 +92,14 @@ export default function JobSeekerDashboardClient({ userName }: { userName: strin
   useEffect(() => {
     void loadDashboard();
   }, [loadDashboard]);
+
+  useEffect(() => {
+    try {
+      setHideUpgradeBanner(window.localStorage.getItem(FREE_UPGRADE_BANNER_KEY) === "1");
+    } catch {
+      setHideUpgradeBanner(true);
+    }
+  }, []);
 
   useEffect(() => {
     const onFocus = () => void loadDashboard(true);
@@ -195,6 +206,40 @@ export default function JobSeekerDashboardClient({ userName }: { userName: strin
 
   return (
     <div className="space-y-8">
+      {tier === "FREE" && !hideUpgradeBanner ? (
+        <section className="rounded-2xl border border-[#0F4C75]/20 bg-gradient-to-r from-[#EFF6FF] to-white p-5 shadow-sm">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-[#0D2137]">{t("upgradeAiStatTitle")}</p>
+              <p className="mt-1 text-sm text-[#6B7280]">{t("upgradeAiStatBody")}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Link
+                href="/pricing"
+                className="inline-flex min-h-11 items-center justify-center rounded-xl bg-[#0F4C75] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0D2137]"
+              >
+                {t("btnViewPlans")}
+              </Link>
+              <button
+                type="button"
+                className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                aria-label="Dismiss"
+                onClick={() => {
+                  setHideUpgradeBanner(true);
+                  try {
+                    window.localStorage.setItem(FREE_UPGRADE_BANNER_KEY, "1");
+                  } catch {
+                    /* ignore */
+                  }
+                }}
+              >
+                ×
+              </button>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
       <DashboardWelcomeBanner
         eyebrow={t("jobSeekerEyebrow")}
         title={t("welcomeBannerGreeting", { name: userName })}

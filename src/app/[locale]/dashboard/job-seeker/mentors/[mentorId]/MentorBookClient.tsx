@@ -65,10 +65,11 @@ export default function MentorBookClient({ mentorId }: { mentorId: string }) {
       });
   }, [mentorId]);
 
+  const mentorHourlyRate = mentor?.hourlyRate ?? null;
   const pricing = useMemo(() => {
-    if (!mentor?.hourlyRate) return null;
-    return calculateSessionPricing(mentor.hourlyRate, duration);
-  }, [mentor?.hourlyRate, duration]);
+    if (!mentorHourlyRate) return null;
+    return calculateSessionPricing(mentorHourlyRate, duration);
+  }, [mentorHourlyRate, duration]);
 
   const bio =
     locale === "ar" && mentor?.bioAr ? mentor.bioAr : mentor?.bio ?? "";

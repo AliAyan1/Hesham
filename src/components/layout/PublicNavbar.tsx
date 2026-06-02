@@ -5,7 +5,6 @@ import { useSession } from "next-auth/react";
 import { useTranslations } from "next-intl";
 import { Link, usePathname } from "@/i18n/navigation";
 import { cn } from "@/lib/cn";
-import { ClearSessionButton } from "@/components/auth/ClearSessionButton";
 import { signOutThenNavigate } from "@/lib/auth-redirect";
 import { hrefRegisterFree } from "@/lib/i18n-hrefs";
 import { dashboardPathForRole } from "@/lib/subscription";
@@ -54,7 +53,6 @@ export function PublicNavbar({ locale, guestOnly = false }: PublicNavbarProps): 
   const items = useMemo(
     () => [
       { href: "/", label: t("home") },
-      { href: "/jobs", label: t("jobs") },
       { href: "/about", label: t("about") },
       { href: "/pricing", label: t("pricing") },
       { href: "/contact", label: t("contact") },
@@ -76,8 +74,8 @@ export function PublicNavbar({ locale, guestOnly = false }: PublicNavbarProps): 
       )}
       role="banner"
     >
-      <div className="relative mx-auto flex h-full w-full max-w-[100vw] items-center justify-between gap-3 px-6 lg:gap-4">
-        <div className="flex min-h-0 min-w-0 items-center justify-start">
+      <div className="relative mx-auto flex h-full w-full max-w-6xl items-center px-6">
+        <div className="flex w-[200px] shrink-0 items-center justify-start">
           <Logo
             variant="light"
             size="sm"
@@ -86,10 +84,9 @@ export function PublicNavbar({ locale, guestOnly = false }: PublicNavbarProps): 
           />
         </div>
 
-        {/* Centered desktop nav — absolute row avoids grid col-start clashes that stacked links above the bar on some breakpoints. */}
         <nav
           aria-label={t("mainNavigationAria")}
-          className="pointer-events-none absolute inset-x-0 top-1/2 z-[1] hidden max-h-11 max-w-[100vw] -translate-y-1/2 items-center justify-center gap-1 overflow-x-auto overscroll-x-contain px-6 sm:px-8 lg:flex lg:justify-center lg:gap-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+          className="hidden flex-1 items-center justify-center gap-8 lg:flex"
         >
           {items.map((it) => {
             const active = isActive(it.href);
@@ -98,10 +95,10 @@ export function PublicNavbar({ locale, guestOnly = false }: PublicNavbarProps): 
                 key={it.href}
                 href={it.href}
                 className={cn(
-                  "pointer-events-auto inline-flex h-11 shrink-0 items-center whitespace-nowrap rounded-md px-3 text-sm font-medium transition-colors duration-150",
-                  "text-gray-600 hover:text-brand-blue focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal",
+                  "inline-flex h-11 shrink-0 items-center whitespace-nowrap rounded-md px-3 text-sm font-medium transition-colors duration-150",
+                  "text-[#6B7280] hover:text-[#0F4C75] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal",
                   active &&
-                    "font-semibold text-brand-blue underline decoration-brand-teal decoration-2 underline-offset-8",
+                    "font-semibold text-[#0F4C75] underline decoration-[#1D9E75] decoration-2 underline-offset-8",
                 )}
               >
                 {it.label}
@@ -110,7 +107,7 @@ export function PublicNavbar({ locale, guestOnly = false }: PublicNavbarProps): 
           })}
         </nav>
 
-        <div className="flex min-h-0 min-w-0 items-center justify-end gap-2 sm:gap-3">
+        <div className="flex w-[200px] shrink-0 items-center justify-end gap-2 sm:gap-3">
           <div className="hidden sm:block">
             <LanguageSwitcher tone="light" minimal />
           </div>
@@ -119,7 +116,6 @@ export function PublicNavbar({ locale, guestOnly = false }: PublicNavbarProps): 
               <span className="inline-flex h-11 w-[9.5rem] animate-pulse rounded-lg bg-gray-100" aria-hidden />
             ) : isLoggedIn && dashboardHref ? (
               <>
-                <ClearSessionButton locale={locale} variant="button" />
                 <button
                   type="button"
                   onClick={() => void signOutThenNavigate("/", locale)}
@@ -140,12 +136,7 @@ export function PublicNavbar({ locale, guestOnly = false }: PublicNavbarProps): 
               </>
             ) : (
               <>
-                {guestOnly ? (
-                  <ClearSessionButton locale={locale} variant="link" className="hidden sm:inline-flex" />
-                ) : (
-                  <ClearSessionButton locale={locale} variant="button" />
-                )}
-                <Link href="/auth/login">
+                <Link href="/login">
                   <Button
                     variant="outline"
                     size="sm"
@@ -174,7 +165,7 @@ export function PublicNavbar({ locale, guestOnly = false }: PublicNavbarProps): 
             isLoggedIn={isLoggedIn}
             dashboardHref={dashboardHref}
             locale={locale}
-            guestOnly={guestOnly}
+            isActive={isActive}
           />
         </div>
       </div>
@@ -187,13 +178,13 @@ function PublicMobileMenu({
   isLoggedIn,
   dashboardHref,
   locale,
-  guestOnly,
+  isActive,
 }: {
   items: { href: string; label: string }[];
   isLoggedIn: boolean;
   dashboardHref: string | null;
   locale: string;
-  guestOnly: boolean;
+  isActive: (href: string) => boolean;
 }) {
   const t = useTranslations("nav");
   const [open, setOpen] = useState(false);
@@ -235,7 +226,10 @@ function PublicMobileMenu({
                 key={it.href}
                 href={it.href}
                 onClick={() => setOpen(false)}
-                className="min-h-10 rounded-xl px-3 py-2.5 text-sm font-semibold text-gray-800 hover:bg-brand-lightBlue"
+                className={cn(
+                  "min-h-10 rounded-xl px-3 py-2.5 text-sm font-semibold hover:bg-brand-lightBlue",
+                  isActive(it.href) ? "text-[#0F4C75]" : "text-gray-800",
+                )}
               >
                 {it.label}
               </Link>
@@ -245,11 +239,6 @@ function PublicMobileMenu({
           <div className="mt-2 border-t border-gray-100 pt-3">
             <LanguageSwitcher tone="light" minimal className="w-full [&_button]:w-full [&_button]:justify-center" />
             <div className="mt-3 grid gap-2">
-              {guestOnly ? (
-                <ClearSessionButton locale={locale} variant="link" className="mx-auto" />
-              ) : (
-                <ClearSessionButton locale={locale} variant="button" className="w-full" />
-              )}
               {isLoggedIn && dashboardHref ? (
                 <>
                   <Link href={dashboardHref} onClick={() => setOpen(false)}>
@@ -275,7 +264,7 @@ function PublicMobileMenu({
                 </>
               ) : (
                 <>
-                  <Link href="/auth/login" onClick={() => setOpen(false)}>
+                  <Link href="/login" onClick={() => setOpen(false)}>
                     <Button
                       variant="outline"
                       className="h-9 min-h-0 w-full border border-[#0F4C75] px-3 text-sm text-[#0F4C75]"
