@@ -32,17 +32,6 @@ export async function POST(
   const prisma = getPrisma();
   const seekerId = session.user.id;
 
-  const seekerPool = await prisma.user.findUnique({
-    where: { id: seekerId },
-    select: { inTalentPool: true },
-  });
-  if (seekerPool?.inTalentPool) {
-    return NextResponse.json(
-      { success: false, error: "talent_pool_blocked" },
-      { status: 403 },
-    );
-  }
-
   const completedAssessment = await prisma.assessment.findFirst({
     where: {
       userId: seekerId,

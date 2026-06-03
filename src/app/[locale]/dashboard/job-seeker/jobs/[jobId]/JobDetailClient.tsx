@@ -54,10 +54,8 @@ export function JobDetailClient({ jobId }: { jobId: string }) {
   const [applyOpen, setApplyOpen] = useState(false);
   const [cover, setCover] = useState("");
   const [applyState, setApplyState] = useState<
-    "idle" | "pending" | "success" | "dup" | "fail" | "needAssessment" | "talentPoolBlocked"
-  >(
-    "idle",
-  );
+    "idle" | "pending" | "success" | "dup" | "fail" | "needAssessment"
+  >("idle");
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
@@ -112,10 +110,6 @@ export function JobDetailClient({ jobId }: { jobId: string }) {
       }
       if (res.status === 403 && json.error === "assessment_required") {
         setApplyState("needAssessment");
-        return;
-      }
-      if (res.status === 403 && json.error === "talent_pool_blocked") {
-        setApplyState("talentPoolBlocked");
         return;
       }
       if (!res.ok || !json.success) {
@@ -386,14 +380,6 @@ export function JobDetailClient({ jobId }: { jobId: string }) {
                 {t("applyNeedAssessment")}{" "}
                 <Link href="/dashboard/job-seeker/assessment" className="text-brand-teal underline">
                   {t("goToAssessment")}
-                </Link>
-              </p>
-            ) : null}
-            {applyState === "talentPoolBlocked" ? (
-              <p className="mt-3 text-sm font-semibold text-amber-800">
-                {t("applyTalentPoolBlocked")}{" "}
-                <Link href="/dashboard/job-seeker/invites" className="text-brand-teal underline">
-                  {t("viewInvites")}
                 </Link>
               </p>
             ) : null}

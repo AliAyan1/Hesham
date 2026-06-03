@@ -580,7 +580,7 @@
     "welcomeBack": "Welcome back, {name}!",
     "welcomeSubtitle": "Small steps compound—finish your profile, explore roles, and let AI spotlight the best fit for your future.",
     "talentPoolBannerTitle": "You are in the talent pool",
-    "talentPoolBannerBody": "An employer or screening result placed you in the talent pool. You can still improve your profile and retake assessments when eligible.",
+    "talentPoolBannerBody": "You are in the talent pool for improvement tracking. You can still apply to jobs and complete AI interviews (Lara). Improve your profile and retake assessments when eligible to strengthen your standing.",
     "talentPoolReassessmentReady": "Your 24-hour cooldown has ended — you can retake your assessment now.",
     "talentPoolGoAssessment": "Go to AI assessment →",
     "completeProfilePrompt": "Your profile is {percent}% complete. Reach at least 80% for better AI matches.",
