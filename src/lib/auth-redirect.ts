@@ -57,10 +57,14 @@ export async function waitForSessionFlag(
 export function hardNavigate(path: string, locale: string): void {
   const normalized = path.startsWith("/") ? path : `/${path}`;
   const prefix = `/${locale}`;
-  const target = normalized.startsWith(prefix)
+  const relative = normalized.startsWith(prefix)
     ? normalized
     : `${prefix}${normalized === "/" ? "" : normalized}`;
-  window.location.assign(target);
+  const target =
+    typeof window !== "undefined"
+      ? new URL(relative, window.location.origin).href
+      : relative;
+  window.location.replace(target);
 }
 
 export function dashboardHrefForRole(role: string, locale: string): string {
@@ -118,4 +122,26 @@ export async function fetchPostAuthPath(): Promise<string> {
   const role = String(json.user?.role ?? "JOBSEEKER");
   const onboardingComplete = json.user?.onboardingComplete === true;
   return resolvePostAuthPath(role, onboardingComplete);
+}
+
+/** After `signIn({ redirect: false })`, wait until the session cookie is readable. */
+export async function waitForAuthenticatedSession(
+  maxAttempts = 25,
+): Promise<{ ok: boolean; userId?: string }> {
+  for (let i = 0; i < maxAttempts; i += 1) {
+    try {
+      const res = await fetch("/api/auth/session", {
+        credentials: "include",
+        cache: "no-store",
+      });
+      const json = (await res.json()) as { user?: { id?: string } };
+      if (json.user?.id) {
+        return { ok: true, userId: json.user.id };
+      }
+    } catch {
+      /* retry */
+    }
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  return { ok: false };
 }

@@ -1,0 +1,70 @@
+import { NotificationType } from "@prisma/client";
+import { NextResponse, type NextRequest } from "next/server";
+import { z } from "zod";
+import { logAudit } from "@/lib/audit";
+import { getPrisma } from "@/lib/db";
+import { createNotification } from "@/lib/notifications";
+import { requireAdminApi } from "@/lib/admin/require-admin";
+
+const paySchema = z.object({
+  payoutId: z.string().min(1),
+  reference: z.string().min(2).max(80),
+  transferDate: z.string().optional(),
+});
+
+export async function POST(request: NextRequest): Promise<NextResponse> {
+  const authResult = await requireAdminApi();
+  if (authResult instanceof NextResponse) return authResult;
+  const { session } = authResult;
+
+  const parsed = paySchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Validation failed" }, { status: 400 });
+  }
+
+  const prisma = getPrisma();
+  const payout = await prisma.mentorPayoutRequest.findFirst({
+    where: { id: parsed.data.payoutId, status: "REQUESTED" },
+    include: { mentor: { select: { id: true, userId: true, pendingPayout: true } } },
+  });
+
+  if (!payout) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  const ref = parsed.data.reference.trim();
+  const processedAt = parsed.data.transferDate
+    ? new Date(parsed.data.transferDate)
+    : new Date();
+
+  await prisma.$transaction([
+    prisma.mentorPayoutRequest.update({
+      where: { id: payout.id },
+      data: { status: "PAID", reference: ref, processedAt },
+    }),
+    prisma.mentor.update({
+      where: { id: payout.mentorId },
+      data: { pendingPayout: { decrement: payout.amount } },
+    }),
+  ]);
+
+  await createNotification({
+    userId: payout.mentor.userId,
+    type: NotificationType.PAYOUT_PAID,
+    title: "Payout processed",
+    titleAr: "تم صرف المبلغ",
+    message: `Your payout of SAR ${Math.round(payout.amount)} has been processed. Ref: ${ref}`,
+    messageAr: `تم صرف ${Math.round(payout.amount)} ريال. المرجع: ${ref}`,
+    link: "/dashboard/mentor/earnings",
+  });
+
+  await logAudit({
+    userId: session.user.id,
+    action: "ADMIN_PAYOUT_PAID",
+    entity: "MentorPayoutRequest",
+    entityId: payout.id,
+    newData: { reference: ref, amount: payout.amount },
+  });
+
+  return NextResponse.json({ success: true, data: { ok: true } });
+}

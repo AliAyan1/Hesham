@@ -12,8 +12,7 @@ export function StaleSessionCleaner() {
   const ran = useRef(false);
 
   useEffect(() => {
-    if (ran.current || status === "loading") return;
-    ran.current = true;
+    if (status === "loading") return;
 
     void (async () => {
       try {
@@ -21,6 +20,8 @@ export function StaleSessionCleaner() {
         const json = (await res.json()) as { user?: { id?: string } };
         const hasServerUser = Boolean(json.user?.id);
         if (status === "authenticated" && !hasServerUser) {
+          if (ran.current) return;
+          ran.current = true;
           await signOut({ redirect: false });
           window.location.href = window.location.pathname;
         }

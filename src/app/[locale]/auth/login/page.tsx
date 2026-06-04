@@ -11,7 +11,11 @@ import { loginSchema } from "@/lib/validations";
 import { BRAND_COLORS } from "@/lib/constants";
 import { ClientHydrationGate } from "@/components/ui/ClientHydrationGate";
 import { GoogleIcon } from "@/components/auth/GoogleIcon";
-import { fetchPostAuthPath, hardNavigate } from "@/lib/auth-redirect";
+import {
+  fetchPostAuthPath,
+  hardNavigate,
+  waitForAuthenticatedSession,
+} from "@/lib/auth-redirect";
 import type { LoginFormData } from "@/types";
 import type { ZodIssue } from "zod";
 
@@ -104,8 +108,20 @@ export default function LoginPage() {
           redirect: false,
         });
 
-        if (result?.error) {
+        if (!result?.ok || result.error) {
           setServerError(t("auth.invalidCredentials"));
+          return;
+        }
+
+        await update();
+        const sessionReady = await waitForAuthenticatedSession();
+        if (!sessionReady.ok) {
+          setServerError(t("auth.sessionNotReady"));
+          return;
+        }
+
+        if (result.url) {
+          window.location.replace(result.url);
           return;
         }
 

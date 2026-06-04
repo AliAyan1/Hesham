@@ -58,7 +58,7 @@ export function MentorLandingSection() {
           <h3 className="text-lg font-bold">{t("calcTitle")}</h3>
           <p className="mt-1 text-sm text-[#6B7280]">{t("calcSubtitle")}</p>
 
-          <div className="mt-6 grid gap-4">
+          <div className="mt-6 grid gap-4" suppressHydrationWarning>
             <label className="text-sm font-semibold">
               {t("sessionsPerWeek")}
               <input
@@ -67,12 +67,19 @@ export function MentorLandingSection() {
                 value={sessionsPerWeek}
                 onChange={(e) => setSessionsPerWeek(Number.parseInt(e.target.value || "0", 10))}
                 className="mt-2 w-full rounded-xl border border-gray-200 px-3 py-2"
+                suppressHydrationWarning
+                autoComplete="off"
+                data-lpignore="true"
+                data-form-type="other"
               />
             </label>
 
             <label className="text-sm font-semibold">
               {t("ratePerHour")}
-              <div className="mt-2 flex items-center gap-2 rounded-xl border border-gray-200 px-3 py-2">
+              <div
+                className="mt-2 flex items-center gap-2 rounded-xl border border-gray-200 px-3 py-2"
+                suppressHydrationWarning
+              >
                 <span className="text-sm font-bold text-[#0F4C75]">SAR</span>
                 <input
                   type="number"
@@ -80,6 +87,10 @@ export function MentorLandingSection() {
                   value={ratePerHour}
                   onChange={(e) => setRatePerHour(Number.parseInt(e.target.value || "0", 10))}
                   className="w-full outline-none"
+                  suppressHydrationWarning
+                  autoComplete="off"
+                  data-lpignore="true"
+                  data-form-type="other"
                 />
               </div>
             </label>

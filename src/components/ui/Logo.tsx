@@ -49,7 +49,8 @@ export function Logo({
         width={width}
         height={height}
         priority={priority}
-        className="h-auto w-auto max-w-full"
+        className="max-w-full"
+        style={{ width: "auto", height: "auto" }}
       />
     </Link>
   );

@@ -108,6 +108,32 @@ export default async function middleware(request: NextRequest) {
     const pathWithoutLocale = pathname.slice(`/${pathnameLocale}`.length) || "/";
 
     if (PUBLIC_PATHS.some((p) => pathWithoutLocale.startsWith(p))) {
+      if (pathWithoutLocale.startsWith("/auth/login")) {
+        const loginToken = await getToken({
+          req: request,
+          secret: getAuthSecret(),
+        });
+        if (loginToken?.sub || loginToken?.id) {
+          const rawRole = loginToken.role;
+          const normalized =
+            typeof rawRole === "string" ? rawRole.toUpperCase() : "JOBSEEKER";
+          const role: MiddlewareUserRole =
+            normalized === "EMPLOYER" ||
+            normalized === "MENTOR" ||
+            normalized === "ADMIN"
+              ? normalized
+              : "JOBSEEKER";
+          const dash = MIDDLEWARE_DASHBOARD_ROUTES[role];
+          if (loginToken.onboardingComplete === false && role !== "ADMIN") {
+            return NextResponse.redirect(
+              new URL(`/${pathnameLocale}/onboarding`, request.url),
+            );
+          }
+          return NextResponse.redirect(
+            new URL(`/${pathnameLocale}${dash}`, request.url),
+          );
+        }
+      }
       return nextWithIntlLocale(request, pathnameLocale);
     }
 
