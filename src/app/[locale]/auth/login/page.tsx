@@ -121,8 +121,15 @@ export default function LoginPage() {
         }
 
         if (result.url) {
-          window.location.replace(result.url);
-          return;
+          try {
+            const dest = new URL(result.url, window.location.origin);
+            if (dest.origin === window.location.origin) {
+              window.location.replace(dest.href);
+              return;
+            }
+          } catch {
+            /* fall through to dashboard redirect */
+          }
         }
 
         const params = new URLSearchParams(window.location.search);

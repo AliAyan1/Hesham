@@ -109,8 +109,10 @@ export function resolvePostAuthPath(
   role: string,
   onboardingComplete: boolean,
 ): string {
+  const r = String(role).toUpperCase();
+  if (r === "ADMIN") return dashboardPathForRole(r);
   if (!onboardingComplete) return "/onboarding";
-  return dashboardPathForRole(String(role).toUpperCase());
+  return dashboardPathForRole(r);
 }
 
 /** Fetch fresh session and resolve post-auth destination. */
