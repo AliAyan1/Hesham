@@ -8,6 +8,7 @@ import { loginSchema } from "@/lib/validations";
 import { UserRole } from "@/types";
 import type { NextAuthConfig } from "next-auth";
 import { getAuthSecret } from "@/lib/auth-secret";
+import { getAuthCookieDomain } from "@/lib/auth-cookie-domain";
 
 declare module "next-auth" {
   interface Session {
@@ -351,6 +352,22 @@ export const authConfig: NextAuthConfig = {
     maxAge: 30 * 24 * 60 * 60,
     updateAge: 24 * 60 * 60,
   },
+
+  cookies: (() => {
+    const domain = getAuthCookieDomain();
+    if (!domain) return undefined;
+    return {
+      sessionToken: {
+        options: { domain },
+      },
+      callbackUrl: {
+        options: { domain },
+      },
+      csrfToken: {
+        options: { domain },
+      },
+    };
+  })(),
 };
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
