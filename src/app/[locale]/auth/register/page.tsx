@@ -213,12 +213,12 @@ export default function RegisterPage() {
   }
 
   function continueFromRole() {
+    const explicitPlan = pickedPlan ?? urlPlan ?? planFromStorage();
     if (formData.role === UserRole.EMPLOYER) {
-      commitPlan("free");
+      commitPlan(explicitPlan ?? "free");
       setPhase("account");
       return;
     }
-    const explicitPlan = pickedPlan ?? urlPlan ?? planFromStorage();
     if (explicitPlan) {
       commitPlan(explicitPlan);
       setPhase("account");

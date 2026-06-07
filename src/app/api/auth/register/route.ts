@@ -43,7 +43,7 @@ export async function POST(
     }
 
     const { name, email, password, role, plan } = parsed.data;
-    console.log("[register] attempt:", email);
+    console.log("[register] attempt:", email, "role:", role, "plan:", plan ?? "none");
     let subscriptionTier =
       role === UserRole.MENTOR ? ("FREE" as const) : tierFromPlan(plan);
 
