@@ -172,6 +172,7 @@ export const authConfig: NextAuthConfig = {
     async jwt({ token, user, account, trigger, session: sessionPatch }) {
       if (user) {
         token.id = user.id;
+        token.sub = user.id;
         if ("email" in user && typeof user.email === "string") {
           token.email = user.email;
         }
@@ -214,7 +215,10 @@ export const authConfig: NextAuthConfig = {
       /** Client called `session.update()` — always pull fresh role / onboarding from DB. */
       if (trigger === "update" && typeof uid === "string") {
         const synced = await forceSyncTokenFromDb(token, uid);
-        if (synced === null) return null;
+        if (synced === null) {
+          if (token.role && token.id) return token;
+          return null;
+        }
         const patch = sessionPatch as Record<string, unknown> | undefined;
         if (patch?.onboardingComplete === true) {
           synced.onboardingComplete = true;
@@ -253,7 +257,12 @@ export const authConfig: NextAuthConfig = {
     },
 
     async session({ session, token }) {
-      const uid = typeof token?.id === "string" ? token.id : null;
+      const uid =
+        typeof token?.id === "string"
+          ? token.id
+          : typeof token?.sub === "string"
+            ? token.sub
+            : null;
       if (!uid) {
         return { ...session, user: undefined };
       }
@@ -320,11 +329,14 @@ export const authConfig: NextAuthConfig = {
     redirect({ url, baseUrl }) {
       if (url.startsWith("/")) return `${baseUrl}${url}`;
       try {
-        if (new URL(url).origin === new URL(baseUrl).origin) return url;
+        const dest = new URL(url);
+        const base = new URL(baseUrl);
+        if (dest.origin === base.origin) return url;
+        if (dest.pathname.startsWith("/")) return `${base.origin}${dest.pathname}${dest.search}`;
       } catch {
         /* ignore */
       }
-      return baseUrl;
+      return `${baseUrl}/auth/login`;
     },
   },
 

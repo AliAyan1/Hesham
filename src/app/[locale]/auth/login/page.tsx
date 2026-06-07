@@ -113,23 +113,10 @@ export default function LoginPage() {
           return;
         }
 
-        await update();
-        const sessionReady = await waitForAuthenticatedSession();
+        const sessionReady = await waitForAuthenticatedSession(40);
         if (!sessionReady.ok) {
           setServerError(t("auth.sessionNotReady"));
           return;
-        }
-
-        if (result.url) {
-          try {
-            const dest = new URL(result.url, window.location.origin);
-            if (dest.origin === window.location.origin) {
-              window.location.replace(dest.href);
-              return;
-            }
-          } catch {
-            /* fall through to dashboard redirect */
-          }
         }
 
         const params = new URLSearchParams(window.location.search);

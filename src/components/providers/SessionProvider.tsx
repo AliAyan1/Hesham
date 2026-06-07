@@ -11,8 +11,7 @@ interface SessionProviderProps {
 }
 
 export function SessionProvider({ children, session }: SessionProviderProps) {
-  const hydrated =
-    session?.user?.id && session?.user?.email ? session : null;
+  const hydrated = session?.user?.id ? session : null;
 
   return (
     <NextAuthSessionProvider

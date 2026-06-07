@@ -136,14 +136,17 @@ export async function waitForAuthenticatedSession(
         credentials: "include",
         cache: "no-store",
       });
-      const json = (await res.json()) as { user?: { id?: string } };
-      if (json.user?.id) {
-        return { ok: true, userId: json.user.id };
+      const json = (await res.json()) as {
+        user?: { id?: string; role?: string };
+      };
+      const userId = json.user?.id;
+      if (userId) {
+        return { ok: true, userId };
       }
     } catch {
       /* retry */
     }
-    await new Promise((r) => setTimeout(r, 200));
+    await new Promise((r) => setTimeout(r, 250));
   }
   return { ok: false };
 }

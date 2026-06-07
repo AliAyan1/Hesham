@@ -76,8 +76,7 @@ export default async function LocaleLayout({
   const messages = await getMessages();
   const isRTL = RTL_LOCALES.includes(locale as Locale);
   const rawSession = await auth();
-  const session =
-    rawSession?.user?.id && rawSession?.user?.email ? rawSession : null;
+  const session = rawSession?.user?.id ? rawSession : null;
 
   return (
     <HtmlLocaleSync locale={locale as Locale}>
