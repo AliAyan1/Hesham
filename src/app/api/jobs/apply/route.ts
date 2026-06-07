@@ -37,16 +37,10 @@ export async function POST(
       userId: seekerId,
       status: AssessmentStatus.COMPLETED,
       isFlagged: false,
-      totalScore: { gte: 50 },
     },
+    orderBy: { totalScore: "desc" },
     select: { id: true, totalScore: true },
   });
-  if (!completedAssessment) {
-    return NextResponse.json(
-      { success: false, error: "assessment_required" },
-      { status: 403 },
-    );
-  }
 
   const job = await prisma.job.findFirst({
     where: { id: parsed.data.jobId, isActive: true },
@@ -89,7 +83,9 @@ export async function POST(
       return created;
     });
 
-    await shareCompletedAssessmentsForUser(prisma, seekerId);
+    if (completedAssessment) {
+      await shareCompletedAssessmentsForUser(prisma, seekerId);
+    }
 
     const seeker = await prisma.user.findUnique({
       where: { id: seekerId },

@@ -32,8 +32,8 @@ export async function resolveInviteAssessmentGate(
   return { gate: "ok", metrics };
 }
 
-function initialInviteStatus(gate: InviteGate): TalentPoolInviteStatus {
-  return gate === "ok" ? TalentPoolInviteStatus.ASSESSMENT_COMPLETE : TalentPoolInviteStatus.PENDING_ASSESSMENT;
+function initialInviteStatus(): TalentPoolInviteStatus {
+  return TalentPoolInviteStatus.ASSESSMENT_COMPLETE;
 }
 
 export async function createTalentPoolInvite(params: {
@@ -66,8 +66,7 @@ export async function createTalentPoolInvite(params: {
   });
   if (!job) throw new Error("job_not_found");
 
-  const { gate } = await resolveInviteAssessmentGate(params.candidateId);
-  const status = initialInviteStatus(gate);
+  const status = initialInviteStatus();
   const expiresAt = inviteExpiresAt();
 
   const invite = await prisma.talentPoolInvite.upsert({
@@ -100,8 +99,8 @@ export async function createTalentPoolInvite(params: {
     type: NotificationType.TALENT_POOL_INVITE,
     title: `${company} invited you to apply`,
     titleAr: `${company} دعاك للتقديم`,
-    message: `${company} wants to interview you for ${job.title}! Complete your assessment to unlock this opportunity.`,
-    messageAr: `${company} يريد مقابلتك لوظيفة ${job.title}! أكمل تقييمك لفتح هذه الفرصة.`,
+    message: `${company} invited you to apply for ${job.title}. Open your invitations to accept and continue.`,
+    messageAr: `${company} دعاك للتقديم على ${job.title}. افتح دعواتك للقبول والمتابعة.`,
     link: "/dashboard/job-seeker/invites",
   });
 
@@ -236,9 +235,6 @@ export async function acceptTalentPoolInvite(params: {
   if (invite.status === TalentPoolInviteStatus.DECLINED) {
     throw new Error("invite_declined");
   }
-
-  const { gate } = await resolveInviteAssessmentGate(params.candidateId);
-  if (gate !== "ok") return { gate };
 
   const existing = await prisma.application.findUnique({
     where: { jobId_jobSeekerId: { jobId: invite.jobId, jobSeekerId: params.candidateId } },
