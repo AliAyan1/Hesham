@@ -419,7 +419,7 @@
     "loggingIn": "جارٍ تسجيل الدخول…",
     "creatingAccount": "جارٍ إنشاء الحساب…",
     "invalidCredentials": "البريد أو كلمة المرور غير صحيحة.",
-    "sessionNotReady": "تم التحقق لكن الجلسة لم تبدأ. تأكد من AUTH_SECRET في .env.local ثم أعد المحاولة.",
+    "sessionNotReady": "تم التحقق لكن الجلسة لم تبدأ. على localhost استخدم NEXTAUTH_URL=http://localhost:3000 في .env.local؛ على الإنتاج اضبط AUTH_SECRET وNEXTAUTH_URL في Vercel ثم أعد النشر.",
     "emailTaken": "البريد الإلكتروني مسجل مسبقًا.",
     "registerSuccess": "تم إنشاء الحساب بنجاح.",
     "accountTypePrompt": "أُنشئ حسابي كـ",

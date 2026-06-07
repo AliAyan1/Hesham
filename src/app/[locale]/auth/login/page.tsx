@@ -113,9 +113,12 @@ export default function LoginPage() {
           return;
         }
 
+        await update();
         const sessionReady = await waitForAuthenticatedSession(40);
         if (!sessionReady.ok) {
-          setServerError(t("auth.sessionNotReady"));
+          // signIn succeeded — cookie may lag; navigate so middleware reads the JWT
+          const fallback = await fetchPostAuthPath().catch(() => "/dashboard/job-seeker");
+          hardNavigate(fallback, locale);
           return;
         }
 

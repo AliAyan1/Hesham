@@ -457,7 +457,7 @@
     "loggingIn": "Signing in…",
     "creatingAccount": "Creating account…",
     "invalidCredentials": "Invalid email or password.",
-    "sessionNotReady": "Sign-in succeeded but the session did not start. Check AUTH_SECRET in .env.local, then try again.",
+    "sessionNotReady": "Sign-in succeeded but the session did not start. On localhost use NEXTAUTH_URL=http://localhost:3000 in .env.local; on production set AUTH_SECRET and NEXTAUTH_URL in Vercel, then restart/redeploy.",
     "emailTaken": "This email is already registered.",
     "registerSuccess": "Account created successfully.",
     "accountTypePrompt": "I am signing up as",
