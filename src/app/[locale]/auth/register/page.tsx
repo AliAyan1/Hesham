@@ -7,7 +7,7 @@ import { RegisterRolePickModal } from "@/components/auth/RegisterRolePickModal";
 import { signIn, useSession } from "next-auth/react";
 import { useLocale, useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
-import { Link } from "@/i18n/navigation";
+import { Link, useRouter } from "@/i18n/navigation";
 import { registerSchema } from "@/lib/validations";
 import { BRAND_COLORS } from "@/lib/constants";
 import { AuthShell } from "@/components/auth/AuthShell";
@@ -17,6 +17,7 @@ import type { RegisterFormData } from "@/types";
 import {
   finishGoogleSignup,
   hardNavigate,
+  markOnboardingComplete,
   signOutThenNavigate,
   type SignupPlanChoice,
 } from "@/lib/auth-redirect";
@@ -74,6 +75,7 @@ export default function RegisterPage() {
   const tAuth = useTranslations("auth");
   const locale = useLocale();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const isRTL = locale === "ar" || locale === "ur";
   const { data: session, status: sessionStatus, update } = useSession();
 
@@ -154,11 +156,16 @@ export default function RegisterPage() {
   const [serverError, setServerError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
+  /** Sync role/plan from URL only — never reset phase or wipe a plan the user already picked. */
   useEffect(() => {
-    const flow = resolveInitialFlow(urlPlan, urlRoleParsed);
-    setPhase(flow.phase);
-    setPickedPlan(flow.plan);
-    setFormData((prev) => ({ ...prev, role: flow.role }));
+    if (urlRoleParsed) {
+      setFormData((prev) =>
+        prev.role === urlRoleParsed ? prev : { ...prev, role: urlRoleParsed },
+      );
+    }
+    if (urlPlan) {
+      setPickedPlan((prev) => prev ?? urlPlan);
+    }
   }, [urlPlan, urlRoleParsed]);
 
   const pwdMeter = passwordStrengthMeter(formData.password);
@@ -192,6 +199,12 @@ export default function RegisterPage() {
     setServerError(null);
   }
 
+  function syncPlanToUrl(plan: PlanChoice) {
+    const query: Record<string, string> = { plan };
+    if (urlRoleParsed) query.role = urlRoleParsed.toLowerCase();
+    router.replace({ pathname: "/auth/register", query });
+  }
+
   function continueFromRole() {
     if (formData.role === UserRole.EMPLOYER) {
       setPickedPlan("free");
@@ -208,6 +221,7 @@ export default function RegisterPage() {
 
   function pickPlan(next: PlanChoice) {
     setPickedPlan(next);
+    syncPlanToUrl(next);
     setPhase("account");
   }
 
@@ -385,12 +399,9 @@ export default function RegisterPage() {
         }
 
         await update();
+        await markOnboardingComplete(update);
         setPostSignupRedirect(true);
-        if (parsed.data.role === UserRole.MENTOR) {
-          hardNavigate("/dashboard/mentor", locale);
-        } else {
-          hardNavigate("/onboarding", locale);
-        }
+        hardNavigate(dashboardPathForRole(parsed.data.role), locale);
       } catch (err: unknown) {
         if (axios.isAxiosError(err) && err.response?.status === 409) {
           setServerError(t("auth.emailTaken"));

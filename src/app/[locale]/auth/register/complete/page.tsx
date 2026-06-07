@@ -7,7 +7,7 @@ import axios from "axios";
 import { Link } from "@/i18n/navigation";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { dashboardPathForRole } from "@/lib/subscription";
-import { hardNavigate } from "@/lib/auth-redirect";
+import { finishGoogleSignup, hardNavigate } from "@/lib/auth-redirect";
 import { useSearchParams } from "next/navigation";
 
 type RoleChoice = "JOBSEEKER" | "EMPLOYER" | "MENTOR";
@@ -53,13 +53,16 @@ export default function RegisterCompletePage() {
       try {
         await axios.post("/api/account/role-choice", { role });
 
-        // No payment integration yet. When PAYMENTS_LIVE is not true, /api/upgrade persists the tier in DB.
         if (role === "JOBSEEKER") {
           await axios.post("/api/upgrade", { plan });
         }
 
-        await update();
-        hardNavigate("/onboarding", locale);
+        await finishGoogleSignup(
+          role,
+          update,
+          locale,
+          role === "JOBSEEKER" ? plan : null,
+        );
       } catch {
         setError(t("common.error"));
       }
