@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { useSession, signOut } from "next-auth/react";
+import { useSession } from "next-auth/react";
+import { signOutToLanding } from "@/lib/auth-redirect";
 import { useTranslations } from "next-intl";
 import type { Session } from "next-auth";
 import type { UserRole } from "@/types";
@@ -241,7 +242,7 @@ function DashboardUserMenu({
             type="button"
             className="flex min-h-10 w-full items-center px-4 py-2 text-start text-sm font-medium text-red-600 hover:bg-red-50"
             role="menuitem"
-            onClick={() => void signOut({ callbackUrl: `/${locale}/auth/login` })}
+            onClick={() => void signOutToLanding(locale)}
           >
             {logoutLabel}
           </button>

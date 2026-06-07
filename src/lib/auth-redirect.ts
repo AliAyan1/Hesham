@@ -104,6 +104,11 @@ export async function signOutThenNavigate(path: string, locale: string): Promise
   await signOut({ callbackUrl: target });
 }
 
+/** Sign out and return to the public landing page (not login — middleware would bounce back to dashboard). */
+export async function signOutToLanding(locale: string): Promise<void> {
+  await signOutThenNavigate("/", locale);
+}
+
 /** Where to send a user after successful login/register. */
 export function resolvePostAuthPath(
   role: string,

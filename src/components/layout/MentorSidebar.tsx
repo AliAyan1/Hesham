@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import { usePathname } from "@/i18n/navigation";
-import { signOut, useSession } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/cn";
 import { Avatar } from "@/components/ui/Avatar";
@@ -111,13 +111,13 @@ export function MentorSidebar({ locale }: { locale: string }) {
               </span>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => void signOut({ callbackUrl: `/${locale}/auth/login` })}
-            className="mt-3 w-full rounded-lg border border-white/20 py-2 text-xs font-medium text-white/80 hover:bg-white/5"
+          <Link
+            href={`${ROOT}/profile`}
+            prefetch={false}
+            className="mt-3 flex min-h-10 w-full items-center justify-center rounded-lg border border-white/20 py-2 text-xs font-medium text-white/80 transition-colors hover:border-brand-teal hover:bg-white/5 hover:text-white"
           >
-            {tNav("logout")}
-          </button>
+            {tNav("profile")}
+          </Link>
         </div>
       </aside>
     </>

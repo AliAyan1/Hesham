@@ -13,7 +13,7 @@ import {
   Users,
   Wallet,
 } from "lucide-react";
-import { signOut } from "next-auth/react";
+import { signOutToLanding } from "@/lib/auth-redirect";
 import { useLocale, useTranslations } from "next-intl";
 import { Link, usePathname } from "@/i18n/navigation";
 import { Logo } from "@/components/ui/Logo";
@@ -130,7 +130,7 @@ export function AdminSidebar({
         </div>
         <button
           type="button"
-          onClick={() => signOut({ callbackUrl: `/${locale}/auth/login` })}
+          onClick={() => void signOutToLanding(locale)}
           className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/20 py-2 text-sm font-medium text-white/90 hover:bg-white/10"
         >
           <LogOut className="h-4 w-4" aria-hidden />

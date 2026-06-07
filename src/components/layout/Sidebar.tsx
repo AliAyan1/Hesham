@@ -25,7 +25,8 @@ import {
 } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import { usePathname } from "@/i18n/navigation";
-import { signOut, useSession } from "next-auth/react";
+import { useSession } from "next-auth/react";
+import { dashboardProfilePath } from "@/lib/dashboard-nav";
 import { useTranslations } from "next-intl";
 import { SubscriptionTier, type UserRole } from "@/types";
 
@@ -378,16 +379,16 @@ export function Sidebar({ locale, role }: SidebarProps) {
                 </div>
               </div>
             </div>
-            <button
-              type="button"
+            <Link
+              href={dashboardProfilePath(role)}
+              prefetch={false}
               className={cn(
                 "flex min-h-11 w-full items-center justify-center rounded-lg border border-white/20 px-3 text-sm font-medium text-white transition-colors duration-150",
-                "hover:border-red-500 hover:bg-red-500/15 hover:text-red-100",
+                "hover:border-brand-teal hover:bg-[rgba(29,158,117,0.15)] hover:text-white",
               )}
-              onClick={() => signOut({ callbackUrl: `/${locale}/auth/login` })}
             >
-              {tNav("logout")}
-            </button>
+              {tNav("profile")}
+            </Link>
           </>
         ) : null}
       </div>

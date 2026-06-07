@@ -1,6 +1,6 @@
 "use client";
 
-import { signOut } from "next-auth/react";
+import { signOutToLanding } from "@/lib/auth-redirect";
 import { useTranslations } from "next-intl";
 import { BRAND_COLORS } from "@/lib/constants";
 
@@ -14,9 +14,7 @@ export default function LogoutButton({ locale }: LogoutButtonProps) {
 
   return (
     <button
-      onClick={() =>
-        signOut({ callbackUrl: `/${locale}/auth/login` })
-      }
+      onClick={() => void signOutToLanding(locale)}
       className="px-4 py-2 rounded-lg border text-sm font-medium transition-colors hover:bg-[#2a2a2a]"
       style={{ borderColor: BRAND_COLORS.accent, color: BRAND_COLORS.accent }}
     >

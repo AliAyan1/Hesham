@@ -9,6 +9,8 @@ export function dashboardProfilePath(role: UserRole): string {
       return "/dashboard/employer/profile";
     case "ADMIN":
       return "/dashboard/admin";
+    case "MENTOR":
+      return "/dashboard/mentor/profile";
     default:
       return "/dashboard/job-seeker/profile";
   }
@@ -23,6 +25,8 @@ export function dashboardSettingsPath(role: UserRole): string {
       return "/dashboard/employer/settings";
     case "ADMIN":
       return "/dashboard/admin/settings";
+    case "MENTOR":
+      return "/dashboard/mentor/settings";
     default:
       return "/dashboard/job-seeker/profile";
   }

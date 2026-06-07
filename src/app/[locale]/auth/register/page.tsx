@@ -7,7 +7,14 @@ import { RegisterRolePickModal } from "@/components/auth/RegisterRolePickModal";
 import { signIn, useSession } from "next-auth/react";
 import { useLocale, useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
-import { Link, useRouter } from "@/i18n/navigation";
+import { Link } from "@/i18n/navigation";
+import {
+  clearRegisterPlan,
+  planFromStorage,
+  resolveRegisterPlan,
+  saveRegisterPlan,
+  type RegisterPlanChoice,
+} from "@/lib/register-plan-storage";
 import { registerSchema } from "@/lib/validations";
 import { BRAND_COLORS } from "@/lib/constants";
 import { AuthShell } from "@/components/auth/AuthShell";
@@ -27,7 +34,7 @@ import type { ZodIssue } from "zod";
 
 type FieldErrors = Partial<Record<keyof RegisterFormData, string>>;
 type FlowPhase = "role" | "plan" | "mentorInfo" | "account";
-type PlanChoice = "free" | "professional" | "premium";
+type PlanChoice = RegisterPlanChoice;
 
 function passwordStrengthMeter(password: string): 0 | 1 | 2 | 3 {
   let score = 0;
@@ -75,7 +82,6 @@ export default function RegisterPage() {
   const tAuth = useTranslations("auth");
   const locale = useLocale();
   const searchParams = useSearchParams();
-  const router = useRouter();
   const isRTL = locale === "ar" || locale === "ur";
   const { data: session, status: sessionStatus, update } = useSession();
 
@@ -144,7 +150,11 @@ export default function RegisterPage() {
     true;
 
   const [phase, setPhase] = useState<FlowPhase>(() => initialFlow.phase);
-  const [pickedPlan, setPickedPlan] = useState<PlanChoice | null>(() => initialFlow.plan);
+  const [pickedPlan, setPickedPlan] = useState<PlanChoice | null>(() => {
+    if (initialFlow.plan) return initialFlow.plan;
+    if (typeof window !== "undefined") return planFromStorage();
+    return null;
+  });
   const [formData, setFormData] = useState<RegisterFormData>(() => ({
     name: "",
     email: "",
@@ -156,16 +166,19 @@ export default function RegisterPage() {
   const [serverError, setServerError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  /** Sync role/plan from URL only — never reset phase or wipe a plan the user already picked. */
+  function commitPlan(plan: PlanChoice) {
+    saveRegisterPlan(plan);
+    setPickedPlan(plan);
+  }
+
+  /** URL plan from pricing links — persist so it survives re-renders / HMR. */
   useEffect(() => {
     if (urlRoleParsed) {
       setFormData((prev) =>
         prev.role === urlRoleParsed ? prev : { ...prev, role: urlRoleParsed },
       );
     }
-    if (urlPlan) {
-      setPickedPlan((prev) => prev ?? urlPlan);
-    }
+    if (urlPlan) commitPlan(urlPlan);
   }, [urlPlan, urlRoleParsed]);
 
   const pwdMeter = passwordStrengthMeter(formData.password);
@@ -199,20 +212,15 @@ export default function RegisterPage() {
     setServerError(null);
   }
 
-  function syncPlanToUrl(plan: PlanChoice) {
-    const query: Record<string, string> = { plan };
-    if (urlRoleParsed) query.role = urlRoleParsed.toLowerCase();
-    router.replace({ pathname: "/auth/register", query });
-  }
-
   function continueFromRole() {
     if (formData.role === UserRole.EMPLOYER) {
-      setPickedPlan("free");
+      commitPlan("free");
       setPhase("account");
       return;
     }
-    if (urlPlan) {
-      setPickedPlan(urlPlan);
+    const explicitPlan = pickedPlan ?? urlPlan ?? planFromStorage();
+    if (explicitPlan) {
+      commitPlan(explicitPlan);
       setPhase("account");
       return;
     }
@@ -220,8 +228,7 @@ export default function RegisterPage() {
   }
 
   function pickPlan(next: PlanChoice) {
-    setPickedPlan(next);
-    syncPlanToUrl(next);
+    commitPlan(next);
     setPhase("account");
   }
 
@@ -233,7 +240,11 @@ export default function RegisterPage() {
       setPhase("mentorInfo");
       return;
     }
-    if (formData.role === UserRole.EMPLOYER || urlPlan || pickedPlan) {
+    if (hasPreselectedPlan) {
+      setPhase("plan");
+      return;
+    }
+    if (formData.role === UserRole.EMPLOYER || pickedPlan || planFromStorage()) {
       setPhase("role");
       return;
     }
@@ -246,7 +257,7 @@ export default function RegisterPage() {
   }
 
   function resolvedPlan(): PlanChoice {
-    return pickedPlan ?? urlPlan ?? "free";
+    return resolveRegisterPlan({ pickedPlan, urlPlan });
   }
 
   const signupPlanBanner = resolvedPlan();
@@ -400,6 +411,7 @@ export default function RegisterPage() {
 
         await update();
         await markOnboardingComplete(update);
+        clearRegisterPlan();
         setPostSignupRedirect(true);
         hardNavigate(dashboardPathForRole(parsed.data.role), locale);
       } catch (err: unknown) {
@@ -542,22 +554,8 @@ export default function RegisterPage() {
         <div className="space-y-5">
           <p className="text-center text-lg font-semibold text-white">{tAuth("registerFlow.step1Title")}</p>
           <p className="text-center text-sm text-gray-400">{tAuth("registerFlow.step1Subtitle")}</p>
-          {urlPlan ? (
-            <p
-              className={`rounded-lg border px-3 py-2 text-center text-xs font-semibold ${
-                urlPlan === "professional"
-                  ? "border-[#1D9E75]/30 bg-[#1D9E75]/10 text-[#A7F3D0]"
-                  : urlPlan === "premium"
-                    ? "border-[#C9973A]/35 bg-[#C9973A]/10 text-[#FDE68A]"
-                    : "border-[#0F4C75]/25 bg-[#EFF6FF]/10 text-[#93C5FD]"
-              }`}
-            >
-              {urlPlan === "professional"
-                ? t("subscription.signupProfessionalBanner")
-                : urlPlan === "premium"
-                  ? t("subscription.signupPremiumBanner")
-                  : t("subscription.signupFreeBanner")}
-            </p>
+          {resolvedPlan() !== "free" || urlPlan || pickedPlan ? (
+            <PlanBanner plan={resolvedPlan()} t={t} />
           ) : null}
           <div className="flex flex-col gap-3">
             {roleCards.map(({ value, label, hint, Icon }) => {
@@ -679,22 +677,7 @@ export default function RegisterPage() {
               {tAuth("registerFlow.mentorSignupBanner")}
             </div>
           ) : (
-            <div
-              className={`rounded-xl border px-4 py-3 text-sm font-semibold ${
-                signupPlanBanner === "professional"
-                  ? "border-[#1D9E75]/30 bg-[#1D9E75]/10 text-[#A7F3D0]"
-                  : signupPlanBanner === "premium"
-                    ? "border-[#C9973A]/35 bg-[#C9973A]/10 text-[#FDE68A]"
-                    : "border-[#0F4C75]/25 bg-[#EFF6FF]/10 text-[#93C5FD]"
-              }`}
-              role="status"
-            >
-              {signupPlanBanner === "professional"
-                ? t("subscription.signupProfessionalBanner")
-                : signupPlanBanner === "premium"
-                  ? t("subscription.signupPremiumBanner")
-                  : t("subscription.signupFreeBanner")}
-            </div>
+            <PlanBanner plan={signupPlanBanner} t={t} size="md" />
           )}
 
           {!skipRoleAndPlanSteps && !hasPreselectedPlan ? (
@@ -818,8 +801,8 @@ export default function RegisterPage() {
             {t("auth.hasAccount")}{" "}
             <Link
               href={
-                urlPlan
-                  ? { pathname: "/auth/login", query: { plan: urlPlan } }
+                resolvedPlan() !== "free"
+                  ? { pathname: "/auth/login", query: { plan: resolvedPlan() } }
                   : "/auth/login"
               }
               className="font-medium hover:underline"
@@ -831,5 +814,34 @@ export default function RegisterPage() {
         </form>
       ) : null}
     </AuthShell>
+  );
+}
+
+function PlanBanner({
+  plan,
+  t,
+  size = "sm",
+}: {
+  plan: PlanChoice;
+  t: ReturnType<typeof useTranslations>;
+  size?: "sm" | "md";
+}) {
+  const box =
+    plan === "professional"
+      ? "border-[#1D9E75]/30 bg-[#1D9E75]/10 text-[#A7F3D0]"
+      : plan === "premium"
+        ? "border-[#C9973A]/35 bg-[#C9973A]/10 text-[#FDE68A]"
+        : "border-[#0F4C75]/25 bg-[#EFF6FF]/10 text-[#93C5FD]";
+  const text =
+    plan === "professional"
+      ? t("subscription.signupProfessionalBanner")
+      : plan === "premium"
+        ? t("subscription.signupPremiumBanner")
+        : t("subscription.signupFreeBanner");
+  const pad = size === "md" ? "rounded-xl px-4 py-3 text-sm" : "rounded-lg px-3 py-2 text-xs";
+  return (
+    <p className={`border text-center font-semibold ${box} ${pad}`} role="status">
+      {text}
+    </p>
   );
 }
