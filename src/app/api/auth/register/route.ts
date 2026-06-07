@@ -26,6 +26,8 @@ export async function POST(
     }
 
     const prisma = getPrisma();
+    await prisma.$connect();
+
     const body: unknown = await request.json();
     const parsed = registerWithPlanSchema.safeParse(body);
 
@@ -41,6 +43,7 @@ export async function POST(
     }
 
     const { name, email, password, role, plan } = parsed.data;
+    console.log("[register] attempt:", email);
     let subscriptionTier =
       role === UserRole.MENTOR ? ("FREE" as const) : tierFromPlan(plan);
 
@@ -121,10 +124,19 @@ export async function POST(
       { status: 201 },
     );
   } catch (err) {
-    console.error("[register]", err);
+    console.error("[register] error:", err);
+    const message = err instanceof Error ? err.message : String(err);
+    const isDb =
+      message.includes("DATABASE_URL") ||
+      message.includes("connect") ||
+      message.includes("ECONNREFUSED");
     return NextResponse.json(
-      { success: false, error: "Internal server error" },
-      { status: 500 }
+      {
+        success: false,
+        error: isDb ? "Database connection failed" : "Registration failed",
+        message: process.env.NODE_ENV === "production" ? undefined : message,
+      },
+      { status: 500 },
     );
   }
 }

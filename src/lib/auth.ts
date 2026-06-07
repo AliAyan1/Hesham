@@ -162,7 +162,8 @@ export const authConfig: NextAuthConfig = {
             subscriptionTier: user.subscriptionTier,
             onboardingComplete: user.onboardingComplete,
           };
-        } catch {
+        } catch (err) {
+          console.error("[auth] credentials authorize failed:", err);
           return null;
         }
       },

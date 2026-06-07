@@ -13,7 +13,21 @@ import { getAuthSecret } from "@/lib/auth-secret";
 /** next-intl reads this on the server; custom middleware must set it (see getRequestLocale). */
 const NEXT_INTL_LOCALE_HEADER = "X-NEXT-INTL-LOCALE";
 
-const PUBLIC_PATHS = ["/auth/login", "/auth/register", "/api/auth"];
+/** Pages and API prefixes that never require a dashboard session. */
+const PUBLIC_PATHS = [
+  "/",
+  "/about",
+  "/pricing",
+  "/contact",
+  "/privacy",
+  "/terms",
+  "/auth/login",
+  "/auth/register",
+  "/auth/forgot-password",
+  "/api/auth",
+  "/api/health",
+  "/api/jobs",
+];
 
 /** Extract locale segment from pathname (e.g. /ar/dashboard → "ar") */
 function getLocaleFromPath(pathname: string): Locale | null {
