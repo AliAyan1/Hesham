@@ -12,12 +12,13 @@ export async function GET() {
     await prisma.$connect();
     const user = await prisma.user.findFirst({
       where: { role: "ADMIN" },
-      select: { email: true },
+      select: { email: true, password: true },
     });
     const totalUsers = await prisma.user.count();
     return NextResponse.json({
       adminExists: Boolean(user),
       adminEmail: user?.email ?? null,
+      adminHasPassword: Boolean(user?.password),
       totalUsers,
     });
   } catch (error) {

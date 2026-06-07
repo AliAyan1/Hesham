@@ -357,14 +357,13 @@ export const authConfig: NextAuthConfig = {
   cookies: (() => {
     const domain = getAuthCookieDomain();
     if (!domain) return undefined;
+    // Only session/callback cookies may set Domain. CSRF uses __Host- prefix and
+    // must stay host-only — setting domain on it breaks credentials login on Vercel.
     return {
       sessionToken: {
         options: { domain },
       },
       callbackUrl: {
-        options: { domain },
-      },
-      csrfToken: {
         options: { domain },
       },
     };
