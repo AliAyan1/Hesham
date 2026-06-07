@@ -3,6 +3,11 @@ import { UserRole } from "@/types";
 
 export const planParamSchema = z.enum(["free", "professional", "premium"]);
 
+/** Roles allowed via public registration — ADMIN must be seeded only. */
+export const registerRoleSchema = z
+  .enum([UserRole.JOBSEEKER, UserRole.EMPLOYER, UserRole.MENTOR])
+  .default(UserRole.JOBSEEKER);
+
 const registerObjectSchema = z.object({
   name: z
     .string()
@@ -18,7 +23,7 @@ const registerObjectSchema = z.object({
     .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
     .regex(/[0-9]/, "Password must contain at least one number"),
   confirmPassword: z.string(),
-  role: z.nativeEnum(UserRole).default(UserRole.JOBSEEKER),
+  role: registerRoleSchema,
 });
 
 /** Extend the object before `.refine` — Zod 3 does not expose `.extend` on `ZodEffects`. */

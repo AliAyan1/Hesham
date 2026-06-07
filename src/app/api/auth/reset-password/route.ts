@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { getPrisma } from "@/lib/db";
 import { consumePasswordResetToken } from "@/lib/auth/password-reset-token";
+import { clientIp, rateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
 const bodySchema = z.object({
   token: z.string().min(16),
@@ -13,6 +14,11 @@ const bodySchema = z.object({
 });
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  const limited = rateLimit(`reset:${clientIp(request)}`, 10, 60 * 60 * 1000);
+  if (!limited.ok) {
+    return rateLimitResponse(limited.retryAfterSec);
+  }
+
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json({ success: false, error: "Validation failed" }, { status: 400 });

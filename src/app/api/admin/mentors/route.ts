@@ -1,13 +1,10 @@
 import { NextResponse } from "next/server";
-import { UserRole } from "@prisma/client";
-import { getServerSession } from "@/lib/get-server-session";
 import { getPrisma } from "@/lib/db";
+import { requireAdminApi } from "@/lib/admin/require-admin";
 
 export async function GET(): Promise<NextResponse> {
-  const session = await getServerSession();
-  if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
-    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
-  }
+  const authResult = await requireAdminApi();
+  if (authResult instanceof NextResponse) return authResult;
 
   const prisma = getPrisma();
   const rows = await prisma.mentor.findMany({

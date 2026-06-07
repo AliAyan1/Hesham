@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getPrisma } from "@/lib/db";
 import { createPasswordResetToken } from "@/lib/auth/password-reset-token";
 import { onPasswordReset } from "@/lib/email-triggers";
+import { clientIp, rateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
 const bodySchema = z.object({
   email: z.string().email(),
@@ -10,6 +11,11 @@ const bodySchema = z.object({
 
 /** Always returns success to avoid email enumeration. */
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  const limited = rateLimit(`forgot:${clientIp(request)}`, 5, 60 * 60 * 1000);
+  if (!limited.ok) {
+    return rateLimitResponse(limited.retryAfterSec);
+  }
+
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json({ success: false, error: "Validation failed" }, { status: 400 });

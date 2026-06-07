@@ -1,7 +1,7 @@
 import { AssessmentStatus, InterviewStatus, UserRole } from "@prisma/client";
 import { NextResponse, type NextRequest } from "next/server";
-import { getServerSession } from "@/lib/get-server-session";
 import { getPrisma } from "@/lib/db";
+import { requireAdminApi } from "@/lib/admin/require-admin";
 
 function csvEscape(value: string | number | null | undefined): string {
   const s = value == null ? "" : String(value);
@@ -18,10 +18,8 @@ function toCsv(headers: string[], rows: (string | number | null | undefined)[][]
 }
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  const session = await getServerSession();
-  if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
-    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
-  }
+  const authResult = await requireAdminApi();
+  if (authResult instanceof NextResponse) return authResult;
 
   const type = new URL(request.url).searchParams.get("type") ?? "stats";
   const prisma = getPrisma();

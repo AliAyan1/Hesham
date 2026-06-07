@@ -1,8 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { UserRole } from "@prisma/client";
 import { z } from "zod";
-import { getServerSession } from "@/lib/get-server-session";
+import { logAudit } from "@/lib/audit";
 import { getPrisma } from "@/lib/db";
+import { requireAdminApi } from "@/lib/admin/require-admin";
 
 const patchSchema = z.object({
   isActive: z.boolean(),
@@ -12,10 +12,9 @@ export async function PATCH(
   request: NextRequest,
   ctx: { params: Promise<{ mentorId: string }> },
 ): Promise<NextResponse> {
-  const session = await getServerSession();
-  if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
-    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
-  }
+  const authResult = await requireAdminApi();
+  if (authResult instanceof NextResponse) return authResult;
+  const { session } = authResult;
 
   const parsed = patchSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
@@ -31,6 +30,15 @@ export async function PATCH(
       data: { isActive: parsed.data.isActive },
       select: { id: true, isActive: true },
     });
+
+    await logAudit({
+      userId: session.user.id,
+      action: "ADMIN_MENTOR_UPDATE",
+      entity: "Mentor",
+      entityId: mentor.id,
+      newData: { isActive: mentor.isActive },
+    });
+
     return NextResponse.json({ success: true, data: { mentor } });
   } catch {
     return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });

@@ -1,16 +1,15 @@
-import { NotificationType, UserRole } from "@prisma/client";
+import { NotificationType } from "@prisma/client";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { getServerSession } from "@/lib/get-server-session";
+import { logAudit } from "@/lib/audit";
 import { getPrisma } from "@/lib/db";
 import { createNotification } from "@/lib/notifications";
 import { sanitizeUserForPublic } from "@/lib/sanitize-user";
+import { requireAdminApi } from "@/lib/admin/require-admin";
 
 export async function GET(): Promise<NextResponse> {
-  const session = await getServerSession();
-  if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
-    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
-  }
+  const authResult = await requireAdminApi();
+  if (authResult instanceof NextResponse) return authResult;
 
   const prisma = getPrisma();
   const pending = await prisma.mentorPayoutRequest.findMany({
@@ -59,10 +58,9 @@ const paySchema = z.object({
 });
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  const session = await getServerSession();
-  if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
-    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
-  }
+  const authResult = await requireAdminApi();
+  if (authResult instanceof NextResponse) return authResult;
+  const { session } = authResult;
 
   const parsed = paySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
@@ -102,6 +100,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     message: `Your payout of SAR ${Math.round(payout.amount)} has been processed. Ref: ${ref}`,
     messageAr: `تم صرف ${Math.round(payout.amount)} ريال. المرجع: ${ref}`,
     link: "/dashboard/mentor/earnings",
+  });
+
+  await logAudit({
+    userId: session.user.id,
+    action: "ADMIN_PAYOUT_PAID",
+    entity: "MentorPayoutRequest",
+    entityId: payout.id,
+    newData: { status: "PAID", reference: ref, amount: payout.amount },
   });
 
   return NextResponse.json({ success: true, data: { ok: true } });

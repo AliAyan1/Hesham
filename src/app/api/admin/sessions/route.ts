@@ -1,14 +1,12 @@
-import { SessionStatus, UserRole } from "@prisma/client";
+import { SessionStatus } from "@prisma/client";
 import { NextResponse, type NextRequest } from "next/server";
-import { getServerSession } from "@/lib/get-server-session";
 import { getPrisma } from "@/lib/db";
 import { sanitizeUserForPublic } from "@/lib/sanitize-user";
+import { requireAdminApi } from "@/lib/admin/require-admin";
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  const session = await getServerSession();
-  if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
-    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
-  }
+  const authResult = await requireAdminApi();
+  if (authResult instanceof NextResponse) return authResult;
 
   const url = new URL(request.url);
   const status = url.searchParams.get("status")?.trim();

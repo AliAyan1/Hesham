@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getPrisma } from "@/lib/db";
+import { clientIp, rateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
 const contactSchema = z.object({
   name: z.string().trim().min(2).max(120),
@@ -13,6 +14,11 @@ export async function POST(request: Request): Promise<
   NextResponse<{ ok: true } | { error: string }>
 > {
   try {
+    const limited = rateLimit(`contact:${clientIp(request)}`, 5, 15 * 60 * 1000);
+    if (!limited.ok) {
+      return rateLimitResponse(limited.retryAfterSec);
+    }
+
     const json: unknown = await request.json().catch(() => null);
     const parsed = contactSchema.safeParse(json);
     if (!parsed.success) {

@@ -1,17 +1,16 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { UserRole } from "@prisma/client";
-import { getServerSession } from "@/lib/get-server-session";
+import { logAudit } from "@/lib/audit";
 import { getPrisma } from "@/lib/db";
 import { onMentorApproved } from "@/lib/mentor/notifications";
+import { requireAdminApi } from "@/lib/admin/require-admin";
 
 export async function POST(
   _request: NextRequest,
   ctx: { params: Promise<{ mentorId: string }> },
 ): Promise<NextResponse> {
-  const session = await getServerSession();
-  if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
-    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
-  }
+  const authResult = await requireAdminApi();
+  if (authResult instanceof NextResponse) return authResult;
+  const { session } = authResult;
 
   const { mentorId } = await ctx.params;
   const prisma = getPrisma();
@@ -32,6 +31,14 @@ export async function POST(
     userId: mentor.user.id,
     email: mentor.user.email,
     name: mentor.user.name ?? "Mentor",
+  });
+
+  await logAudit({
+    userId: session.user.id,
+    action: "ADMIN_MENTOR_APPROVE",
+    entity: "Mentor",
+    entityId: mentor.id,
+    newData: { isApproved: true },
   });
 
   return NextResponse.json({ success: true, data: { ok: true } });

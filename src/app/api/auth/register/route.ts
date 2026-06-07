@@ -4,12 +4,12 @@ import { getPrisma } from "@/lib/db";
 import type { ZodIssue } from "zod";
 import { registerWithPlanSchema } from "@/lib/validations";
 import type { ApiResponse, IUser } from "@/types";
-import jwt from "jsonwebtoken";
-import { getAuthSecret } from "@/lib/auth-secret";
 import { tierFromPlan } from "@/lib/subscription";
 import { UserRole } from "@prisma/client";
 import { onEmployerRegistered, onJobSeekerRegistered } from "@/lib/email-triggers";
 import { defaultMentorProfileCreate } from "@/lib/mentor/default-mentor-create";
+import { paymentsAreLive } from "@/lib/payments-config";
+import { clientIp, rateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
 /**
  * POST /api/auth/register
@@ -17,18 +17,14 @@ import { defaultMentorProfileCreate } from "@/lib/mentor/default-mentor-create";
  */
 export async function POST(
   request: NextRequest
-): Promise<
-  NextResponse<
-    ApiResponse<
-      | {
-          user: Pick<IUser, "id" | "email" | "name" | "role">;
-          token: string;
-        }
-      | Pick<IUser, "id" | "email" | "name" | "role">
-    >
-  >
-> {
+): Promise<NextResponse> {
   try {
+    const ip = clientIp(request);
+    const limited = rateLimit(`register:${ip}`, 10, 60 * 60 * 1000);
+    if (!limited.ok) {
+      return rateLimitResponse(limited.retryAfterSec);
+    }
+
     const prisma = getPrisma();
     const body: unknown = await request.json();
     const parsed = registerWithPlanSchema.safeParse(body);
@@ -45,8 +41,18 @@ export async function POST(
     }
 
     const { name, email, password, role, plan } = parsed.data;
-    const subscriptionTier =
+    let subscriptionTier =
       role === UserRole.MENTOR ? ("FREE" as const) : tierFromPlan(plan);
+
+    if (paymentsAreLive() && subscriptionTier !== "FREE") {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Paid plans require checkout before account creation",
+        },
+        { status: 402 },
+      );
+    }
 
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
@@ -106,32 +112,13 @@ export async function POST(
       console.error("[register] welcome email failed:", sideEffectErr);
     }
 
-    const secret = getAuthSecret();
-    if (!secret) {
-      return NextResponse.json(
-        {
-          success: true,
-          data: user,
-          message:
-            "Account created successfully. NEXTAUTH_SECRET is not set; JWT not issued.",
-        },
-        { status: 201 }
-      );
-    }
-
-    const token = jwt.sign(
-      { sub: user.id, email: user.email, role: user.role },
-      secret,
-      { expiresIn: "7d" }
-    );
-
     return NextResponse.json(
       {
         success: true,
-        data: { user, token },
+        data: user,
         message: "Account created successfully",
       },
-      { status: 201 }
+      { status: 201 },
     );
   } catch (err) {
     console.error("[register]", err);
