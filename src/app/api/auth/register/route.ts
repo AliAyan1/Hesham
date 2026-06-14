@@ -8,7 +8,7 @@ import { tierFromPlan } from "@/lib/subscription";
 import { UserRole } from "@prisma/client";
 import { onEmployerRegistered, onJobSeekerRegistered } from "@/lib/email-triggers";
 import { defaultMentorProfileCreate } from "@/lib/mentor/default-mentor-create";
-import { paymentsAreLive } from "@/lib/payments-config";
+import { paymentsAreLive, moyasarPaymentsEnabled, isPaidPlanChoice } from "@/lib/payments-config";
 import { clientIp, rateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
 /**
@@ -46,6 +46,10 @@ export async function POST(
     console.log("[register] attempt:", email, "role:", role, "plan:", plan ?? "none");
     let subscriptionTier =
       role === UserRole.MENTOR ? ("FREE" as const) : tierFromPlan(plan);
+
+    if (moyasarPaymentsEnabled() && isPaidPlanChoice(plan) && role !== UserRole.MENTOR) {
+      subscriptionTier = "FREE";
+    }
 
     if (paymentsAreLive() && subscriptionTier !== "FREE") {
       return NextResponse.json(

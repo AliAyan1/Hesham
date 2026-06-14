@@ -279,6 +279,7 @@
     "missingPaymentId": "Payment ID missing from redirect.",
     "missingPaymentContext": "Payment session expired. Please try again from the upgrade page.",
     "payAndUpgrade": "Pay & upgrade",
+    "signupPaymentTitle": "Complete payment — {plan}",
     "upgradeTitle": "Upgrade to {plan}",
     "subscriptionDescription": "QudrahTech {plan} subscription",
     "obligationTitle": "Obligation letter",

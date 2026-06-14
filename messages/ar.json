@@ -272,6 +272,7 @@
     "formLoadFailed": "تعذّر تحميل نموذج الدفع",
     "missingPublishableKey": "الدفع غير مُعد (مفتاح عام مفقود)",
     "payAndUpgrade": "ادفع وترقّى",
+    "signupPaymentTitle": "أكمل الدفع — {plan}",
     "upgradeTitle": "الترقية إلى {plan}",
     "subscriptionDescription": "اشتراك QudrahTech {plan}",
     "obligationTitle": "خطاب الالتزام",

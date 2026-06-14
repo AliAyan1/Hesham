@@ -30,6 +30,11 @@ import {
 } from "@/lib/auth-redirect";
 import { signInWithGoogle } from "@/lib/google-oauth";
 import { dashboardPathForRole } from "@/lib/subscription";
+import { PaymentModal } from "@/components/payments/PaymentModal";
+import {
+  SUBSCRIPTION_PLAN_PRICES_SAR,
+  type SubscriptionPlanKey,
+} from "@/lib/payments/pricing";
 import type { ZodIssue } from "zod";
 
 type FieldErrors = Partial<Record<keyof RegisterFormData, string>>;
@@ -80,6 +85,7 @@ function resolveInitialFlow(
 export default function RegisterPage() {
   const t = useTranslations();
   const tAuth = useTranslations("auth");
+  const tp = useTranslations("payments");
   const locale = useLocale();
   const searchParams = useSearchParams();
   const isRTL = locale === "ar" || locale === "ur";
@@ -122,6 +128,17 @@ export default function RegisterPage() {
 
   /** After signup sign-in, skip signed-in gate until hard navigation completes. */
   const [postSignupRedirect, setPostSignupRedirect] = useState(false);
+  const [moyasarConfigured, setMoyasarConfigured] = useState(false);
+  const [showSignupPayment, setShowSignupPayment] = useState(false);
+  const [signupPaymentPlan, setSignupPaymentPlan] = useState<PlanChoice | null>(null);
+  const [signupRole, setSignupRole] = useState<UserRole | null>(null);
+
+  useEffect(() => {
+    void fetch("/api/payments/config", { cache: "no-store" })
+      .then((r) => r.json() as Promise<{ configured?: boolean }>)
+      .then((j) => setMoyasarConfigured(j.configured === true))
+      .catch(() => setMoyasarConfigured(false));
+  }, []);
 
   const registerReturnPath = useMemo(() => {
     const qs = searchParams.toString();
@@ -145,6 +162,7 @@ export default function RegisterPage() {
   const showSignedInGate =
     loggedInReady &&
     !postSignupRedirect &&
+    !showSignupPayment &&
     !pickRoleAfterGoogle &&
     !pendingGoogleRole &&
     true;
@@ -411,6 +429,26 @@ export default function RegisterPage() {
 
         await update();
         await markOnboardingComplete(update);
+
+        let paymentsConfigured = moyasarConfigured;
+        try {
+          const cfg = await fetch("/api/payments/config", { cache: "no-store" });
+          const j = (await cfg.json()) as { configured?: boolean };
+          paymentsConfigured = j.configured === true;
+        } catch {
+          /* use cached flag */
+        }
+
+        const needsPayment =
+          paymentsConfigured && (plan === "professional" || plan === "premium");
+
+        if (needsPayment) {
+          setSignupPaymentPlan(plan);
+          setSignupRole(parsed.data.role);
+          setShowSignupPayment(true);
+          return;
+        }
+
         clearRegisterPlan();
         setPostSignupRedirect(true);
         hardNavigate(dashboardPathForRole(parsed.data.role), locale);
@@ -478,7 +516,15 @@ export default function RegisterPage() {
     },
   ];
 
+  const signupPlanKey: SubscriptionPlanKey | null =
+    signupPaymentPlan === "premium"
+      ? "PREMIUM"
+      : signupPaymentPlan === "professional"
+        ? "PROFESSIONAL"
+        : null;
+
   return (
+    <>
     <AuthShell isRtl={isRTL} slogan={t("common.slogan")}>
       <div
         className="mb-6 flex gap-1"
@@ -814,6 +860,32 @@ export default function RegisterPage() {
         </form>
       ) : null}
     </AuthShell>
+
+    {signupPlanKey && signupRole ? (
+      <PaymentModal
+        isOpen={showSignupPayment}
+        onClose={() => setShowSignupPayment(false)}
+        title={tp("signupPaymentTitle", { plan: t(`subscription.${signupPaymentPlan}`) })}
+        baseAmount={SUBSCRIPTION_PLAN_PRICES_SAR[signupPlanKey]}
+        description={tp("subscriptionDescription", {
+          plan: t(`subscription.${signupPaymentPlan}`),
+        })}
+        metadata={{
+          type: "SUBSCRIPTION",
+          plan: signupPlanKey,
+        }}
+        onSuccess={() => {
+          void (async () => {
+            await update();
+            clearRegisterPlan();
+            setShowSignupPayment(false);
+            setPostSignupRedirect(true);
+            hardNavigate(dashboardPathForRole(signupRole), locale);
+          })();
+        }}
+      />
+    ) : null}
+    </>
   );
 }
 

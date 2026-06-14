@@ -6,8 +6,13 @@ import { useSession } from "next-auth/react";
 import axios from "axios";
 import { Link } from "@/i18n/navigation";
 import { AuthShell } from "@/components/auth/AuthShell";
+import { PaymentModal } from "@/components/payments/PaymentModal";
 import { dashboardPathForRole } from "@/lib/subscription";
 import { finishGoogleSignup, hardNavigate } from "@/lib/auth-redirect";
+import {
+  SUBSCRIPTION_PLAN_PRICES_SAR,
+  type SubscriptionPlanKey,
+} from "@/lib/payments/pricing";
 import { useSearchParams } from "next/navigation";
 
 type RoleChoice = "JOBSEEKER" | "EMPLOYER" | "MENTOR";
@@ -19,15 +24,25 @@ function planFromUrl(raw: string | null): PlanChoice | null {
   return null;
 }
 
+function planToKey(plan: PlanChoice): SubscriptionPlanKey | null {
+  if (plan === "professional") return "PROFESSIONAL";
+  if (plan === "premium") return "PREMIUM";
+  return null;
+}
+
 export default function RegisterCompletePage() {
   const t = useTranslations();
   const tAuth = useTranslations("auth");
+  const tp = useTranslations("payments");
   const locale = useLocale();
   const isRTL = locale === "ar" || locale === "ur";
   const sp = useSearchParams();
   const { data: session, status, update } = useSession();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [moyasarConfigured, setMoyasarConfigured] = useState(false);
+  const [showPayment, setShowPayment] = useState(false);
+  const [pendingRole, setPendingRole] = useState<RoleChoice | null>(null);
 
   const urlPlan = useMemo(() => planFromUrl(sp.get("plan")), [sp]);
   const urlRole = useMemo(() => sp.get("role")?.toUpperCase() ?? null, [sp]);
@@ -39,19 +54,43 @@ export default function RegisterCompletePage() {
   const [plan, setPlan] = useState<PlanChoice>(urlPlan ?? "free");
 
   useEffect(() => {
-    // Existing user: go straight to dashboard (or onboarding if not complete).
-    if (status !== "authenticated" || !session?.user) return;
+    void fetch("/api/payments/config", { cache: "no-store" })
+      .then((r) => r.json() as Promise<{ configured?: boolean }>)
+      .then((j) => setMoyasarConfigured(j.configured === true))
+      .catch(() => setMoyasarConfigured(false));
+  }, []);
+
+  useEffect(() => {
+    if (status !== "authenticated" || !session?.user || showPayment) return;
     if (session.user.onboardingComplete) {
       const r = String(session.user.role ?? "JOBSEEKER").toUpperCase();
       hardNavigate(dashboardPathForRole(r), locale);
     }
-  }, [status, session?.user, locale]);
+  }, [status, session?.user, locale, showPayment]);
 
   async function complete() {
     setError(null);
     startTransition(async () => {
       try {
         await axios.post("/api/account/role-choice", { role });
+
+        let paymentsConfigured = moyasarConfigured;
+        try {
+          const cfg = await fetch("/api/payments/config", { cache: "no-store" });
+          const j = (await cfg.json()) as { configured?: boolean };
+          paymentsConfigured = j.configured === true;
+        } catch {
+          /* use cached flag */
+        }
+
+        const needsPayment =
+          paymentsConfigured && (plan === "professional" || plan === "premium");
+
+        if (needsPayment) {
+          setPendingRole(role);
+          setShowPayment(true);
+          return;
+        }
 
         if (role === "JOBSEEKER") {
           await axios.post("/api/upgrade", { plan });
@@ -68,6 +107,8 @@ export default function RegisterCompletePage() {
       }
     });
   }
+
+  const paymentPlanKey = planToKey(plan);
 
   if (status === "loading") {
     return (
@@ -91,43 +132,66 @@ export default function RegisterCompletePage() {
   const name = session?.user?.name ?? tAuth("registerFlow.completeFallbackName");
 
   return (
-    <AuthShell isRtl={isRTL} slogan={t("common.slogan")}>
-      <h2 className="mb-1 text-xl font-semibold text-white">{tAuth("registerFlow.completeTitle", { name })}</h2>
-      <p className="mb-6 text-sm text-gray-400">{tAuth("registerFlow.completeSubtitle")}</p>
+    <>
+      <AuthShell isRtl={isRTL} slogan={t("common.slogan")}>
+        <h2 className="mb-1 text-xl font-semibold text-white">{tAuth("registerFlow.completeTitle", { name })}</h2>
+        <p className="mb-6 text-sm text-gray-400">{tAuth("registerFlow.completeSubtitle")}</p>
 
-      {error ? (
-        <div className="mb-4 rounded-lg border border-red-700 bg-red-900/30 p-3 text-sm text-red-400">{error}</div>
-      ) : null}
-
-      <div className="space-y-4">
-        <div className="flex flex-col gap-3">
-          <RoleCard active={role === "JOBSEEKER"} onClick={() => setRole("JOBSEEKER")} title={tAuth("registerFlow.pathJobSeekerTitle")} subtitle={tAuth("registerFlow.pathJobSeekerDesc")} tone="jobseeker" />
-          <RoleCard active={role === "EMPLOYER"} onClick={() => setRole("EMPLOYER")} title={tAuth("registerFlow.pathEmployerTitle")} subtitle={tAuth("registerFlow.pathEmployerDesc")} tone="employer" />
-          <RoleCard active={role === "MENTOR"} onClick={() => setRole("MENTOR")} title={tAuth("registerFlow.pathMentorTitle")} subtitle={tAuth("registerFlow.pathMentorDesc")} tone="mentor" />
-        </div>
-
-        {role === "JOBSEEKER" ? (
-          <div className="rounded-xl border border-[#333] bg-[#111] p-4">
-            <p className="text-sm font-semibold text-white">{tAuth("registerFlow.step2Title")}</p>
-            <p className="mt-1 text-xs text-gray-400">{tAuth("registerFlow.step2Subtitle")}</p>
-            <div className="mt-3 flex flex-col gap-2">
-              <PlanChip active={plan === "free"} onClick={() => setPlan("free")} label={tAuth("registerFlow.planFreeLabel")} price={tAuth("registerFlow.planFreePrice")} />
-              <PlanChip active={plan === "professional"} onClick={() => setPlan("professional")} label={tAuth("registerFlow.planProLabel")} price={tAuth("registerFlow.planProPrice")} />
-              <PlanChip active={plan === "premium"} onClick={() => setPlan("premium")} label={tAuth("registerFlow.planPremiumLabel")} price={tAuth("registerFlow.planPremiumPrice")} />
-            </div>
-          </div>
+        {error ? (
+          <div className="mb-4 rounded-lg border border-red-700 bg-red-900/30 p-3 text-sm text-red-400">{error}</div>
         ) : null}
 
-        <button
-          type="button"
-          disabled={isPending}
-          onClick={complete}
-          className="mt-2 w-full rounded-lg bg-brand-teal py-2.5 font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-        >
-          {isPending ? tAuth("registerFlow.completeWorking") : tAuth("registerFlow.completeCta")}
-        </button>
-      </div>
-    </AuthShell>
+        <div className="space-y-4">
+          <div className="flex flex-col gap-3">
+            <RoleCard active={role === "JOBSEEKER"} onClick={() => setRole("JOBSEEKER")} title={tAuth("registerFlow.pathJobSeekerTitle")} subtitle={tAuth("registerFlow.pathJobSeekerDesc")} tone="jobseeker" />
+            <RoleCard active={role === "EMPLOYER"} onClick={() => setRole("EMPLOYER")} title={tAuth("registerFlow.pathEmployerTitle")} subtitle={tAuth("registerFlow.pathEmployerDesc")} tone="employer" />
+            <RoleCard active={role === "MENTOR"} onClick={() => setRole("MENTOR")} title={tAuth("registerFlow.pathMentorTitle")} subtitle={tAuth("registerFlow.pathMentorDesc")} tone="mentor" />
+          </div>
+
+          {role === "JOBSEEKER" ? (
+            <div className="rounded-xl border border-[#333] bg-[#111] p-4">
+              <p className="text-sm font-semibold text-white">{tAuth("registerFlow.step2Title")}</p>
+              <p className="mt-1 text-xs text-gray-400">{tAuth("registerFlow.step2Subtitle")}</p>
+              <div className="mt-3 flex flex-col gap-2">
+                <PlanChip active={plan === "free"} onClick={() => setPlan("free")} label={tAuth("registerFlow.planFreeLabel")} price={tAuth("registerFlow.planFreePrice")} />
+                <PlanChip active={plan === "professional"} onClick={() => setPlan("professional")} label={tAuth("registerFlow.planProLabel")} price={tAuth("registerFlow.planProPrice")} />
+                <PlanChip active={plan === "premium"} onClick={() => setPlan("premium")} label={tAuth("registerFlow.planPremiumLabel")} price={tAuth("registerFlow.planPremiumPrice")} />
+              </div>
+            </div>
+          ) : null}
+
+          <button
+            type="button"
+            disabled={isPending}
+            onClick={complete}
+            className="mt-2 w-full rounded-lg bg-brand-teal py-2.5 font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+          >
+            {isPending ? tAuth("registerFlow.completeWorking") : tAuth("registerFlow.completeCta")}
+          </button>
+        </div>
+      </AuthShell>
+
+      {paymentPlanKey && pendingRole ? (
+        <PaymentModal
+          isOpen={showPayment}
+          onClose={() => setShowPayment(false)}
+          title={tp("signupPaymentTitle", { plan: t(`subscription.${plan}`) })}
+          baseAmount={SUBSCRIPTION_PLAN_PRICES_SAR[paymentPlanKey]}
+          description={tp("subscriptionDescription", { plan: t(`subscription.${plan}`) })}
+          metadata={{
+            type: "SUBSCRIPTION",
+            plan: paymentPlanKey,
+          }}
+          onSuccess={() => {
+            void (async () => {
+              await update();
+              setShowPayment(false);
+              await finishGoogleSignup(pendingRole, update, locale, null);
+            })();
+          }}
+        />
+      ) : null}
+    </>
   );
 }
 
@@ -195,4 +259,3 @@ function PlanChip({
     </button>
   );
 }
-
