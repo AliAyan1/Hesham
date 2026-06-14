@@ -4,7 +4,6 @@ import { z } from "zod";
 import { getServerSession } from "@/lib/get-server-session";
 import { getPrisma } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
-import { onPaymentConfirmed } from "@/lib/email-triggers";
 
 const signSchema = z.object({
   signedByName: z.string().min(2).max(120),
@@ -57,7 +56,11 @@ export async function POST(
   const prisma = getPrisma();
   const row = await prisma.obligationLetter.findFirst({
     where: { id, employerId: session.user.id, status: ObligationStatus.PENDING },
-    include: { job: { select: { title: true } }, payment: true },
+    include: {
+      candidate: { select: { name: true } },
+      job: { select: { title: true } },
+      payment: true,
+    },
   });
   if (!row) return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
 
@@ -67,13 +70,11 @@ export async function POST(
   await prisma.obligationLetter.update({
     where: { id },
     data: {
-      status: ObligationStatus.SIGNED,
       signedAt: new Date(),
       signedByName: parsed.data.signedByName,
     },
   });
 
-  const receipt = `RCP-${Date.now()}`;
   await prisma.recruitmentPayment.upsert({
     where: { obligationId: id },
     create: {
@@ -82,38 +83,30 @@ export async function POST(
       amount: row.recruitmentFee,
       vatAmount: vat,
       totalAmount: total,
-      status: PaymentStatus.PAID,
-      paidAt: new Date(),
-      receiptNumber: receipt,
+      status: PaymentStatus.PENDING,
     },
     update: {
-      status: PaymentStatus.PAID,
-      paidAt: new Date(),
-      receiptNumber: receipt,
+      amount: row.recruitmentFee,
+      vatAmount: vat,
+      totalAmount: total,
     },
   });
 
   await logAudit({
     userId: session.user.id,
-    action: "obligation.signed",
+    action: "obligation.signed_pending_payment",
     entity: "ObligationLetter",
     entityId: id,
   });
 
-  const employer = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { email: true },
-  });
-  if (employer?.email) {
-    await onPaymentConfirmed({
-      employerId: session.user.id,
-      employerEmail: employer.email,
-      amount: total,
-      currency: row.currency,
+  return NextResponse.json({
+    success: true,
+    data: {
+      obligationId: id,
+      recruitmentFee: row.recruitmentFee,
+      totalAmount: total,
+      candidateName: row.candidate.name,
       jobTitle: row.job.title,
-      receiptNumber: receipt,
-    });
-  }
-
-  return NextResponse.json({ success: true, data: { receiptNumber: receipt, totalAmount: total } });
+    },
+  });
 }

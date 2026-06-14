@@ -56,6 +56,7 @@ model User {
   offersAsCandidate        OfferLetter[]      @relation("CandidateOffer")
   recruitmentPayments      RecruitmentPayment[]
   auditLogs                AuditLog[]
+  payments                 Payment[]
   mentorProfile            Mentor?
   mentorSessionsAsMentee   MentorSession[]    @relation("MenteeSessions")
   profileReminderSentAt    DateTime?
@@ -610,6 +611,45 @@ enum PaymentStatus {
   PAID
   FAILED
   REFUNDED
+}
+
+enum PaymentType {
+  SUBSCRIPTION
+  RECRUITMENT_FEE
+  MENTOR_SESSION
+}
+
+model Payment {
+  id               String        @id @default(cuid())
+  userId           String
+  user             User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type             PaymentType
+
+  subscriptionPlan String?
+  obligationId     String?
+  sessionId        String?
+
+  amount           Float
+  vatAmount        Float
+  totalAmount      Float
+  currency         String        @default("SAR")
+
+  status           PaymentStatus @default(PENDING)
+
+  moyasarPaymentId String?       @unique
+  moyasarInvoiceId String?
+
+  paidAt           DateTime?
+  failureReason    String?
+
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([type])
+  @@index([obligationId])
+  @@index([sessionId])
 }
 
 enum SessionStatus {

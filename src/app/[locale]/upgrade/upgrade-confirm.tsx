@@ -1,14 +1,17 @@
 "use client";
 
 import { Briefcase, UserRound } from "lucide-react";
-import axios from "axios";
 import { getSession, useSession } from "next-auth/react";
 import { useTranslations } from "next-intl";
 import { useCallback, useRef, useState, useTransition } from "react";
 import { useRouter } from "@/i18n/navigation";
 import { cn } from "@/lib/cn";
+import { PaymentModal } from "@/components/payments/PaymentModal";
+import {
+  SUBSCRIPTION_PLAN_PRICES_SAR,
+  type SubscriptionPlanKey,
+} from "@/lib/payments/pricing";
 
-/** Values sent to `/api/account/role-choice` and tracked while saving. */
 type AccountPick = "EMPLOYER" | "JOBSEEKER";
 
 export function UpgradeConfirm({
@@ -17,21 +20,36 @@ export function UpgradeConfirm({
   selectedPlan: "professional" | "premium" | null;
 }) {
   const t = useTranslations("subscription");
+  const tp = useTranslations("payments");
   const tc = useTranslations("common");
   const router = useRouter();
   const { update } = useSession();
   const [err, setErr] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [pickOpen, setPickOpen] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
   const upgradedPlanSlug = useRef<"professional" | "premium" | null>(null);
   const [rolePending, setRolePending] = useState<AccountPick | null>(null);
+
+  const planKey: SubscriptionPlanKey | null =
+    selectedPlan === "professional"
+      ? "PROFESSIONAL"
+      : selectedPlan === "premium"
+        ? "PREMIUM"
+        : null;
 
   const finalizeToDashboard = useCallback(
     async (pick: AccountPick) => {
       setErr(null);
       setRolePending(pick);
       try {
-        await axios.post("/api/account/role-choice", { role: pick });
+        const res = await fetch("/api/account/role-choice", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ role: pick }),
+        });
+        if (!res.ok) throw new Error("role_failed");
         await update();
         const dest = pick === "EMPLOYER" ? "/dashboard/employer" : "/dashboard/job-seeker";
         const slug = upgradedPlanSlug.current;
@@ -46,26 +64,31 @@ export function UpgradeConfirm({
     [router, update, t],
   );
 
-  async function onConfirm() {
+  async function afterPaymentSuccess() {
+    await update();
+    const slug = upgradedPlanSlug.current;
+    const sess = await getSession();
+    const r = sess?.user?.role;
+    if (r === "ADMIN") {
+      router.push(slug ? `/dashboard/admin?upgraded=${slug}` : "/dashboard/admin");
+      router.refresh();
+      return;
+    }
+    if (r === "EMPLOYER" || r === "JOBSEEKER") {
+      const dest =
+        r === "EMPLOYER" ? "/dashboard/employer" : "/dashboard/job-seeker";
+      router.push(slug ? `${dest}?upgraded=${slug}` : dest);
+      router.refresh();
+      return;
+    }
+    setPickOpen(true);
+  }
+
+  function onConfirm() {
     setErr(null);
-    if (!selectedPlan) return;
-    startTransition(async () => {
-      try {
-        await axios.post("/api/upgrade", { plan: selectedPlan });
-        await update();
-        const sess = await getSession();
-        const r = sess?.user?.role;
-        if (r === "ADMIN") {
-          router.push(`/dashboard/admin?upgraded=${selectedPlan}`);
-          router.refresh();
-          return;
-        }
-        upgradedPlanSlug.current = selectedPlan;
-        setPickOpen(true);
-      } catch {
-        setErr(t("upgradeError"));
-      }
-    });
+    if (!selectedPlan || !planKey) return;
+    upgradedPlanSlug.current = selectedPlan;
+    setShowPaymentModal(true);
   }
 
   const busy = pending || rolePending !== null;
@@ -81,9 +104,28 @@ export function UpgradeConfirm({
           selectedPlan ? "bg-white text-[#0D2137] hover:bg-white/90" : "bg-white/20 text-white/60",
         )}
       >
-        {pending ? t("upgrading") : t("confirmUpgrade")}
+        {pending ? t("upgrading") : tp("payAndUpgrade")}
       </button>
       {err ? <p className="mt-3 text-sm text-red-200">{err}</p> : null}
+
+      {planKey ? (
+        <PaymentModal
+          isOpen={showPaymentModal}
+          onClose={() => setShowPaymentModal(false)}
+          title={tp("upgradeTitle", { plan: t(selectedPlan!) })}
+          baseAmount={SUBSCRIPTION_PLAN_PRICES_SAR[planKey]}
+          description={tp("subscriptionDescription", { plan: t(selectedPlan!) })}
+          metadata={{
+            type: "SUBSCRIPTION",
+            plan: planKey,
+          }}
+          onSuccess={() => {
+            startTransition(async () => {
+              await afterPaymentSuccess();
+            });
+          }}
+        />
+      ) : null}
 
       {pickOpen ? (
         <div

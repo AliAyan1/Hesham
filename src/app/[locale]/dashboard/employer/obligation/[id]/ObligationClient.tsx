@@ -1,7 +1,10 @@
 "use client";
 
 import { useParams } from "next/navigation";
+import { useRouter } from "@/i18n/navigation";
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
+import { PaymentModal } from "@/components/payments/PaymentModal";
 
 type ObligationDto = {
   id: string;
@@ -15,13 +18,26 @@ type ObligationDto = {
   totalAmount?: number;
 };
 
+type SignResponse = {
+  success?: boolean;
+  data?: {
+    obligationId: string;
+    recruitmentFee: number;
+    totalAmount: number;
+    candidateName: string | null;
+    jobTitle: string;
+  };
+};
+
 export default function ObligationClient() {
   const params = useParams();
+  const router = useRouter();
+  const t = useTranslations("payments");
   const id = String(params.id ?? "");
   const [row, setRow] = useState<ObligationDto | null>(null);
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
-  const [done, setDone] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
 
   useEffect(() => {
     void fetch(`/api/employer/obligation/${encodeURIComponent(id)}`, { credentials: "include" })
@@ -41,47 +57,68 @@ export default function ObligationClient() {
       body: JSON.stringify({ signedByName: name.trim() }),
     });
     setLoading(false);
-    if (res.ok) setDone(true);
+    const json = (await res.json()) as SignResponse;
+    if (res.ok && json.success) {
+      setShowPaymentModal(true);
+    }
   }
 
-  if (!row) return <p className="text-sm text-[#6B7280]">Loading…</p>;
-  if (done) {
-    return (
-      <p className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-emerald-900">
-        Obligation signed and payment recorded. You can proceed with the offer.
-      </p>
-    );
-  }
+  if (!row) return <p className="text-sm text-[#6B7280]">{t("loading")}</p>;
 
   const vat = row.vatAmount ?? row.recruitmentFee * 0.15;
   const total = row.totalAmount ?? row.recruitmentFee + vat;
+  const candidateName = row.candidate.name ?? t("candidate");
+  const jobTitle = row.job.title;
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6 rounded-xl border bg-white p-8 shadow-sm">
-      <h1 className="text-xl font-bold text-[#0D2137]">Obligation letter</h1>
-      <p className="text-sm text-[#6B7280]">
-        {row.candidate.name} — {row.job.title}
-      </p>
-      <ul className="text-sm text-[#374151]">
-        <li>Recruitment fee: {row.recruitmentFee} {row.currency}</li>
-        <li>VAT (15%): {vat.toFixed(2)} {row.currency}</li>
-        <li className="font-semibold">Total: {total.toFixed(2)} {row.currency}</li>
-      </ul>
-      <p className="whitespace-pre-wrap text-sm text-[#374151]">{row.terms}</p>
-      <label className="block text-sm font-medium">Digital signature (full name)</label>
-      <input
-        className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
+    <>
+      <div className="mx-auto max-w-2xl space-y-6 rounded-xl border bg-white p-8 shadow-sm">
+        <h1 className="text-xl font-bold text-[#0D2137]">{t("obligationTitle")}</h1>
+        <p className="text-sm text-[#6B7280]">
+          {candidateName} — {jobTitle}
+        </p>
+        <ul className="text-sm text-[#374151]">
+          <li>
+            {t("recruitmentFee")}: {row.recruitmentFee} {row.currency}
+          </li>
+          <li>
+            {t("vat")}: {vat.toFixed(2)} {row.currency}
+          </li>
+          <li className="font-semibold">
+            {t("total")}: {total.toFixed(2)} {row.currency}
+          </li>
+        </ul>
+        <p className="whitespace-pre-wrap text-sm text-[#374151]">{row.terms}</p>
+        <label className="block text-sm font-medium">{t("signatureLabel")}</label>
+        <input
+          className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+        <button
+          type="button"
+          disabled={loading || !name.trim()}
+          onClick={() => void sign()}
+          className="w-full rounded-lg bg-[#0F4C75] py-3 text-sm font-semibold text-white disabled:opacity-50"
+        >
+          {loading ? t("signing") : t("agreeAndSign")}
+        </button>
+      </div>
+
+      <PaymentModal
+        isOpen={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        title={t("recruitmentFeeTitle")}
+        baseAmount={row.recruitmentFee}
+        description={t("recruitmentFeeDescription", { candidate: candidateName, job: jobTitle })}
+        metadata={{
+          type: "RECRUITMENT_FEE",
+          obligationId: row.id,
+        }}
+        onSuccess={() => {
+          router.push("/dashboard/employer/candidates");
+        }}
       />
-      <button
-        type="button"
-        disabled={loading || !name.trim()}
-        onClick={() => void sign()}
-        className="w-full rounded-lg bg-[#0F4C75] py-3 text-sm font-semibold text-white disabled:opacity-50"
-      >
-        {loading ? "Signing…" : "I agree and sign"}
-      </button>
-    </div>
+    </>
   );
 }

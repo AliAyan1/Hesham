@@ -12,6 +12,7 @@ import type { SubscriptionTier } from "@/types";
 import { Button } from "@/components/ui/Button";
 import type { MentorCertificationDto } from "@/lib/mentor/certification-types";
 import { MentorCertificationsDisplay } from "@/components/mentor/MentorCertificationsDisplay";
+import { PaymentModal } from "@/components/payments/PaymentModal";
 
 type MentorDetail = {
   id: string;
@@ -43,6 +44,7 @@ export default function MentorBookClient({ mentorId }: { mentorId: string }) {
   const router = useRouter();
   const locale = useLocale();
   const t = useTranslations("mentor");
+  const tp = useTranslations("payments");
   const session = useSession();
   const rawTier = session.data?.user?.subscriptionTier as string | undefined;
   const tier: SubscriptionTier =
@@ -54,6 +56,8 @@ export default function MentorBookClient({ mentorId }: { mentorId: string }) {
   const [duration, setDuration] = useState<number>(60);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [pendingSessionId, setPendingSessionId] = useState<string | null>(null);
 
   useEffect(() => {
     void axios
@@ -82,15 +86,16 @@ export default function MentorBookClient({ mentorId }: { mentorId: string }) {
     setError(null);
     try {
       const iso = new Date(scheduledAt).toISOString();
-      const res = await axios.post<{ success: boolean; error?: string }>(
+      const res = await axios.post<{ success: boolean; error?: string; data?: { id: string } }>(
         `/api/mentors/${encodeURIComponent(mentorId)}/book`,
         { scheduledAt: iso, duration, topic: "Career guidance" },
       );
-      if (!res.data.success) {
+      if (!res.data.success || !res.data.data?.id) {
         setError(res.data.error ?? t("bookingFailed"));
         return;
       }
-      router.push("/dashboard/job-seeker/sessions");
+      setPendingSessionId(res.data.data.id);
+      setShowPaymentModal(true);
     } catch {
       setError(t("bookingFailed"));
     } finally {
@@ -186,10 +191,30 @@ export default function MentorBookClient({ mentorId }: { mentorId: string }) {
           </label>
           {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
           <Button type="button" className="mt-4" loading={busy} disabled={!scheduledAt || !rate} onClick={() => void book()}>
-            {t("bookSession")}
+            {tp("confirmBooking")}
           </Button>
         </section>
       )}
+
+      {pricing && pendingSessionId ? (
+        <PaymentModal
+          isOpen={showPaymentModal}
+          onClose={() => setShowPaymentModal(false)}
+          title={tp("mentorSessionTitle")}
+          baseAmount={pricing.price}
+          description={tp("mentorSessionDescription", {
+            mentor: mentor.user.name ?? title,
+            duration: String(duration),
+          })}
+          metadata={{
+            type: "MENTOR_SESSION",
+            sessionId: pendingSessionId,
+          }}
+          onSuccess={() => {
+            router.push("/dashboard/job-seeker/sessions");
+          }}
+        />
+      ) : null}
     </div>
   );
 }

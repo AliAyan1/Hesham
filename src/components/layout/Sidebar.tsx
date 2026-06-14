@@ -21,6 +21,7 @@ import {
   UserRound,
   Users,
   Video,
+  Wallet,
   type LucideIcon,
 } from "lucide-react";
 import { Link } from "@/i18n/navigation";
@@ -65,7 +66,8 @@ type LabelKey =
   | "mentorManagement"
   | "sessions"
   | "mentorSessions"
-  | "mentorPayouts";
+  | "mentorPayouts"
+  | "payments";
 
 type NavItem = { href: string; labelKey: LabelKey; Icon: LucideIcon };
 
@@ -97,6 +99,7 @@ const ICON: Record<LabelKey, LucideIcon> = {
   sessions: Calendar,
   mentorSessions: Calendar,
   mentorPayouts: LineChart,
+  payments: Wallet,
 };
 
 function dashboardRoot(role: UserRole): string {
@@ -143,6 +146,7 @@ function groupsFor(role: UserRole): NavGroup[] {
           sectionKey: "groupAccount",
           items: [
             { href: "/dashboard/job-seeker/notifications", labelKey: "notifications", Icon: ICON.notifications },
+            { href: "/dashboard/job-seeker/payments", labelKey: "payments", Icon: ICON.payments },
           ],
         },
       ];
@@ -178,6 +182,7 @@ function groupsFor(role: UserRole): NavGroup[] {
           sectionKey: "groupAccount",
           items: [
             { href: "/dashboard/employer/notifications", labelKey: "notifications", Icon: ICON.notifications },
+            { href: "/dashboard/employer/payments", labelKey: "payments", Icon: ICON.payments },
             { href: "/dashboard/employer/settings", labelKey: "settings", Icon: ICON.settings },
           ],
         },
