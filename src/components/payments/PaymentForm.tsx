@@ -4,9 +4,63 @@ import { useEffect, useId, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import type { MoyasarPaymentResult } from "@/types/moyasar";
 
-const MOYASAR_JS = "https://cdn.moyasar.com/mpf/2.0.0/moyasar.js";
-const MOYASAR_CSS = "https://cdn.moyasar.com/mpf/2.0.0/moyasar.css";
+/** 2.0.x returns 403 on Moyasar CDN — 1.14.0 is the current stable bundle. */
+const MOYASAR_JS = "https://cdn.moyasar.com/mpf/1.14.0/moyasar.js";
+const MOYASAR_CSS = "https://cdn.moyasar.com/mpf/1.14.0/moyasar.css";
 export const PAYMENT_METADATA_STORAGE_KEY = "qt-moyasar-payment-metadata";
+
+let moyasarAssetsPromise: Promise<void> | null = null;
+
+function loadMoyasarAssets(): Promise<void> {
+  if (typeof window === "undefined") {
+    return Promise.reject(new Error("Moyasar requires a browser"));
+  }
+  if (window.Moyasar) {
+    return Promise.resolve();
+  }
+  if (moyasarAssetsPromise) {
+    return moyasarAssetsPromise;
+  }
+
+  moyasarAssetsPromise = new Promise((resolve, reject) => {
+    if (!document.querySelector(`link[href="${MOYASAR_CSS}"]`)) {
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = MOYASAR_CSS;
+      document.head.appendChild(link);
+    }
+
+    const existing = document.querySelector(
+      `script[src="${MOYASAR_JS}"]`,
+    ) as HTMLScriptElement | null;
+
+    const onReady = () => {
+      if (window.Moyasar) resolve();
+      else reject(new Error("Moyasar global missing after script load"));
+    };
+
+    if (existing) {
+      if (window.Moyasar) {
+        resolve();
+        return;
+      }
+      existing.addEventListener("load", onReady, { once: true });
+      existing.addEventListener("error", () => reject(new Error("script error")), {
+        once: true,
+      });
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = MOYASAR_JS;
+    script.async = true;
+    script.onload = onReady;
+    script.onerror = () => reject(new Error("script error"));
+    document.head.appendChild(script);
+  });
+
+  return moyasarAssetsPromise;
+}
 
 interface PaymentFormProps {
   amount: number;
@@ -27,16 +81,25 @@ export function PaymentForm({
   const formId = useId().replace(/:/g, "");
   const elementClass = `mysr-form-${formId}`;
   const containerRef = useRef<HTMLDivElement>(null);
+  const onSuccessRef = useRef(onSuccess);
+  const onErrorRef = useRef(onError);
   const [publishableKey, setPublishableKey] = useState<string | null>(null);
   const [loadingKey, setLoadingKey] = useState(true);
 
+  const metadataKey = JSON.stringify(metadata);
+
+  useEffect(() => {
+    onSuccessRef.current = onSuccess;
+    onErrorRef.current = onError;
+  }, [onSuccess, onError]);
+
   useEffect(() => {
     try {
-      sessionStorage.setItem(PAYMENT_METADATA_STORAGE_KEY, JSON.stringify(metadata));
+      sessionStorage.setItem(PAYMENT_METADATA_STORAGE_KEY, metadataKey);
     } catch {
       /* ignore */
     }
-  }, [metadata]);
+  }, [metadataKey]);
 
   useEffect(() => {
     let cancelled = false;
@@ -71,65 +134,57 @@ export function PaymentForm({
   useEffect(() => {
     if (loadingKey || !publishableKey || !containerRef.current) return;
 
-    let script: HTMLScriptElement | null = null;
-    let link: HTMLLinkElement | null = null;
-    let destroyed = false;
+    let cancelled = false;
+    const container = containerRef.current;
+    const parsedMetadata = JSON.parse(metadataKey) as Record<string, string>;
 
-    link = document.createElement("link");
-    link.rel = "stylesheet";
-    link.href = MOYASAR_CSS;
-    document.head.appendChild(link);
+    void loadMoyasarAssets()
+      .then(() => {
+        if (cancelled || !containerRef.current || !window.Moyasar) {
+          if (!cancelled) onErrorRef.current(t("formLoadFailed"));
+          return;
+        }
 
-    const initForm = () => {
-      if (destroyed || !window.Moyasar) return;
-      const halalas = Math.round(amount * 100);
-      const origin = window.location.origin;
+        container.innerHTML = "";
+        const halalas = Math.round(amount * 100);
+        const origin = window.location.origin;
 
-      window.Moyasar.init({
-        element: `.${elementClass}`,
-        amount: halalas,
-        currency: "SAR",
-        description,
-        publishable_api_key: publishableKey,
-        callback_url: `${origin}/api/payments/callback`,
-        methods: ["creditcard"],
-        metadata,
-        on_completed: async (payment: MoyasarPaymentResult) => {
-          onSuccess(payment.id);
-          return true;
-        },
-        on_failure: (error: MoyasarPaymentResult | string) => {
-          const msg =
-            typeof error === "string"
-              ? error
-              : error.source?.message ?? t("paymentFailed");
-          onError(msg);
-        },
+        window.Moyasar.init({
+          element: `.${elementClass}`,
+          amount: halalas,
+          currency: "SAR",
+          country: "SA",
+          description,
+          publishable_api_key: publishableKey,
+          callback_url: `${origin}/api/payments/callback`,
+          supported_networks: ["mada", "visa", "mastercard"],
+          methods: ["creditcard"],
+          metadata: parsedMetadata,
+          on_completed: async (payment: MoyasarPaymentResult) => {
+            onSuccessRef.current(payment.id);
+            return true;
+          },
+          on_failure: (error: MoyasarPaymentResult | string) => {
+            const msg =
+              typeof error === "string"
+                ? error
+                : (error.source?.message ?? t("paymentFailed"));
+            onErrorRef.current(msg);
+          },
+        });
+      })
+      .catch(() => {
+        if (!cancelled) onErrorRef.current(t("formLoadFailed"));
       });
-    };
-
-    if (window.Moyasar) {
-      initForm();
-    } else {
-      script = document.createElement("script");
-      script.src = MOYASAR_JS;
-      script.async = true;
-      script.onload = initForm;
-      script.onerror = () => onError(t("formLoadFailed"));
-      document.head.appendChild(script);
-    }
 
     return () => {
-      destroyed = true;
-      if (script?.parentNode) script.parentNode.removeChild(script);
-      if (link?.parentNode) link.parentNode.removeChild(link);
+      cancelled = true;
+      container.innerHTML = "";
     };
   }, [
     amount,
     description,
-    metadata,
-    onSuccess,
-    onError,
+    metadataKey,
     elementClass,
     t,
     publishableKey,

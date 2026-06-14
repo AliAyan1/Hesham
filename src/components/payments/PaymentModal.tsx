@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { calculateVAT } from "@/lib/moyasar";
 import { PaymentForm } from "./PaymentForm";
@@ -44,9 +44,7 @@ export function PaymentModal({
     }
   }, [isOpen, metadata]);
 
-  if (!isOpen) return null;
-
-  const handleSuccess = async (paymentId: string) => {
+  const handleSuccess = useCallback(async (paymentId: string) => {
     setStatus("processing");
     for (let attempt = 0; attempt < 6; attempt += 1) {
       try {
@@ -73,12 +71,14 @@ export function PaymentModal({
     }
     setStatus("error");
     setErrorMsg(t("verifyFailed"));
-  };
+  }, [metadata, onClose, onSuccess, t]);
 
-  const handleError = (error: string) => {
+  const handleError = useCallback((error: string) => {
     setStatus("error");
     setErrorMsg(error);
-  };
+  }, []);
+
+  if (!isOpen) return null;
 
   return (
     <div
@@ -156,7 +156,7 @@ export function PaymentModal({
                 amount={total}
                 description={description}
                 metadata={metadata}
-                onSuccess={(id) => void handleSuccess(id)}
+                onSuccess={handleSuccess}
                 onError={handleError}
               />
             )}

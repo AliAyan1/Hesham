@@ -19,9 +19,11 @@ export interface MoyasarInitConfig {
   element: string;
   amount: number;
   currency: string;
+  country?: string;
   description: string;
   publishable_api_key: string;
   callback_url: string;
+  supported_networks?: string[];
   methods: string[];
   metadata: Record<string, string>;
   on_completed: (payment: MoyasarPaymentResult) => Promise<boolean>;
