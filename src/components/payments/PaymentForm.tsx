@@ -66,6 +66,7 @@ interface PaymentFormProps {
   amount: number;
   description: string;
   metadata: Record<string, string>;
+  isTestMode?: boolean;
   onSuccess: (paymentId: string) => void;
   onError: (error: string) => void;
 }
@@ -74,6 +75,7 @@ export function PaymentForm({
   amount,
   description,
   metadata,
+  isTestMode = false,
   onSuccess,
   onError,
 }: PaymentFormProps) {
@@ -206,7 +208,9 @@ export function PaymentForm({
   return (
     <div>
       <div className={elementClass} ref={containerRef} />
-      <p className="mt-3 text-center text-xs text-[#6B7280]">{t("secureNote")}</p>
+      <p className="mt-3 text-center text-xs text-[#6B7280]">
+        {isTestMode ? t("secureNote") : t("secureNoteLive")}
+      </p>
     </div>
   );
 }

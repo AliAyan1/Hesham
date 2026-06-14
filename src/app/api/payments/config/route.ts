@@ -9,5 +9,6 @@ export async function GET(): Promise<NextResponse> {
     configured: publishableKey.length > 0 && secretConfigured,
     publishableKey: publishableKey.length > 0 ? publishableKey : null,
     secretConfigured,
+    isTestMode: publishableKey.startsWith("pk_test_"),
   });
 }

@@ -15,6 +15,7 @@ import {
   saveRegisterPlan,
   type RegisterPlanChoice,
 } from "@/lib/register-plan-storage";
+import { savePaymentReturnContext } from "@/lib/payments/return-context";
 import { registerSchema } from "@/lib/validations";
 import { BRAND_COLORS } from "@/lib/constants";
 import { AuthShell } from "@/components/auth/AuthShell";
@@ -286,9 +287,18 @@ export default function RegisterPage() {
   async function handleGoogleRegister() {
     startTransition(async () => {
       try {
-        // Always send the user to the completion screen after OAuth.
-        // Existing users will be redirected from there to their dashboard.
-        await signInWithGoogle({ callbackUrl: `/${locale}/auth/register/complete` });
+        const plan = resolvedPlan();
+        saveRegisterPlan(plan);
+        const params = new URLSearchParams();
+        if (plan !== "free") params.set("plan", plan);
+        const roleParam = formData.role;
+        if (roleParam === UserRole.EMPLOYER) params.set("role", "employer");
+        else if (roleParam === UserRole.MENTOR) params.set("role", "mentor");
+        else if (roleParam === UserRole.JOBSEEKER) params.set("role", "jobseeker");
+        const qs = params.toString();
+        await signInWithGoogle({
+          callbackUrl: `/${locale}/auth/register/complete${qs ? `?${qs}` : ""}`,
+        });
       } catch {
         setServerError(t("common.error"));
       }
@@ -443,6 +453,11 @@ export default function RegisterPage() {
           paymentsConfigured && (plan === "professional" || plan === "premium");
 
         if (needsPayment) {
+          savePaymentReturnContext({
+            dashboardRole: String(parsed.data.role).toUpperCase(),
+            locale,
+            finalizeSignup: false,
+          });
           setSignupPaymentPlan(plan);
           setSignupRole(parsed.data.role);
           setShowSignupPayment(true);
@@ -876,10 +891,10 @@ export default function RegisterPage() {
         }}
         onSuccess={() => {
           void (async () => {
-            await update();
             clearRegisterPlan();
             setShowSignupPayment(false);
             setPostSignupRedirect(true);
+            await update();
             hardNavigate(dashboardPathForRole(signupRole), locale);
           })();
         }}

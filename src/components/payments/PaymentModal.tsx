@@ -29,6 +29,14 @@ export function PaymentModal({
   const t = useTranslations("payments");
   const [status, setStatus] = useState<ModalStatus>("idle");
   const [errorMsg, setErrorMsg] = useState("");
+  const [isTestMode, setIsTestMode] = useState(false);
+
+  useEffect(() => {
+    void fetch("/api/payments/config", { cache: "no-store" })
+      .then((r) => r.json() as Promise<{ isTestMode?: boolean }>)
+      .then((j) => setIsTestMode(j.isTestMode === true))
+      .catch(() => setIsTestMode(false));
+  }, []);
 
   const { vat, total } = useMemo(() => {
     const breakdown = calculateVAT(baseAmount);
@@ -133,9 +141,11 @@ export function PaymentModal({
               </div>
             </div>
 
-            <div className="mb-4 rounded-lg border border-[#FDE68A] bg-[#FEF9C3] px-3 py-2.5 text-xs text-[#854D0E]">
-              {t("testModeBanner")}
-            </div>
+            {isTestMode ? (
+              <div className="mb-4 rounded-lg border border-[#FDE68A] bg-[#FEF9C3] px-3 py-2.5 text-xs text-[#854D0E]">
+                {t("testModeBanner")}
+              </div>
+            ) : null}
 
             {errorMsg ? (
               <div className="mb-4 rounded-lg border border-[#FECACA] bg-[#FEE2E2] px-3 py-2.5 text-sm text-[#991B1B]">
@@ -156,6 +166,7 @@ export function PaymentModal({
                 amount={total}
                 description={description}
                 metadata={metadata}
+                isTestMode={isTestMode}
                 onSuccess={handleSuccess}
                 onError={handleError}
               />

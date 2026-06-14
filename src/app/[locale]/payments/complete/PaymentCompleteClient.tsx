@@ -2,11 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { useRouter } from "@/i18n/navigation";
+import { useLocale } from "next-intl";
 import { useSession } from "next-auth/react";
 import { useTranslations } from "next-intl";
 import { PAYMENT_METADATA_STORAGE_KEY } from "@/components/payments/PaymentForm";
 import type { PaymentMetadataInput } from "@/lib/payments/fulfill";
+import {
+  clearPaymentReturnContext,
+  loadPaymentReturnContext,
+} from "@/lib/payments/return-context";
+import { dashboardPathForRole } from "@/lib/subscription";
+import { hardNavigate } from "@/lib/auth-redirect";
 
 async function verifyWithRetries(
   paymentId: string,
@@ -30,9 +36,9 @@ async function verifyWithRetries(
 
 export default function PaymentCompleteClient() {
   const t = useTranslations("payments");
+  const locale = useLocale();
   const searchParams = useSearchParams();
-  const router = useRouter();
-  const { update } = useSession();
+  const { data: session, update } = useSession();
   const paymentId = searchParams.get("id");
   const status = searchParams.get("status");
   const [message, setMessage] = useState(t("verifying"));
@@ -81,23 +87,42 @@ export default function PaymentCompleteClient() {
         /* ignore */
       }
 
-      await update();
+      const returnCtx = loadPaymentReturnContext();
+      clearPaymentReturnContext();
+
+      if (returnCtx?.finalizeSignup) {
+        await fetch("/api/profile/onboarding", {
+          method: "POST",
+          credentials: "include",
+        });
+        await update({
+          onboardingComplete: true,
+          role: returnCtx.dashboardRole,
+        });
+      } else {
+        await update();
+      }
+
+      const role =
+        returnCtx?.dashboardRole ??
+        String(session?.user?.role ?? "JOBSEEKER").toUpperCase();
+      const navLocale = returnCtx?.locale ?? locale;
 
       if (metadata.type === "SUBSCRIPTION") {
-        router.push("/upgrade?payment=success");
+        hardNavigate(dashboardPathForRole(role), navLocale);
         return;
       }
       if (metadata.type === "RECRUITMENT_FEE") {
-        router.push("/dashboard/employer/candidates");
+        hardNavigate("/dashboard/employer/candidates", navLocale);
         return;
       }
       if (metadata.type === "MENTOR_SESSION") {
-        router.push("/dashboard/job-seeker/sessions");
+        hardNavigate("/dashboard/job-seeker/sessions", navLocale);
         return;
       }
-      router.push("/dashboard");
+      hardNavigate(dashboardPathForRole(role), navLocale);
     })();
-  }, [paymentId, status, router, update, t]);
+  }, [paymentId, status, session?.user?.role, update, locale, t]);
 
   return (
     <main className="mx-auto flex min-h-[50vh] max-w-md flex-col items-center justify-center px-6 py-16 text-center">

@@ -9,6 +9,8 @@ import { AuthShell } from "@/components/auth/AuthShell";
 import { PaymentModal } from "@/components/payments/PaymentModal";
 import { dashboardPathForRole } from "@/lib/subscription";
 import { finishGoogleSignup, hardNavigate } from "@/lib/auth-redirect";
+import { planFromStorage } from "@/lib/register-plan-storage";
+import { savePaymentReturnContext, clearPaymentReturnContext } from "@/lib/payments/return-context";
 import {
   SUBSCRIPTION_PLAN_PRICES_SAR,
   type SubscriptionPlanKey,
@@ -43,6 +45,7 @@ export default function RegisterCompletePage() {
   const [moyasarConfigured, setMoyasarConfigured] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
   const [pendingRole, setPendingRole] = useState<RoleChoice | null>(null);
+  const [finishing, setFinishing] = useState(false);
 
   const urlPlan = useMemo(() => planFromUrl(sp.get("plan")), [sp]);
   const urlRole = useMemo(() => sp.get("role")?.toUpperCase() ?? null, [sp]);
@@ -51,7 +54,11 @@ export default function RegisterCompletePage() {
     if (urlRole === "EMPLOYER" || urlRole === "MENTOR" || urlRole === "JOBSEEKER") return urlRole;
     return "JOBSEEKER";
   });
-  const [plan, setPlan] = useState<PlanChoice>(urlPlan ?? "free");
+  const [plan, setPlan] = useState<PlanChoice>(() => urlPlan ?? planFromStorage() ?? "free");
+
+  useEffect(() => {
+    if (urlPlan) setPlan(urlPlan);
+  }, [urlPlan]);
 
   useEffect(() => {
     void fetch("/api/payments/config", { cache: "no-store" })
@@ -61,12 +68,21 @@ export default function RegisterCompletePage() {
   }, []);
 
   useEffect(() => {
-    if (status !== "authenticated" || !session?.user || showPayment) return;
+    if (status !== "authenticated" || !session?.user || showPayment || finishing) return;
     if (session.user.onboardingComplete) {
       const r = String(session.user.role ?? "JOBSEEKER").toUpperCase();
       hardNavigate(dashboardPathForRole(r), locale);
+      return;
     }
-  }, [status, session?.user, locale, showPayment]);
+
+    const tier = String(session.user.subscriptionTier ?? "FREE").toUpperCase();
+    const hasPaidTier = tier === "PROFESSIONAL" || tier === "PREMIUM";
+    const userRole = String(session.user.role ?? "").toUpperCase();
+    if (hasPaidTier && userRole && userRole !== "ADMIN") {
+      setFinishing(true);
+      void finishGoogleSignup(userRole, update, locale, null);
+    }
+  }, [status, session?.user, locale, showPayment, finishing, update]);
 
   async function complete() {
     setError(null);
@@ -87,6 +103,11 @@ export default function RegisterCompletePage() {
           paymentsConfigured && (plan === "professional" || plan === "premium");
 
         if (needsPayment) {
+          savePaymentReturnContext({
+            dashboardRole: role,
+            locale,
+            finalizeSignup: true,
+          });
           setPendingRole(role);
           setShowPayment(true);
           return;
@@ -110,7 +131,7 @@ export default function RegisterCompletePage() {
 
   const paymentPlanKey = planToKey(plan);
 
-  if (status === "loading") {
+  if (status === "loading" || finishing) {
     return (
       <AuthShell isRtl={isRTL} slogan={t("common.slogan")}>
         <p className="py-12 text-center text-sm text-gray-400">{t("common.loading")}</p>
@@ -148,10 +169,10 @@ export default function RegisterCompletePage() {
             <RoleCard active={role === "MENTOR"} onClick={() => setRole("MENTOR")} title={tAuth("registerFlow.pathMentorTitle")} subtitle={tAuth("registerFlow.pathMentorDesc")} tone="mentor" />
           </div>
 
-          {role === "JOBSEEKER" ? (
+          {role === "JOBSEEKER" || plan !== "free" ? (
             <div className="rounded-xl border border-[#333] bg-[#111] p-4">
               <p className="text-sm font-semibold text-white">{tAuth("registerFlow.step2Title")}</p>
-              <p className="mt-1 text-xs text-gray-400">{tAuth("registerFlow.step2Subtitle")}</p>
+              <p className="mt-1 text-xs text-gray-400">{tAuth("registerFlow.step2SubtitlePaid")}</p>
               <div className="mt-3 flex flex-col gap-2">
                 <PlanChip active={plan === "free"} onClick={() => setPlan("free")} label={tAuth("registerFlow.planFreeLabel")} price={tAuth("registerFlow.planFreePrice")} />
                 <PlanChip active={plan === "professional"} onClick={() => setPlan("professional")} label={tAuth("registerFlow.planProLabel")} price={tAuth("registerFlow.planProPrice")} />
@@ -184,8 +205,10 @@ export default function RegisterCompletePage() {
           }}
           onSuccess={() => {
             void (async () => {
-              await update();
+              setFinishing(true);
               setShowPayment(false);
+              clearPaymentReturnContext();
+              await update();
               await finishGoogleSignup(pendingRole, update, locale, null);
             })();
           }}
