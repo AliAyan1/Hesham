@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { calculateVAT } from "@/lib/moyasar";
 import { PaymentForm } from "./PaymentForm";
@@ -35,29 +35,44 @@ export function PaymentModal({
     return { vat: breakdown.vat, total: breakdown.total };
   }, [baseAmount]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    try {
+      sessionStorage.setItem("qt-moyasar-payment-metadata", JSON.stringify(metadata));
+    } catch {
+      /* ignore */
+    }
+  }, [isOpen, metadata]);
+
   if (!isOpen) return null;
 
   const handleSuccess = async (paymentId: string) => {
     setStatus("processing");
-    try {
-      const res = await fetch("/api/payments/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ paymentId, metadata }),
-      });
-
-      if (!res.ok) throw new Error("verify_failed");
-
-      setStatus("success");
-      window.setTimeout(() => {
-        onSuccess();
-        onClose();
-      }, 2000);
-    } catch {
-      setStatus("error");
-      setErrorMsg(t("verifyFailed"));
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      try {
+        const res = await fetch("/api/payments/verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ paymentId, metadata }),
+        });
+        if (res.ok) {
+          setStatus("success");
+          window.setTimeout(() => {
+            onSuccess();
+            onClose();
+          }, 1500);
+          return;
+        }
+      } catch {
+        /* retry */
+      }
+      if (attempt < 5) {
+        await new Promise((r) => setTimeout(r, 1500));
+      }
     }
+    setStatus("error");
+    setErrorMsg(t("verifyFailed"));
   };
 
   const handleError = (error: string) => {

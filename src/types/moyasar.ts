@@ -25,7 +25,7 @@ export interface MoyasarInitConfig {
   methods: string[];
   metadata: Record<string, string>;
   on_completed: (payment: MoyasarPaymentResult) => Promise<boolean>;
-  on_failure: (payment: MoyasarPaymentResult) => void;
+  on_failure: (error: MoyasarPaymentResult | string) => void;
 }
 
 declare global {

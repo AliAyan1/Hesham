@@ -39,7 +39,20 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
 
     return NextResponse.json({ success: true });
-  } catch {
-    return NextResponse.json({ error: "Verification failed" }, { status: 500 });
+  } catch (err) {
+    const code = err instanceof Error ? err.message : "unknown";
+    const status =
+      code === "payment_not_paid" || code === "payment_failed"
+        ? 402
+        : code === "amount_mismatch" || code === "invalid_plan"
+          ? 400
+          : 500;
+    return NextResponse.json(
+      {
+        error: "Verification failed",
+        code: process.env.NODE_ENV === "production" ? undefined : code,
+      },
+      { status },
+    );
   }
 }

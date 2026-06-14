@@ -6,7 +6,7 @@ import {
   SubscriptionTier,
 } from "@prisma/client";
 import { getPrisma } from "@/lib/db";
-import { calculateVAT, fromHalalas, getPayment, toHalalas } from "@/lib/moyasar";
+import { calculateVAT, fromHalalas, pollPaidPayment, toHalalas } from "@/lib/moyasar";
 import { subscriptionBaseAmount, SUBSCRIPTION_PLAN_PRICES_SAR, type SubscriptionPlanKey } from "@/lib/payments/pricing";
 import { createDailyRoomForSession } from "@/lib/daily/client";
 import { ensureMentorMessageThread } from "@/lib/mentor/session-access";
@@ -71,13 +71,10 @@ export async function verifyAndFulfillPayment(
     return;
   }
 
-  const remote = await getPayment(paymentId);
-  if (remote.status !== "paid") {
-    throw new Error("payment_not_paid");
-  }
+  const remote = await pollPaidPayment(paymentId);
 
   const expectedHalalas = await resolveExpectedTotalHalalas(metadata);
-  if (remote.amount !== expectedHalalas) {
+  if (Math.abs(remote.amount - expectedHalalas) > 1) {
     throw new Error("amount_mismatch");
   }
 

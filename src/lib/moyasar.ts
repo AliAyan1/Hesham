@@ -80,3 +80,25 @@ export function toHalalas(sar: number): number {
 export function fromHalalas(halalas: number): number {
   return halalas / 100;
 }
+
+const PAID_STATUSES = new Set(["paid", "captured"]);
+
+/** Moyasar may still be `initiated` when on_completed fires — poll until paid. */
+export async function pollPaidPayment(
+  paymentId: string,
+  maxAttempts = 12,
+  delayMs = 1000,
+): Promise<MoyasarApiPayment> {
+  let last: MoyasarApiPayment | null = null;
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    last = await getPayment(paymentId);
+    if (PAID_STATUSES.has(last.status)) return last;
+    if (last.status === "failed" || last.status === "voided" || last.status === "expired") {
+      throw new Error("payment_failed");
+    }
+    if (attempt < maxAttempts - 1) {
+      await new Promise((r) => setTimeout(r, delayMs));
+    }
+  }
+  throw new Error("payment_not_paid");
+}
