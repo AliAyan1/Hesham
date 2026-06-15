@@ -26,6 +26,11 @@ export interface MoyasarInitConfig {
   supported_networks?: string[];
   methods: string[];
   metadata: Record<string, string>;
+  apple_pay?: {
+    country: string;
+    label: string;
+    validate_merchant_url: string;
+  };
   on_completed: (payment: MoyasarPaymentResult) => Promise<boolean>;
   on_failure: (error: MoyasarPaymentResult | string) => void;
 }

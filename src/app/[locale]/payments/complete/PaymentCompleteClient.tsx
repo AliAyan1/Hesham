@@ -34,16 +34,108 @@ async function verifyWithRetries(
   return false;
 }
 
+async function finishAndRedirect(input: {
+  metadata: PaymentMetadataInput;
+  sessionRole: string | undefined;
+  locale: string;
+  update: ReturnType<typeof useSession>["update"];
+}): Promise<void> {
+  try {
+    sessionStorage.removeItem(PAYMENT_METADATA_STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+
+  const returnCtx = loadPaymentReturnContext();
+  clearPaymentReturnContext();
+
+  if (returnCtx?.finalizeSignup) {
+    await fetch("/api/profile/onboarding", {
+      method: "POST",
+      credentials: "include",
+    });
+    await input.update({
+      onboardingComplete: true,
+      role: returnCtx.dashboardRole,
+    });
+  } else {
+    await input.update();
+  }
+
+  const role =
+    returnCtx?.dashboardRole ?? String(input.sessionRole ?? "JOBSEEKER").toUpperCase();
+  const navLocale = returnCtx?.locale ?? input.locale;
+
+  if (input.metadata.type === "SUBSCRIPTION") {
+    hardNavigate(dashboardPathForRole(role), navLocale);
+    return;
+  }
+  if (input.metadata.type === "RECRUITMENT_FEE") {
+    hardNavigate("/dashboard/employer/candidates", navLocale);
+    return;
+  }
+  if (input.metadata.type === "MENTOR_SESSION") {
+    hardNavigate("/dashboard/job-seeker/sessions", navLocale);
+    return;
+  }
+  hardNavigate(dashboardPathForRole(role), navLocale);
+}
+
 export default function PaymentCompleteClient() {
   const t = useTranslations("payments");
   const locale = useLocale();
   const searchParams = useSearchParams();
   const { data: session, update } = useSession();
-  const paymentId = searchParams.get("id");
+  const provider = searchParams.get("provider");
+  const paymentId = searchParams.get("id") ?? searchParams.get("payment_id");
   const status = searchParams.get("status");
   const [message, setMessage] = useState(t("verifying"));
 
   useEffect(() => {
+    const isBnplReturn =
+      (provider === "tabby" || provider === "tamara") && status === "paid";
+
+    if (isBnplReturn) {
+      let raw: string | null = null;
+      try {
+        raw = sessionStorage.getItem(PAYMENT_METADATA_STORAGE_KEY);
+      } catch {
+        raw = null;
+      }
+
+      if (!raw) {
+        setMessage(t("missingPaymentContext"));
+        return;
+      }
+
+      let metadata: PaymentMetadataInput;
+      try {
+        metadata = JSON.parse(raw) as PaymentMetadataInput;
+      } catch {
+        setMessage(t("missingPaymentContext"));
+        return;
+      }
+
+      void finishAndRedirect({
+        metadata,
+        sessionRole: session?.user?.role,
+        locale,
+        update,
+      });
+      return;
+    }
+
+    if (provider === "tabby" || provider === "tamara") {
+      if (status === "cancel") {
+        setMessage(t("paymentCancelled"));
+        return;
+      }
+      if (status === "failure" || status === "failed") {
+        setMessage(t("paymentFailed"));
+        return;
+      }
+    }
+
     if (!paymentId) {
       setMessage(t("missingPaymentId"));
       return;
@@ -81,48 +173,14 @@ export default function PaymentCompleteClient() {
         return;
       }
 
-      try {
-        sessionStorage.removeItem(PAYMENT_METADATA_STORAGE_KEY);
-      } catch {
-        /* ignore */
-      }
-
-      const returnCtx = loadPaymentReturnContext();
-      clearPaymentReturnContext();
-
-      if (returnCtx?.finalizeSignup) {
-        await fetch("/api/profile/onboarding", {
-          method: "POST",
-          credentials: "include",
-        });
-        await update({
-          onboardingComplete: true,
-          role: returnCtx.dashboardRole,
-        });
-      } else {
-        await update();
-      }
-
-      const role =
-        returnCtx?.dashboardRole ??
-        String(session?.user?.role ?? "JOBSEEKER").toUpperCase();
-      const navLocale = returnCtx?.locale ?? locale;
-
-      if (metadata.type === "SUBSCRIPTION") {
-        hardNavigate(dashboardPathForRole(role), navLocale);
-        return;
-      }
-      if (metadata.type === "RECRUITMENT_FEE") {
-        hardNavigate("/dashboard/employer/candidates", navLocale);
-        return;
-      }
-      if (metadata.type === "MENTOR_SESSION") {
-        hardNavigate("/dashboard/job-seeker/sessions", navLocale);
-        return;
-      }
-      hardNavigate(dashboardPathForRole(role), navLocale);
+      await finishAndRedirect({
+        metadata,
+        sessionRole: session?.user?.role,
+        locale,
+        update,
+      });
     })();
-  }, [paymentId, status, session?.user?.role, update, locale, t]);
+  }, [paymentId, provider, status, session?.user?.role, update, locale, t]);
 
   return (
     <main className="mx-auto flex min-h-[50vh] max-w-md flex-col items-center justify-center px-6 py-16 text-center">

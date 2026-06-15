@@ -91,6 +91,7 @@ export default async function middleware(request: NextRequest) {
     if (
       pathname.startsWith("/_next") ||
       pathname.startsWith("/api") ||
+      pathname.startsWith("/.well-known") ||
       pathname.includes(".")
     ) {
       return NextResponse.next();

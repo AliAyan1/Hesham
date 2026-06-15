@@ -67,6 +67,7 @@ interface PaymentFormProps {
   description: string;
   metadata: Record<string, string>;
   isTestMode?: boolean;
+  applePayEnabled?: boolean;
   onSuccess: (paymentId: string) => void;
   onError: (error: string) => void;
 }
@@ -76,6 +77,7 @@ export function PaymentForm({
   description,
   metadata,
   isTestMode = false,
+  applePayEnabled = false,
   onSuccess,
   onError,
 }: PaymentFormProps) {
@@ -151,6 +153,8 @@ export function PaymentForm({
         const halalas = Math.round(amount * 100);
         const origin = window.location.origin;
 
+        const methods = applePayEnabled ? ["creditcard", "applepay"] : ["creditcard"];
+
         window.Moyasar.init({
           element: `.${elementClass}`,
           amount: halalas,
@@ -160,8 +164,17 @@ export function PaymentForm({
           publishable_api_key: publishableKey,
           callback_url: `${origin}/api/payments/callback`,
           supported_networks: ["mada", "visa", "mastercard"],
-          methods: ["creditcard"],
+          methods,
           metadata: parsedMetadata,
+          ...(applePayEnabled
+            ? {
+                apple_pay: {
+                  country: "SA",
+                  label: "QudrahTech",
+                  validate_merchant_url: "https://api.moyasar.com/v1/applepay/initiate",
+                },
+              }
+            : {}),
           on_completed: async (payment: MoyasarPaymentResult) => {
             onSuccessRef.current(payment.id);
             return true;
@@ -191,6 +204,7 @@ export function PaymentForm({
     t,
     publishableKey,
     loadingKey,
+    applePayEnabled,
   ]);
 
   if (loadingKey) {

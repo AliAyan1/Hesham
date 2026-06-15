@@ -1,5 +1,6 @@
 import {
   ObligationStatus,
+  PaymentProvider,
   PaymentStatus,
   PaymentType,
   SessionStatus,
@@ -57,53 +58,63 @@ async function resolveExpectedTotalHalalas(metadata: PaymentMetadataInput): Prom
   throw new Error("invalid_type");
 }
 
-export async function verifyAndFulfillPayment(
+async function recordPaymentAndFulfill(input: {
+  userId: string;
+  provider: PaymentProvider;
+  externalPaymentId: string;
+  metadata: PaymentMetadataInput;
+  baseAmount: number;
+  vatAmount: number;
+  totalAmount: number;
+  moyasarPaymentId?: string | null;
+}): Promise<void> {
+  const prisma = getPrisma();
+  const paymentType = input.metadata.type as PaymentType;
+
+  const existing = await prisma.payment.findFirst({
+    where: {
+      OR: [
+        { externalPaymentId: input.externalPaymentId },
+        ...(input.moyasarPaymentId
+          ? [{ moyasarPaymentId: input.moyasarPaymentId }]
+          : []),
+      ],
+      status: PaymentStatus.PAID,
+    },
+  });
+  if (existing) return;
+
+  await prisma.payment.create({
+    data: {
+      userId: input.userId,
+      type: paymentType,
+      provider: input.provider,
+      subscriptionPlan: input.metadata.plan ?? null,
+      obligationId: input.metadata.obligationId ?? null,
+      sessionId: input.metadata.sessionId ?? null,
+      amount: input.baseAmount,
+      vatAmount: input.vatAmount,
+      totalAmount: input.totalAmount,
+      status: PaymentStatus.PAID,
+      moyasarPaymentId: input.moyasarPaymentId ?? null,
+      externalPaymentId: input.externalPaymentId,
+      paidAt: new Date(),
+    },
+  });
+
+  await applyPaymentFulfillment(input.userId, input.metadata, {
+    baseAmount: input.baseAmount,
+    totalAmount: input.totalAmount,
+    externalPaymentId: input.externalPaymentId,
+  });
+}
+
+async function applyPaymentFulfillment(
   userId: string,
-  paymentId: string,
   metadata: PaymentMetadataInput,
+  amounts: { baseAmount: number; totalAmount: number; externalPaymentId: string },
 ): Promise<void> {
   const prisma = getPrisma();
-
-  const existing = await prisma.payment.findUnique({
-    where: { moyasarPaymentId: paymentId },
-  });
-  if (existing?.status === PaymentStatus.PAID) {
-    return;
-  }
-
-  const remote = await pollPaidPayment(paymentId);
-
-  const expectedHalalas = await resolveExpectedTotalHalalas(metadata);
-  if (Math.abs(remote.amount - expectedHalalas) > 1) {
-    throw new Error("amount_mismatch");
-  }
-
-  const totalAmount = fromHalalas(remote.amount);
-  const baseAmount = Math.round((totalAmount / 1.15) * 100) / 100;
-  const vatAmount = Math.round((totalAmount - baseAmount) * 100) / 100;
-
-  const paymentType = metadata.type as PaymentType;
-
-  await prisma.payment.upsert({
-    where: { moyasarPaymentId: paymentId },
-    create: {
-      userId,
-      type: paymentType,
-      subscriptionPlan: metadata.plan ?? null,
-      obligationId: metadata.obligationId ?? null,
-      sessionId: metadata.sessionId ?? null,
-      amount: baseAmount,
-      vatAmount,
-      totalAmount,
-      status: PaymentStatus.PAID,
-      moyasarPaymentId: paymentId,
-      paidAt: new Date(),
-    },
-    update: {
-      status: PaymentStatus.PAID,
-      paidAt: new Date(),
-    },
-  });
 
   if (metadata.type === "SUBSCRIPTION") {
     const tier =
@@ -147,20 +158,20 @@ export async function verifyAndFulfillPayment(
       create: {
         obligationId: metadata.obligationId,
         employerId: userId,
-        amount: baseAmount,
-        vatAmount,
-        totalAmount,
+        amount: amounts.baseAmount,
+        vatAmount: Math.round((amounts.totalAmount - amounts.baseAmount) * 100) / 100,
+        totalAmount: amounts.totalAmount,
         status: PaymentStatus.PAID,
         paidAt: new Date(),
-        receiptNumber: paymentId,
+        receiptNumber: amounts.externalPaymentId,
       },
       update: {
         status: PaymentStatus.PAID,
         paidAt: new Date(),
-        receiptNumber: paymentId,
-        amount: baseAmount,
-        vatAmount,
-        totalAmount,
+        receiptNumber: amounts.externalPaymentId,
+        amount: amounts.baseAmount,
+        vatAmount: Math.round((amounts.totalAmount - amounts.baseAmount) * 100) / 100,
+        totalAmount: amounts.totalAmount,
       },
     });
 
@@ -172,10 +183,10 @@ export async function verifyAndFulfillPayment(
       await onPaymentConfirmed({
         employerId: userId,
         employerEmail: employer.email,
-        amount: totalAmount,
+        amount: amounts.totalAmount,
         currency: obligation.currency,
         jobTitle: obligation.job.title,
-        receiptNumber: paymentId,
+        receiptNumber: amounts.externalPaymentId,
       });
     }
     return;
@@ -212,6 +223,127 @@ export async function verifyAndFulfillPayment(
       sessionId: row.id,
     });
   }
+}
+
+export async function verifyAndFulfillPayment(
+  userId: string,
+  paymentId: string,
+  metadata: PaymentMetadataInput,
+): Promise<void> {
+  const prisma = getPrisma();
+
+  const existing = await prisma.payment.findUnique({
+    where: { moyasarPaymentId: paymentId },
+  });
+  if (existing?.status === PaymentStatus.PAID) {
+    return;
+  }
+
+  const remote = await pollPaidPayment(paymentId);
+
+  const expectedHalalas = await resolveExpectedTotalHalalas(metadata);
+  if (Math.abs(remote.amount - expectedHalalas) > 1) {
+    throw new Error("amount_mismatch");
+  }
+
+  const totalAmount = fromHalalas(remote.amount);
+  const baseAmount = Math.round((totalAmount / 1.15) * 100) / 100;
+  const vatAmount = Math.round((totalAmount - baseAmount) * 100) / 100;
+
+  await recordPaymentAndFulfill({
+    userId,
+    provider: PaymentProvider.MOYASAR,
+    externalPaymentId: paymentId,
+    metadata,
+    baseAmount,
+    vatAmount,
+    totalAmount,
+    moyasarPaymentId: paymentId,
+  });
+}
+
+export async function verifyAndFulfillTabbyPayment(
+  userId: string,
+  paymentId: string,
+): Promise<void> {
+  const { getTabbyPayment, captureTabbyPayment, tabbyIsPaid } = await import(
+    "@/lib/payments/tabby"
+  );
+  const {
+    findIntentByExternalId,
+    markIntentPaid,
+    parseIntentMetadata,
+  } = await import("@/lib/payments/intent");
+
+  const intent = await findIntentByExternalId(PaymentProvider.TABBY, paymentId);
+  if (!intent || intent.userId !== userId) throw new Error("intent_not_found");
+
+  const remote = await getTabbyPayment(paymentId);
+  if (!tabbyIsPaid(remote.status)) throw new Error("payment_not_paid");
+
+  if (remote.status === "AUTHORIZED") {
+    await captureTabbyPayment(paymentId);
+  }
+
+  const remoteAmount = parseFloat(remote.amount);
+  if (Math.abs(remoteAmount - intent.totalAmount) > 0.02) {
+    throw new Error("amount_mismatch");
+  }
+
+  const metadata = parseIntentMetadata(intent.metadataJson);
+
+  await recordPaymentAndFulfill({
+    userId,
+    provider: PaymentProvider.TABBY,
+    externalPaymentId: paymentId,
+    metadata,
+    baseAmount: intent.baseAmount,
+    vatAmount: intent.vatAmount,
+    totalAmount: intent.totalAmount,
+  });
+
+  await markIntentPaid(intent.id);
+}
+
+export async function verifyAndFulfillTamaraPayment(
+  userId: string,
+  orderId: string,
+): Promise<void> {
+  const { getTamaraOrder, authoriseTamaraOrder, tamaraIsApproved } = await import(
+    "@/lib/payments/tamara"
+  );
+  const {
+    findIntentByExternalId,
+    markIntentPaid,
+    parseIntentMetadata,
+  } = await import("@/lib/payments/intent");
+
+  const intent = await findIntentByExternalId(PaymentProvider.TAMARA, orderId);
+  if (!intent || intent.userId !== userId) throw new Error("intent_not_found");
+
+  const remote = await getTamaraOrder(orderId);
+  if (!tamaraIsApproved(remote.status)) throw new Error("payment_not_paid");
+
+  await authoriseTamaraOrder(orderId);
+
+  const remoteAmount = remote.total_amount?.amount;
+  if (remoteAmount != null && Math.abs(remoteAmount - intent.totalAmount) > 0.02) {
+    throw new Error("amount_mismatch");
+  }
+
+  const metadata = parseIntentMetadata(intent.metadataJson);
+
+  await recordPaymentAndFulfill({
+    userId,
+    provider: PaymentProvider.TAMARA,
+    externalPaymentId: orderId,
+    metadata,
+    baseAmount: intent.baseAmount,
+    vatAmount: intent.vatAmount,
+    totalAmount: intent.totalAmount,
+  });
+
+  await markIntentPaid(intent.id);
 }
 
 export type PaymentHistoryRow = {

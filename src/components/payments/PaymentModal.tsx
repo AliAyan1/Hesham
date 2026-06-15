@@ -4,8 +4,16 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { calculateVAT } from "@/lib/moyasar";
 import { PaymentForm } from "./PaymentForm";
+import { BnplPaymentButtons } from "./BnplPaymentButtons";
 
 type ModalStatus = "idle" | "processing" | "success" | "error";
+
+type PaymentMethodsAvailability = {
+  card: boolean;
+  applePay: boolean;
+  tabby: boolean;
+  tamara: boolean;
+};
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -30,12 +38,29 @@ export function PaymentModal({
   const [status, setStatus] = useState<ModalStatus>("idle");
   const [errorMsg, setErrorMsg] = useState("");
   const [isTestMode, setIsTestMode] = useState(false);
+  const [methods, setMethods] = useState<PaymentMethodsAvailability>({
+    card: true,
+    applePay: false,
+    tabby: false,
+    tamara: false,
+  });
 
   useEffect(() => {
     void fetch("/api/payments/config", { cache: "no-store" })
-      .then((r) => r.json() as Promise<{ isTestMode?: boolean }>)
-      .then((j) => setIsTestMode(j.isTestMode === true))
-      .catch(() => setIsTestMode(false));
+      .then(
+        (r) =>
+          r.json() as Promise<{
+            isTestMode?: boolean;
+            methods?: PaymentMethodsAvailability;
+          }>,
+      )
+      .then((j) => {
+        setIsTestMode(j.isTestMode === true);
+        if (j.methods) setMethods(j.methods);
+      })
+      .catch(() => {
+        setIsTestMode(false);
+      });
   }, []);
 
   const { vat, total } = useMemo(() => {
@@ -162,14 +187,27 @@ export function PaymentModal({
                 <p className="text-sm text-[#6B7280]">{t("verifying")}</p>
               </div>
             ) : (
-              <PaymentForm
-                amount={total}
-                description={description}
-                metadata={metadata}
-                isTestMode={isTestMode}
-                onSuccess={handleSuccess}
-                onError={handleError}
-              />
+              <>
+                <BnplPaymentButtons
+                  enabled={{ tabby: methods.tabby, tamara: methods.tamara }}
+                  baseAmount={baseAmount}
+                  totalAmount={total}
+                  description={description}
+                  metadata={metadata}
+                  onError={handleError}
+                />
+                {methods.card ? (
+                  <PaymentForm
+                    amount={total}
+                    description={description}
+                    metadata={metadata}
+                    isTestMode={isTestMode}
+                    applePayEnabled={methods.applePay}
+                    onSuccess={handleSuccess}
+                    onError={handleError}
+                  />
+                ) : null}
+              </>
             )}
           </>
         )}

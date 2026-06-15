@@ -3,7 +3,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { getDatabaseUrl } from "@/lib/database-url";
 
 /** Bump when Assessment (or other) Prisma models change so dev HMR picks up `prisma generate`. */
-const PRISMA_CLIENT_REVISION = "2026-moyasar-payments-v1";
+const PRISMA_CLIENT_REVISION = "2026-bnpl-payments-v1";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;

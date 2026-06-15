@@ -57,6 +57,7 @@ model User {
   recruitmentPayments      RecruitmentPayment[]
   auditLogs                AuditLog[]
   payments                 Payment[]
+  paymentIntents           PaymentIntent[]
   mentorProfile            Mentor?
   mentorSessionsAsMentee   MentorSession[]    @relation("MenteeSessions")
   profileReminderSentAt    DateTime?
@@ -620,11 +621,12 @@ enum PaymentType {
 }
 
 model Payment {
-  id               String        @id @default(cuid())
+  id               String          @id @default(cuid())
   userId           String
-  user             User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   type             PaymentType
+  provider         PaymentProvider @default(MOYASAR)
 
   subscriptionPlan String?
   obligationId     String?
@@ -633,23 +635,50 @@ model Payment {
   amount           Float
   vatAmount        Float
   totalAmount      Float
-  currency         String        @default("SAR")
+  currency         String          @default("SAR")
 
-  status           PaymentStatus @default(PENDING)
+  status           PaymentStatus   @default(PENDING)
 
-  moyasarPaymentId String?       @unique
+  moyasarPaymentId String?         @unique
+  externalPaymentId String?        @unique
   moyasarInvoiceId String?
 
   paidAt           DateTime?
   failureReason    String?
 
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
 
   @@index([userId, createdAt])
   @@index([type])
   @@index([obligationId])
   @@index([sessionId])
+  @@index([provider])
+}
+
+model PaymentIntent {
+  id           String          @id @default(cuid())
+  userId       String
+  user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider     PaymentProvider
+  externalId   String?         @unique
+  metadataJson String
+  baseAmount   Float
+  vatAmount    Float
+  totalAmount  Float
+  currency     String          @default("SAR")
+  status       PaymentStatus   @default(PENDING)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  @@index([userId, status])
+  @@index([provider, externalId])
+}
+
+enum PaymentProvider {
+  MOYASAR
+  TABBY
+  TAMARA
 }
 
 enum SessionStatus {
