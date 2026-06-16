@@ -6,6 +6,7 @@ export async function sendTransactionalEmail(params: {
   to: string;
   subject: string;
   html: string;
+  replyTo?: string;
 }): Promise<boolean> {
   const key = process.env.RESEND_API_KEY;
   const from = process.env.FROM_EMAIL ?? process.env.RESEND_FROM_EMAIL;
@@ -24,10 +25,16 @@ export async function sendTransactionalEmail(params: {
         to: [params.to],
         subject: params.subject,
         html: params.html,
+        ...(params.replyTo ? { reply_to: params.replyTo } : {}),
       }),
     });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      console.error("Resend send failed:", res.status, body);
+    }
     return res.ok;
-  } catch {
+  } catch (err) {
+    console.error("Resend send error:", err);
     return false;
   }
 }
