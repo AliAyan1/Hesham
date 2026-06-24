@@ -11,7 +11,7 @@ import {
   SUBSCRIPTION_PLAN_PRICES_SAR,
   type SubscriptionPlanKey,
 } from "@/lib/payments/pricing";
-import type { PublicPlatformSettings } from "@/lib/settings";
+import type { PublicPlatformSettings } from "@/lib/settings-types";
 
 type AccountPick = "EMPLOYER" | "JOBSEEKER";
 

@@ -37,7 +37,7 @@ import {
   subscriptionBaseAmountSync,
   type SubscriptionPlanKey,
 } from "@/lib/payments/pricing";
-import type { PublicPlatformSettings } from "@/lib/settings";
+import type { PublicPlatformSettings } from "@/lib/settings-types";
 import type { ZodIssue } from "zod";
 
 type FieldErrors = Partial<Record<keyof RegisterFormData, string>>;

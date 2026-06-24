@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { PlatformSettingsDto } from "@/lib/settings";
+import type { PlatformSettingsDto } from "@/lib/settings-types";
 
 type TabId = "general" | "pricing" | "features" | "emails" | "limits" | "maintenance";
 type SaveStatus = "idle" | "saving" | "saved" | "error";

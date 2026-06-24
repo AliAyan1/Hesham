@@ -5,7 +5,7 @@ import { getServerSession } from "@/lib/get-server-session";
 import { getPrisma } from "@/lib/db";
 import { hasAccess } from "@/lib/subscription";
 import type { SubscriptionTier } from "@prisma/client";
-import { calculateSessionPricing } from "@/lib/mentor/pricing";
+import { calculateSessionPricing } from "@/lib/mentor/pricing-server";
 import { onMentorSessionBooked } from "@/lib/mentor/notifications";
 import { isMentorMarketOpen } from "@/lib/settings";
 

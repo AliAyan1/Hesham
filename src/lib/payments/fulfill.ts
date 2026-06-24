@@ -11,8 +11,8 @@ import { calculateVAT, fromHalalas, pollPaidPayment, toHalalas } from "@/lib/moy
 import {
   getSubscriptionPlanPrices,
   subscriptionBaseAmount,
-  type SubscriptionPlanKey,
-} from "@/lib/payments/pricing";
+} from "@/lib/payments/pricing-server";
+import type { SubscriptionPlanKey } from "@/lib/payments/pricing";
 import { createDailyRoomForSession } from "@/lib/daily/client";
 import { ensureMentorMessageThread } from "@/lib/mentor/session-access";
 import { onMentorSessionConfirmed } from "@/lib/mentor/notifications";
