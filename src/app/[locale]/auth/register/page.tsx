@@ -34,8 +34,10 @@ import { dashboardPathForRole } from "@/lib/subscription";
 import { PaymentModal } from "@/components/payments/PaymentModal";
 import {
   SUBSCRIPTION_PLAN_PRICES_SAR,
+  subscriptionBaseAmountSync,
   type SubscriptionPlanKey,
 } from "@/lib/payments/pricing";
+import type { PublicPlatformSettings } from "@/lib/settings";
 import type { ZodIssue } from "zod";
 
 type FieldErrors = Partial<Record<keyof RegisterFormData, string>>;
@@ -133,6 +135,23 @@ export default function RegisterPage() {
   const [showSignupPayment, setShowSignupPayment] = useState(false);
   const [signupPaymentPlan, setSignupPaymentPlan] = useState<PlanChoice | null>(null);
   const [signupRole, setSignupRole] = useState<UserRole | null>(null);
+  const [registrationOpen, setRegistrationOpen] = useState(true);
+  const [planPrices, setPlanPrices] = useState(SUBSCRIPTION_PLAN_PRICES_SAR);
+
+  useEffect(() => {
+    void fetch("/api/settings/public", { cache: "no-store" })
+      .then((r) => r.json() as Promise<PublicPlatformSettings>)
+      .then((settings) => {
+        setRegistrationOpen(settings.isRegistrationOpen !== false);
+        setPlanPrices({
+          PROFESSIONAL: settings.proPlanPrice,
+          PREMIUM: settings.premiumPlanPrice,
+        });
+      })
+      .catch(() => {
+        /* keep defaults */
+      });
+  }, []);
 
   useEffect(() => {
     void fetch("/api/payments/config", { cache: "no-store" })
@@ -336,6 +355,27 @@ export default function RegisterPage() {
     return (
       <AuthShell isRtl={isRTL} slogan={t("common.slogan")}>
         <p className="py-12 text-center text-sm text-gray-400">{t("common.loading")}</p>
+      </AuthShell>
+    );
+  }
+
+  if (!registrationOpen) {
+    return (
+      <AuthShell isRtl={isRTL} slogan={t("common.slogan")}>
+        <h2 className="text-center text-xl font-semibold text-white">
+          {isRTL ? "التسجيل مغلق حالياً" : "Registration is closed"}
+        </h2>
+        <p className="mt-3 text-center text-sm text-gray-400">
+          {isRTL
+            ? "التسجيل غير متاح في الوقت الحالي. يرجى المحاولة لاحقاً."
+            : "New sign-ups are not available right now. Please check back later."}
+        </p>
+        <p className="mt-8 text-center text-sm text-gray-400">
+          {t("auth.hasAccount")}{" "}
+          <Link href="/auth/login" className="font-medium hover:underline" style={{ color: BRAND_COLORS.accent }}>
+            {t("auth.login")}
+          </Link>
+        </p>
       </AuthShell>
     );
   }
@@ -881,7 +921,7 @@ export default function RegisterPage() {
         isOpen={showSignupPayment}
         onClose={() => setShowSignupPayment(false)}
         title={tp("signupPaymentTitle", { plan: t(`subscription.${signupPaymentPlan}`) })}
-        baseAmount={SUBSCRIPTION_PLAN_PRICES_SAR[signupPlanKey]}
+        baseAmount={planPrices[signupPlanKey] ?? subscriptionBaseAmountSync(signupPlanKey)}
         description={tp("subscriptionDescription", {
           plan: t(`subscription.${signupPaymentPlan}`),
         })}

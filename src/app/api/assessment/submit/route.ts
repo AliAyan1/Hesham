@@ -19,10 +19,10 @@ import {
 } from "@/lib/assessment-scoring";
 import { calculateAllJobFits, topRecommendedRoles } from "@/lib/job-fit-calculator";
 import {
-  ASSESSMENT_PASS_SCORE,
   ASSESSMENT_STEP_COUNT,
   isValidStep,
 } from "@/lib/assessment/steps";
+import { getAssessmentPassScore } from "@/lib/settings";
 import {
   countCompletedSteps,
   parseStepScores,
@@ -161,8 +161,9 @@ export async function POST(
     if (reportResult.ok) writtenReport = reportResult.report;
   }
 
+  const passScore = await getAssessmentPassScore();
   const passed =
-    overallScore != null ? overallScore >= ASSESSMENT_PASS_SCORE : stepScore >= ASSESSMENT_PASS_SCORE;
+    overallScore != null ? overallScore >= passScore : stepScore >= passScore;
 
   const status = isFlagged
     ? AssessmentStatus.FLAGGED

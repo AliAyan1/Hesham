@@ -1,0 +1,203 @@
+import type { PlatformSettings } from "@prisma/client";
+import { getPrisma } from "@/lib/db";
+import { DEFAULT_PLATFORM_SETTINGS } from "@/lib/settings-defaults";
+
+let settingsCache: PlatformSettings | null = null;
+let settingsCacheTime = 0;
+
+export const SETTINGS_CACHE_TTL_MS = 5 * 60 * 1000;
+
+export type PublicPlatformSettings = {
+  platformName: string;
+  platformNameAr: string;
+  proPlanPrice: number;
+  premiumPlanPrice: number;
+  vatPercentage: number;
+  isRegistrationOpen: boolean;
+  isMaintenanceMode: boolean;
+  isMentorMarketOpen: boolean;
+  assessmentPassScore: number;
+  maintenanceMessage: string;
+  maintenanceMessageAr: string;
+};
+
+export type PlatformSettingsDto = {
+  id: string;
+  platformName: string;
+  platformNameAr: string;
+  platformUrl: string;
+  supportEmail: string;
+  proPlanPrice: number;
+  premiumPlanPrice: number;
+  vatPercentage: number;
+  mentorCommission: number;
+  mentorPayout: number;
+  assessmentPassScore: number;
+  assessmentRetakeLimit: number;
+  interviewQuestionCount: number;
+  talentPoolMinScore: number;
+  talentPoolMinProfile: number;
+  isRegistrationOpen: boolean;
+  isMentorMarketOpen: boolean;
+  isAssessmentRequired: boolean;
+  isProctorEnabled: boolean;
+  isMaintenanceMode: boolean;
+  sendWelcomeEmail: boolean;
+  sendAssessmentInvite: boolean;
+  sendJobMatchEmail: boolean;
+  sendAssessmentResults: boolean;
+  sendApplicationStatus: boolean;
+  sendInterviewInvite: boolean;
+  sendOfferLetter: boolean;
+  sendSessionReminder: boolean;
+  maxJobsPerEmployer: number;
+  maxApplicationsPerJob: number;
+  freeUserJobAlerts: number;
+  maintenanceMessage: string;
+  maintenanceMessageAr: string;
+  updatedAt: string;
+  updatedBy: string | null;
+};
+
+function withDefaults(row: PlatformSettings | null): PlatformSettings {
+  if (row) return row;
+  return {
+    id: "defaults",
+    ...DEFAULT_PLATFORM_SETTINGS,
+    updatedAt: new Date(),
+    updatedBy: null,
+  };
+}
+
+export function toSettingsDto(row: PlatformSettings): PlatformSettingsDto {
+  return {
+    id: row.id,
+    platformName: row.platformName,
+    platformNameAr: row.platformNameAr,
+    platformUrl: row.platformUrl,
+    supportEmail: row.supportEmail,
+    proPlanPrice: row.proPlanPrice,
+    premiumPlanPrice: row.premiumPlanPrice,
+    vatPercentage: row.vatPercentage,
+    mentorCommission: row.mentorCommission,
+    mentorPayout: row.mentorPayout,
+    assessmentPassScore: row.assessmentPassScore,
+    assessmentRetakeLimit: row.assessmentRetakeLimit,
+    interviewQuestionCount: row.interviewQuestionCount,
+    talentPoolMinScore: row.talentPoolMinScore,
+    talentPoolMinProfile: row.talentPoolMinProfile,
+    isRegistrationOpen: row.isRegistrationOpen,
+    isMentorMarketOpen: row.isMentorMarketOpen,
+    isAssessmentRequired: row.isAssessmentRequired,
+    isProctorEnabled: row.isProctorEnabled,
+    isMaintenanceMode: row.isMaintenanceMode,
+    sendWelcomeEmail: row.sendWelcomeEmail,
+    sendAssessmentInvite: row.sendAssessmentInvite,
+    sendJobMatchEmail: row.sendJobMatchEmail,
+    sendAssessmentResults: row.sendAssessmentResults,
+    sendApplicationStatus: row.sendApplicationStatus,
+    sendInterviewInvite: row.sendInterviewInvite,
+    sendOfferLetter: row.sendOfferLetter,
+    sendSessionReminder: row.sendSessionReminder,
+    maxJobsPerEmployer: row.maxJobsPerEmployer,
+    maxApplicationsPerJob: row.maxApplicationsPerJob,
+    freeUserJobAlerts: row.freeUserJobAlerts,
+    maintenanceMessage: row.maintenanceMessage,
+    maintenanceMessageAr: row.maintenanceMessageAr,
+    updatedAt: row.updatedAt.toISOString(),
+    updatedBy: row.updatedBy,
+  };
+}
+
+export function toPublicSettings(row: PlatformSettings): PublicPlatformSettings {
+  return {
+    platformName: row.platformName,
+    platformNameAr: row.platformNameAr,
+    proPlanPrice: row.proPlanPrice,
+    premiumPlanPrice: row.premiumPlanPrice,
+    vatPercentage: row.vatPercentage,
+    isRegistrationOpen: row.isRegistrationOpen,
+    isMaintenanceMode: row.isMaintenanceMode,
+    isMentorMarketOpen: row.isMentorMarketOpen,
+    assessmentPassScore: row.assessmentPassScore,
+    maintenanceMessage: row.maintenanceMessage,
+    maintenanceMessageAr: row.maintenanceMessageAr,
+  };
+}
+
+export async function getSettings(): Promise<PlatformSettings> {
+  const now = Date.now();
+  if (settingsCache && now - settingsCacheTime < SETTINGS_CACHE_TTL_MS) {
+    return settingsCache;
+  }
+
+  const prisma = getPrisma();
+  const row = await prisma.platformSettings.findFirst();
+  settingsCache = withDefaults(row);
+  settingsCacheTime = now;
+  return settingsCache;
+}
+
+export async function getPublicSettings(): Promise<PublicPlatformSettings> {
+  const settings = await getSettings();
+  return toPublicSettings(settings);
+}
+
+export function clearSettingsCache(): void {
+  settingsCache = null;
+  settingsCacheTime = 0;
+}
+
+export async function getAssessmentPassScore(): Promise<number> {
+  const settings = await getSettings();
+  return settings.assessmentPassScore;
+}
+
+export async function getPlanPrices(): Promise<{
+  professional: number;
+  premium: number;
+  vatPercentage: number;
+}> {
+  const settings = await getSettings();
+  return {
+    professional: settings.proPlanPrice,
+    premium: settings.premiumPlanPrice,
+    vatPercentage: settings.vatPercentage,
+  };
+}
+
+export async function getAssessmentRetakeLimit(): Promise<number> {
+  const settings = await getSettings();
+  return settings.assessmentRetakeLimit;
+}
+
+export async function getTalentPoolThresholds(): Promise<{
+  minScore: number;
+  minProfile: number;
+}> {
+  const settings = await getSettings();
+  return {
+    minScore: settings.talentPoolMinScore,
+    minProfile: settings.talentPoolMinProfile,
+  };
+}
+
+export async function getMentorCommissionRate(): Promise<number> {
+  const settings = await getSettings();
+  return settings.mentorCommission / 100;
+}
+
+export async function getMentorPayoutRate(): Promise<number> {
+  const settings = await getSettings();
+  return settings.mentorPayout / 100;
+}
+
+export async function isRegistrationOpen(): Promise<boolean> {
+  const settings = await getSettings();
+  return settings.isRegistrationOpen;
+}
+
+export async function isMentorMarketOpen(): Promise<boolean> {
+  const settings = await getSettings();
+  return settings.isMentorMarketOpen;
+}

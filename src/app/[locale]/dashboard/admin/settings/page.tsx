@@ -1,7 +1,5 @@
-import { getTranslations } from "next-intl/server";
-import { AdminPlaceholder } from "@/components/admin/AdminPlaceholder";
+import AdminSettingsClient from "./AdminSettingsClient";
 
-export default async function AdminSettingsPage() {
-  const t = await getTranslations("adminPanel.nav");
-  return <AdminPlaceholder title={t("settings")} />;
+export default function AdminSettingsPage() {
+  return <AdminSettingsClient />;
 }

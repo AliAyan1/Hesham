@@ -2,6 +2,7 @@ import { getTranslations } from "next-intl/server";
 import { PublicNavbar } from "@/components/layout/PublicNavbar";
 import { Footer } from "@/components/layout/Footer";
 import { Link } from "@/i18n/navigation";
+import { getContent } from "@/lib/cms";
 
 export default async function AboutPage({
   params,
@@ -10,6 +11,7 @@ export default async function AboutPage({
 }) {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "pages.about" });
+  const content = await getContent(locale);
   const isRTL = locale === "ar" || locale === "ur";
 
   const whyCards = [
@@ -43,7 +45,7 @@ export default async function AboutPage({
           {t("heroLabel")}
         </p>
         <h1 className="mx-auto mt-4 max-w-3xl text-balance text-4xl font-bold leading-tight sm:text-5xl">
-          {t("heroTitle")}
+          {content["about_hero_title"] ?? t("heroTitle")}
         </h1>
         <p className="mx-auto mt-5 max-w-2xl text-base leading-relaxed text-white/70">
           {t("heroSubtitle")}
@@ -57,9 +59,11 @@ export default async function AboutPage({
               {t("missionLabel")}
             </p>
             <h2 className="mt-3 text-[32px] font-bold leading-tight text-[#0D2137]">
-              {t("missionHeadline")}
+              {content["about_vision"] ?? t("missionHeadline")}
             </h2>
-            <p className="mt-4 text-base leading-relaxed text-[#6B7280]">{t("missionBody")}</p>
+            <p className="mt-4 text-base leading-relaxed text-[#6B7280]">
+              {content["about_mission"] ?? t("missionBody")}
+            </p>
           </div>
           <div className="grid gap-4">
             {stats.map((stat) => (

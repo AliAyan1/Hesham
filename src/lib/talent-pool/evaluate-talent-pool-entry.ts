@@ -3,7 +3,7 @@ import {
   TalentPoolReason,
 } from "@prisma/client";
 import { getPrisma } from "@/lib/db";
-import { ASSESSMENT_PASS_SCORE } from "@/lib/assessment/steps";
+import { getAssessmentPassScore } from "@/lib/settings";
 import { addTalentPoolEntry } from "@/lib/talent-pool/add-talent-pool-entry";
 import { getTalentPoolMetrics } from "@/lib/talent-pool/get-talent-pool-metrics";
 import { evaluateTalentPoolExit } from "@/lib/talent-pool/evaluate-talent-pool-exit";
@@ -32,11 +32,12 @@ export async function evaluateTalentPoolEntry(userId: string): Promise<void> {
   }
 
   const metrics = await getTalentPoolMetrics(userId);
+  const passScore = await getAssessmentPassScore();
 
   if (
     metrics.assessmentComplete &&
     metrics.assessmentScore != null &&
-    metrics.assessmentScore < ASSESSMENT_PASS_SCORE
+    metrics.assessmentScore < passScore
   ) {
     await addTalentPoolEntry({ userId, reason: TalentPoolReason.ASSESSMENT_LOW_SCORE });
     return;
@@ -66,7 +67,8 @@ export async function onAssessmentCompletedForTalentPool(
   userId: string,
   overallScore: number,
 ): Promise<void> {
-  if (overallScore < ASSESSMENT_PASS_SCORE) {
+  const passScore = await getAssessmentPassScore();
+  if (overallScore < passScore) {
     await addTalentPoolEntry({ userId, reason: TalentPoolReason.ASSESSMENT_LOW_SCORE });
     return;
   }

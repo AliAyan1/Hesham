@@ -3,6 +3,8 @@ import { getTranslations } from "next-intl/server";
 import { Footer } from "@/components/layout/Footer";
 import { TrustedAssessmentsSection } from "@/components/landing/TrustedAssessmentsSection";
 import { Link } from "@/i18n/navigation";
+import { getContent } from "@/lib/cms";
+import { getSettings } from "@/lib/settings";
 import {
   hrefRegisterFree,
   hrefRegisterEmployer,
@@ -31,6 +33,8 @@ export default async function LocaleHomePage({
 }) {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "landing" });
+  const content = await getContent(locale);
+  const settings = await getSettings();
   const isRTL = locale === "ar" || locale === "ur";
 
   const trusted = t("trustedNames")
@@ -78,13 +82,14 @@ export default async function LocaleHomePage({
             </div>
 
             <h1 className="mt-7 text-balance text-6xl font-black tracking-tight text-[#0D2137] sm:text-7xl md:text-8xl lg:text-9xl">
-              <span className="block">{t("headlineKnowYour")}</span>
-              <span className="block text-[#0F4C75]">{t("headlinePotential")}</span>
-              <span className="block">{t("headlineShape")}</span>
+              <span className="block">
+                {content["hero_title"] ??
+                  `${t("headlineKnowYour")} ${t("headlinePotential")} ${t("headlineShape")}`}
+              </span>
             </h1>
 
             <p className="mx-auto mt-6 max-w-2xl text-pretty text-xl leading-relaxed text-[#6B7280]">
-              {t("subheadline")}
+              {content["hero_subtitle"] ?? t("subheadline")}
             </p>
 
             <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
@@ -92,7 +97,7 @@ export default async function LocaleHomePage({
                 href="#pricing"
                 className="inline-flex min-h-11 items-center justify-center rounded-xl bg-[#0F4C75] px-8 py-4 text-lg font-semibold text-white shadow-lg shadow-[#0F4C75]/25 transition-all duration-200 hover:bg-[#0D2137] hover:shadow-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal"
               >
-                {t("ctaPrimary")}
+                {content["hero_cta"] ?? t("ctaPrimary")}
               </a>
               <Link
                 href="/register?role=employer"
@@ -172,7 +177,9 @@ export default async function LocaleHomePage({
             <p className="text-sm font-semibold uppercase tracking-widest text-[#1D9E75]">
               {t("featuresLabel")}
             </p>
-            <h2 className="mt-2 text-4xl font-bold text-[#0D2137]">{t("featuresTitle")}</h2>
+            <h2 className="mt-2 text-4xl font-bold text-[#0D2137]">
+              {content["features_title"] ?? t("featuresTitle")}
+            </h2>
             <p className="mt-4 max-w-2xl text-sm leading-relaxed text-[#6B7280]">
               {t("featuresSubtitle")}
             </p>
@@ -260,7 +267,9 @@ export default async function LocaleHomePage({
           </div>
         </section>
 
-        <MentorLandingSection />
+        {settings.isMentorMarketOpen ? (
+          <MentorLandingSection mentorPayoutPercent={settings.mentorPayout} />
+        ) : null}
 
         {/* Pricing */}
         <section className="bg-[#F8FAFC] py-24" id="pricing">
@@ -268,21 +277,21 @@ export default async function LocaleHomePage({
         </section>
 
         {/* FAQ */}
-        <section className="bg-white py-24">
+        <section className="bg-white py-24" id="faq">
           <FaqSection locale={locale} />
         </section>
 
         {/* Final CTA */}
         <section className="bg-gradient-to-r from-[#0F4C75] to-[#0D2137] py-24 text-white">
           <div className="mx-auto max-w-4xl px-6 text-center">
-            <h2 className="text-4xl font-bold">{t("finalCtaTitle")}</h2>
+            <h2 className="text-4xl font-bold">{content["cta_title"] ?? t("finalCtaTitle")}</h2>
             <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
               <Link
                 href={hrefRegisterFree}
                 prefetch={false}
                 className="inline-flex min-h-11 items-center justify-center rounded-xl bg-white px-8 py-4 text-lg font-semibold text-[#0D2137] transition-colors hover:bg-white/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal"
               >
-                {t("finalCtaPrimary")}
+                {content["cta_button"] ?? t("finalCtaPrimary")}
               </Link>
               <Link
                 href={hrefRegisterEmployer}
@@ -436,18 +445,20 @@ function MiniStatCard({
 
 async function FaqSection({ locale }: { locale: string }) {
   const t = await getTranslations({ locale, namespace: "landing" });
+  const content = await getContent(locale);
   const items = [
-    { q: t("faq1Q"), a: t("faq1A") },
-    { q: t("faq2Q"), a: t("faq2A") },
-    { q: t("faq3Q"), a: t("faq3A") },
-    { q: t("faq4Q"), a: t("faq4A") },
-    { q: t("faq5Q"), a: t("faq5A") },
-    { q: t("faq6Q"), a: t("faq6A") },
+    { q: content["faq_1_q"] ?? t("faq1Q"), a: content["faq_1_a"] ?? t("faq1A") },
+    { q: content["faq_2_q"] ?? t("faq2Q"), a: content["faq_2_a"] ?? t("faq2A") },
+    { q: content["faq_3_q"] ?? t("faq3Q"), a: content["faq_3_a"] ?? t("faq3A") },
+    { q: content["faq_4_q"] ?? t("faq4Q"), a: content["faq_4_a"] ?? t("faq4A") },
+    { q: content["faq_5_q"] ?? t("faq5Q"), a: content["faq_5_a"] ?? t("faq5A") },
   ];
 
   return (
     <div className="mx-auto max-w-3xl px-6">
-      <h2 className="text-center text-4xl font-bold text-[#0D2137]">{t("faqTitle")}</h2>
+      <h2 className="text-center text-4xl font-bold text-[#0D2137]">
+        {content["faq_title"] ?? t("faqTitle")}
+      </h2>
       <div className="mt-10 divide-y divide-gray-200 rounded-2xl border border-gray-100 bg-white">
         {items.map((it, idx) => (
           <details key={idx} className="group px-6 py-5">

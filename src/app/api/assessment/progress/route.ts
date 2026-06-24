@@ -3,10 +3,10 @@ import { AssessmentStatus, AssessmentType, UserRole } from "@prisma/client";
 import { getServerSession } from "@/lib/get-server-session";
 import { getPrisma } from "@/lib/db";
 import {
-  ASSESSMENT_PASS_SCORE,
   ASSESSMENT_STEP_COUNT,
   ASSESSMENT_STEPS,
 } from "@/lib/assessment/steps";
+import { getAssessmentPassScore, getAssessmentRetakeLimit } from "@/lib/settings";
 import {
   computeOverallFromSteps,
   parseStepScores,
@@ -32,6 +32,8 @@ export type AssessmentProgressDto = {
   currentStep: number | null;
   overallScore: number | null;
   passed: boolean;
+  passScore: number;
+  retakeLimit: number;
   shareWithEmployers: boolean;
   isFlagged: boolean;
   status: string | null;
@@ -80,7 +82,8 @@ export async function GET(
   const scores = parseStepScores(row?.stepScores);
   const overall =
     row?.overallScore ?? row?.totalScore ?? computeOverallFromSteps(scores);
-  const passed = overall != null && overall >= ASSESSMENT_PASS_SCORE;
+  const passScore = await getAssessmentPassScore();
+  const passed = overall != null && overall >= passScore;
 
   const steps: StepProgressDto[] = ASSESSMENT_STEPS.map((cfg) => {
     const entry = scores[stepKey(cfg.id)];
@@ -90,8 +93,8 @@ export async function GET(
     const score = entry?.score ?? null;
     const canRetake =
       !entry ||
-      (score != null && score < ASSESSMENT_PASS_SCORE) ||
-      (overall != null && overall < ASSESSMENT_PASS_SCORE && score != null && score < ASSESSMENT_PASS_SCORE);
+      (score != null && score < passScore) ||
+      (overall != null && overall < passScore && score != null && score < passScore);
     return {
       step: cfg.id,
       status: st,
@@ -108,6 +111,8 @@ export async function GET(
       currentStep: row?.currentStep ?? null,
       overallScore: overall,
       passed,
+      passScore,
+      retakeLimit: await getAssessmentRetakeLimit(),
       shareWithEmployers: row?.shareWithEmployers ?? true,
       isFlagged: row?.isFlagged ?? false,
       status: row?.status ?? null,

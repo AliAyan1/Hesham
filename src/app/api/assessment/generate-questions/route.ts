@@ -13,6 +13,7 @@ import {
   stepConfig,
   type AssessmentStepId,
 } from "@/lib/assessment/steps";
+import { getAssessmentPassScore, getAssessmentRetakeLimit } from "@/lib/settings";
 import { canStartStep, countCompletedSteps, parseStepScores, stepKey } from "@/lib/assessment/step-scores";
 import { getProctoringSuspensionPayload } from "@/lib/assessment/check-proctoring-suspension";
 import type { ApiResponse } from "@/types";
@@ -101,8 +102,29 @@ export async function POST(
 
   const stepScores = parseStepScores(assessment?.stepScores);
   const overall = assessment?.overallScore ?? assessment?.totalScore ?? null;
+  const passScore = await getAssessmentPassScore();
+  const retakeLimit = await getAssessmentRetakeLimit();
 
-  if (stepScores[stepKey(step)] && !canStartStep(stepScores, step, { forceRetake: parsed.data.forceRetake, overallScore: overall != null ? Math.round(overall) : null })) {
+  if (
+    parsed.data.forceRetake &&
+    assessment &&
+    retakeLimit > 0 &&
+    assessment.retakeCount >= retakeLimit
+  ) {
+    return NextResponse.json(
+      { success: false, error: "Retake limit reached" },
+      { status: 403 },
+    );
+  }
+
+  if (
+    stepScores[stepKey(step)] &&
+    !canStartStep(stepScores, step, {
+      forceRetake: parsed.data.forceRetake,
+      overallScore: overall != null ? Math.round(overall) : null,
+      passScore,
+    })
+  ) {
     return NextResponse.json(
       { success: false, error: "Step already completed. Use retake to try again." },
       { status: 409 },

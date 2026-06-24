@@ -24,8 +24,10 @@ const PUBLIC_PATHS = [
   "/auth/login",
   "/auth/register",
   "/auth/forgot-password",
+  "/maintenance",
   "/api/auth",
   "/api/health",
+  "/api/settings/public",
   "/api/jobs",
 ];
 
@@ -63,7 +65,6 @@ function redirectPreservingSearch(
   return NextResponse.redirect(destination);
 }
 
-/** Forwards locale to next-intl RSC APIs and keeps response meta headers. */
 function nextWithIntlLocale(
   request: NextRequest,
   pathnameLocale: Locale,
@@ -82,6 +83,55 @@ function nextWithIntlLocale(
     RTL_LOCALES.includes(pathnameLocale) ? "rtl" : "ltr",
   );
   return response;
+}
+
+let maintenanceCache: { active: boolean; checkedAt: number } | null = null;
+const MAINTENANCE_CACHE_MS = 60_000;
+
+async function fetchMaintenanceMode(request: NextRequest): Promise<boolean> {
+  const now = Date.now();
+  if (maintenanceCache && now - maintenanceCache.checkedAt < MAINTENANCE_CACHE_MS) {
+    return maintenanceCache.active;
+  }
+  try {
+    const res = await fetch(new URL("/api/settings/public", request.url), {
+      headers: { "cache-control": "no-cache" },
+    });
+    if (!res.ok) return false;
+    const json = (await res.json()) as { isMaintenanceMode?: boolean };
+    const active = Boolean(json.isMaintenanceMode);
+    maintenanceCache = { active, checkedAt: now };
+    return active;
+  } catch {
+    return false;
+  }
+}
+
+async function maintenanceGuard(
+  request: NextRequest,
+  pathnameLocale: Locale,
+  pathWithoutLocale: string,
+): Promise<NextResponse | null> {
+  if (
+    pathWithoutLocale.startsWith("/maintenance") ||
+    pathWithoutLocale.startsWith("/api/settings/public") ||
+    pathWithoutLocale.startsWith("/api/auth")
+  ) {
+    return null;
+  }
+
+  const maintenanceOn = await fetchMaintenanceMode(request);
+  if (!maintenanceOn) return null;
+
+  const token = await getToken({
+    req: request,
+    secret: getAuthSecret(),
+  });
+  const role = typeof token?.role === "string" ? token.role.toUpperCase() : "";
+  if (role === "ADMIN") return null;
+  if (pathWithoutLocale.startsWith("/dashboard/admin")) return null;
+
+  return redirectPreservingSearch(request, `/${pathnameLocale}/maintenance`);
 }
 
 export default async function middleware(request: NextRequest) {
@@ -121,6 +171,13 @@ export default async function middleware(request: NextRequest) {
     }
 
     const pathWithoutLocale = pathname.slice(`/${pathnameLocale}`.length) || "/";
+
+    const maintenanceRedirect = await maintenanceGuard(
+      request,
+      pathnameLocale,
+      pathWithoutLocale,
+    );
+    if (maintenanceRedirect) return maintenanceRedirect;
 
     if (PUBLIC_PATHS.some((p) => pathWithoutLocale.startsWith(p))) {
       if (pathWithoutLocale.startsWith("/auth/login")) {

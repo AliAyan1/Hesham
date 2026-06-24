@@ -3,7 +3,7 @@
 import { Briefcase, UserRound } from "lucide-react";
 import { getSession, useSession } from "next-auth/react";
 import { useTranslations } from "next-intl";
-import { useCallback, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "@/i18n/navigation";
 import { cn } from "@/lib/cn";
 import { PaymentModal } from "@/components/payments/PaymentModal";
@@ -11,6 +11,7 @@ import {
   SUBSCRIPTION_PLAN_PRICES_SAR,
   type SubscriptionPlanKey,
 } from "@/lib/payments/pricing";
+import type { PublicPlatformSettings } from "@/lib/settings";
 
 type AccountPick = "EMPLOYER" | "JOBSEEKER";
 
@@ -30,6 +31,19 @@ export function UpgradeConfirm({
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const upgradedPlanSlug = useRef<"professional" | "premium" | null>(null);
   const [rolePending, setRolePending] = useState<AccountPick | null>(null);
+  const [planPrices, setPlanPrices] = useState(SUBSCRIPTION_PLAN_PRICES_SAR);
+
+  useEffect(() => {
+    void fetch("/api/settings/public", { cache: "no-store" })
+      .then((r) => r.json() as Promise<PublicPlatformSettings>)
+      .then((settings) => {
+        setPlanPrices({
+          PROFESSIONAL: settings.proPlanPrice,
+          PREMIUM: settings.premiumPlanPrice,
+        });
+      })
+      .catch(() => undefined);
+  }, []);
 
   const planKey: SubscriptionPlanKey | null =
     selectedPlan === "professional"
@@ -113,7 +127,7 @@ export function UpgradeConfirm({
           isOpen={showPaymentModal}
           onClose={() => setShowPaymentModal(false)}
           title={tp("upgradeTitle", { plan: t(selectedPlan!) })}
-          baseAmount={SUBSCRIPTION_PLAN_PRICES_SAR[planKey]}
+          baseAmount={planPrices[planKey]}
           description={tp("subscriptionDescription", { plan: t(selectedPlan!) })}
           metadata={{
             type: "SUBSCRIPTION",

@@ -593,6 +593,56 @@ model Contact {
   createdAt DateTime @default(now())
 }
 
+model SiteContent {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  valueEn   String   @db.Text
+  valueAr   String   @db.Text
+  section   String
+  label     String
+  type      String   @default("text")
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+}
+
+model PlatformSettings {
+  id                    String   @id @default(cuid())
+  platformName          String   @default("QudrahTech")
+  platformNameAr        String   @default("قدرتك")
+  platformUrl           String   @default("https://basalim-consulting.com")
+  supportEmail          String   @default("support@basalim-consulting.com")
+  proPlanPrice          Float    @default(99)
+  premiumPlanPrice      Float    @default(299)
+  vatPercentage         Float    @default(15)
+  mentorCommission      Float    @default(25)
+  mentorPayout          Float    @default(75)
+  assessmentPassScore   Int      @default(50)
+  assessmentRetakeLimit Int      @default(3)
+  interviewQuestionCount Int     @default(5)
+  talentPoolMinScore    Int      @default(50)
+  talentPoolMinProfile  Int      @default(80)
+  isRegistrationOpen    Boolean  @default(true)
+  isMentorMarketOpen    Boolean  @default(true)
+  isAssessmentRequired Boolean @default(true)
+  isProctorEnabled      Boolean  @default(true)
+  isMaintenanceMode     Boolean  @default(false)
+  sendWelcomeEmail      Boolean  @default(true)
+  sendAssessmentInvite  Boolean  @default(true)
+  sendJobMatchEmail     Boolean  @default(true)
+  sendAssessmentResults Boolean  @default(true)
+  sendApplicationStatus Boolean  @default(true)
+  sendInterviewInvite   Boolean  @default(true)
+  sendOfferLetter       Boolean  @default(true)
+  sendSessionReminder   Boolean  @default(true)
+  maxJobsPerEmployer    Int      @default(10)
+  maxApplicationsPerJob Int      @default(500)
+  freeUserJobAlerts     Int      @default(3)
+  maintenanceMessage    String   @default("We are updating QudrahTech. We will be back shortly!") @db.Text
+  maintenanceMessageAr  String   @default("قدرتك تتحدث") @db.Text
+  updatedAt             DateTime @updatedAt
+  updatedBy             String?
+}
+
 enum ObligationStatus {
   PENDING
   SIGNED

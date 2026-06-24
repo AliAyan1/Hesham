@@ -1,6 +1,7 @@
 import { getPrisma } from "@/lib/db";
 import { getTalentPoolMetrics } from "@/lib/talent-pool/get-talent-pool-metrics";
 import { meetsTalentPoolExitCriteria } from "@/lib/talent-pool/talent-pool-criteria";
+import { getTalentPoolThresholds } from "@/lib/settings";
 import { removeFromTalentPoolAsActive } from "@/lib/talent-pool/remove-from-talent-pool";
 
 /** If user meets all active-candidate criteria, remove from talent pool and notify. */
@@ -13,7 +14,8 @@ export async function evaluateTalentPoolExit(userId: string): Promise<boolean> {
   if (!inPool?.inTalentPool) return false;
 
   const metrics = await getTalentPoolMetrics(userId);
-  if (!meetsTalentPoolExitCriteria(metrics)) return false;
+  const thresholds = await getTalentPoolThresholds();
+  if (!meetsTalentPoolExitCriteria(metrics, thresholds)) return false;
 
   const pendingInvites = await prisma.talentPoolInvite.findMany({
     where: {

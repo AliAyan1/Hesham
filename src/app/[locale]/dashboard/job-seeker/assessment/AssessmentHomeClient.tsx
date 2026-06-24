@@ -10,6 +10,10 @@ import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { TalentPoolStatusBanner } from "@/components/dashboard/TalentPoolStatusBanner";
 
+type CmsResponse = {
+  assessment_intro?: string;
+};
+
 export default function AssessmentHomeClient() {
   const t = useTranslations("assessment");
   const tc = useTranslations("common");
@@ -18,6 +22,7 @@ export default function AssessmentHomeClient() {
 
   const [progress, setProgress] = useState<AssessmentProgressDto | null>(null);
   const [err, setErr] = useState(false);
+  const [assessmentIntro, setAssessmentIntro] = useState<string | null>(null);
   const load = useCallback(async () => {
     const res = await fetch("/api/assessment/progress", { credentials: "include" });
     const j = (await res.json()) as { success?: boolean; data?: AssessmentProgressDto };
@@ -25,9 +30,22 @@ export default function AssessmentHomeClient() {
     setProgress(j.data);
   }, []);
 
+  const loadCms = useCallback(async () => {
+    const res = await fetch(`/api/cms?locale=${encodeURIComponent(locale)}`);
+    if (!res.ok) return;
+    const json = (await res.json()) as CmsResponse;
+    if (typeof json.assessment_intro === "string") {
+      setAssessmentIntro(json.assessment_intro);
+    }
+  }, [locale]);
+
   useEffect(() => {
     void load().catch(() => setErr(true));
   }, [load]);
+
+  useEffect(() => {
+    void loadCms().catch(() => undefined);
+  }, [loadCms]);
 
   useEffect(() => {
     const onFocus = () => void load().catch(() => undefined);
@@ -59,7 +77,9 @@ export default function AssessmentHomeClient() {
       <header className="rounded-xl border border-[#EEF2F7] bg-white p-8 shadow-sm">
         <p className="text-sm font-semibold text-[#1D9E75]">{t("poweredBy")}</p>
         <h1 className="mt-2 text-2xl font-bold text-[#0F4C75]">{t("title")}</h1>
-        <p className="mt-3 max-w-2xl text-sm leading-relaxed text-[#6B7280]">{t("subtitle")}</p>
+        <p className="mt-3 max-w-2xl text-sm leading-relaxed text-[#6B7280]">
+          {assessmentIntro ?? t("subtitle")}
+        </p>
         {progress.overallScore != null ? (
           <p className="mt-4 text-sm font-semibold text-brand-teal">
             {t("profileBadge", { score: progress.overallScore })}

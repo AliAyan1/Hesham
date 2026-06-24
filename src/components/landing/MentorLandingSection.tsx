@@ -9,7 +9,7 @@ function formatSar(n: number, locale: string) {
   return new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(n);
 }
 
-export function MentorLandingSection() {
+export function MentorLandingSection({ mentorPayoutPercent = 75 }: { mentorPayoutPercent?: number }) {
   const t = useTranslations("landing.mentor");
   const locale = useLocale();
   const isRtl = locale === "ar" || locale === "ur";
@@ -21,9 +21,9 @@ export function MentorLandingSection() {
     const safeSessions = Number.isFinite(sessionsPerWeek) ? Math.max(0, sessionsPerWeek) : 0;
     const safeRate = Number.isFinite(ratePerHour) ? Math.max(0, ratePerHour) : 0;
     const gross = safeSessions * 4 * safeRate;
-    const net = Math.round(gross * 0.75);
+    const net = Math.round(gross * (mentorPayoutPercent / 100));
     return { gross, net };
-  }, [sessionsPerWeek, ratePerHour]);
+  }, [sessionsPerWeek, ratePerHour, mentorPayoutPercent]);
 
   return (
     <section className="bg-[#0D2137] px-6 py-20 text-white" dir={isRtl ? "rtl" : "ltr"}>

@@ -1,6 +1,8 @@
 import type { ComponentProps } from "react";
 import { getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
+import { getContent } from "@/lib/cms";
+import { getPlanPrices, getSettings } from "@/lib/settings";
 
 type AppLinkHref = ComponentProps<typeof Link>["href"];
 
@@ -16,18 +18,33 @@ export async function PricingCardsSection({
   className = "",
 }: PricingCardsSectionProps) {
   const t = await getTranslations({ locale, namespace: "landing" });
+  const content = await getContent(locale);
+  const prices = await getPlanPrices();
+  const settings = await getSettings();
   const isRtl = locale === "ar" || locale === "ur";
+
+  const formatPrice = (amount: number) =>
+    new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(amount);
+
+  const proPrice = `SAR ${formatPrice(prices.professional)}`;
+  const premiumPrice = `SAR ${formatPrice(prices.premium)}`;
+  const vatNote = t("pricingNew.vat");
+  const gridCols = settings.isMentorMarketOpen ? "lg:grid-cols-4" : "lg:grid-cols-3";
 
   return (
     <div className={className} dir={isRtl ? "rtl" : "ltr"}>
       {showHeader ? (
         <>
-          <h2 className="text-4xl font-bold text-[#0D2137]">{t("pricingNew.title")}</h2>
-          <p className="mt-3 max-w-2xl text-sm text-[#6B7280]">{t("pricingNew.subtitle")}</p>
+          <h2 className="text-4xl font-bold text-[#0D2137]">
+            {content["pricing_title"] ?? t("pricingNew.title")}
+          </h2>
+          <p className="mt-3 max-w-2xl text-sm text-[#6B7280]">
+            {content["pricing_subtitle"] ?? t("pricingNew.subtitle")}
+          </p>
         </>
       ) : null}
 
-      <div className={showHeader ? "mt-10 grid grid-cols-1 items-stretch gap-4 lg:grid-cols-4" : "grid grid-cols-1 items-stretch gap-4 lg:grid-cols-4"}>
+      <div className={showHeader ? `mt-10 grid grid-cols-1 items-stretch gap-4 ${gridCols}` : `grid grid-cols-1 items-stretch gap-4 ${gridCols}`}>
         <NewPriceCard
           variant="free"
           badge={t("pricingNew.free.badge")}
@@ -41,8 +58,8 @@ export async function PricingCardsSection({
           variant="pro"
           badge={t("pricingNew.pro.badge")}
           title={t("pricingNew.pro.title")}
-          price={t("pricingNew.pro.price")}
-          vatNote={t("pricingNew.vat")}
+          price={proPrice}
+          vatNote={vatNote}
           features={pricingFeatures(t, "pricingNew.pro.features")}
           ctaLabel={t("pricingNew.pro.cta")}
           ctaHref={{ pathname: "/auth/register", query: { plan: "professional" } }}
@@ -51,12 +68,13 @@ export async function PricingCardsSection({
           variant="premium"
           badge={t("pricingNew.premium.badge")}
           title={t("pricingNew.premium.title")}
-          price={t("pricingNew.premium.price")}
-          vatNote={t("pricingNew.vat")}
+          price={premiumPrice}
+          vatNote={vatNote}
           features={pricingFeatures(t, "pricingNew.premium.features")}
           ctaLabel={t("pricingNew.premium.cta")}
           ctaHref={{ pathname: "/auth/register", query: { plan: "premium" } }}
         />
+        {settings.isMentorMarketOpen ? (
         <NewPriceCard
           variant="mentor"
           badge={t("pricingNew.mentor.badge")}
@@ -68,6 +86,7 @@ export async function PricingCardsSection({
           ctaHref={{ pathname: "/auth/register", query: { role: "mentor" } }}
           highlightBorder
         />
+        ) : null}
       </div>
     </div>
   );

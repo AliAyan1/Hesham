@@ -4,7 +4,7 @@ import {
   TalentPoolInviteStatus,
 } from "@prisma/client";
 import { getPrisma } from "@/lib/db";
-import { ASSESSMENT_PASS_SCORE } from "@/lib/assessment/steps";
+import { getAssessmentPassScore } from "@/lib/settings";
 import { createUserNotification } from "@/lib/notifications/create-user-notification";
 import { TALENT_POOL_INVITE_DAYS } from "@/lib/talent-pool/talent-pool-criteria";
 import { getTalentPoolMetrics } from "@/lib/talent-pool/get-talent-pool-metrics";
@@ -23,10 +23,11 @@ export async function resolveInviteAssessmentGate(
   candidateId: string,
 ): Promise<{ gate: InviteGate; metrics: Awaited<ReturnType<typeof getTalentPoolMetrics>> }> {
   const metrics = await getTalentPoolMetrics(candidateId);
+  const passScore = await getAssessmentPassScore();
   if (!metrics.assessmentComplete) {
     return { gate: "needs_assessment", metrics };
   }
-  if ((metrics.assessmentScore ?? 0) < ASSESSMENT_PASS_SCORE) {
+  if ((metrics.assessmentScore ?? 0) < passScore) {
     return { gate: "needs_score", metrics };
   }
   return { gate: "ok", metrics };

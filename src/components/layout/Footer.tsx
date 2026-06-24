@@ -1,6 +1,7 @@
 import { getTranslations } from "next-intl/server";
 import { Logo } from "@/components/ui/Logo";
 import { Link } from "@/i18n/navigation";
+import { getContent } from "@/lib/cms";
 import { hrefRegisterMentor } from "@/lib/i18n-hrefs";
 
 interface FooterProps {
@@ -9,6 +10,7 @@ interface FooterProps {
 
 export async function Footer({ locale }: FooterProps) {
   const tf = await getTranslations({ locale, namespace: "footer" });
+  const content = await getContent(locale);
   const isRtl = locale === "ar" || locale === "ur";
 
   return (
@@ -21,7 +23,9 @@ export async function Footer({ locale }: FooterProps) {
         <div className="grid gap-10 md:grid-cols-2 lg:grid-cols-4">
           <div className="flex flex-col gap-4">
             <Logo variant="dark" size="md" className="max-w-[220px]" />
-            <p className="max-w-md text-sm text-white/75">{tf("slogan")}</p>
+            <p className="max-w-md text-sm text-white/75">
+              {content["footer_tagline"] ?? tf("slogan")}
+            </p>
           </div>
 
           <div>

@@ -7,6 +7,7 @@ import { hasAccess } from "@/lib/subscription";
 import type { SubscriptionTier } from "@prisma/client";
 import { calculateSessionPricing } from "@/lib/mentor/pricing";
 import { onMentorSessionBooked } from "@/lib/mentor/notifications";
+import { isMentorMarketOpen } from "@/lib/settings";
 
 const bodySchema = z.object({
   scheduledAt: z.string().datetime(),
@@ -26,6 +27,13 @@ export async function POST(
   const tier = (session.user.subscriptionTier ?? "FREE") as SubscriptionTier;
   if (!hasAccess(tier, "mentor_sessions")) {
     return NextResponse.json({ success: false, error: "Premium required" }, { status: 403 });
+  }
+
+  if (!(await isMentorMarketOpen())) {
+    return NextResponse.json(
+      { success: false, error: "Mentor marketplace is currently closed" },
+      { status: 403 },
+    );
   }
 
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));
@@ -59,7 +67,7 @@ export async function POST(
     );
   }
 
-  const { price, platformFee, mentorEarning } = calculateSessionPricing(
+  const { price, platformFee, mentorEarning } = await calculateSessionPricing(
     mentor.hourlyRate,
     parsed.data.duration,
   );

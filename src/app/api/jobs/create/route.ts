@@ -6,6 +6,7 @@ import type { ApiResponse } from "@/types";
 import { createJobSchema, createJobValidationMessage } from "@/lib/jobs/create-job-schema";
 import { runAutoShortlistForJob } from "@/lib/jobs/run-auto-shortlist";
 import { notifyJobSeekersOnNewJob } from "@/lib/jobs/notify-job-matches";
+import { getSettings } from "@/lib/settings";
 
 function toInputJson(value: unknown): Prisma.InputJsonValue {
   return value as Prisma.InputJsonValue;
@@ -32,6 +33,23 @@ export async function POST(
 
   const b = parsed.data;
   const prisma = getPrisma();
+  const settings = await getSettings();
+
+  const monthStart = new Date();
+  monthStart.setDate(1);
+  monthStart.setHours(0, 0, 0, 0);
+  const jobsThisMonth = await prisma.job.count({
+    where: {
+      employerId: session.user.id,
+      createdAt: { gte: monthStart },
+    },
+  });
+  if (jobsThisMonth >= settings.maxJobsPerEmployer) {
+    return NextResponse.json(
+      { success: false, error: "Monthly job posting limit reached" },
+      { status: 403 },
+    );
+  }
 
   const job = await prisma.job.create({
     data: {

@@ -9,6 +9,7 @@ import { onApplicationSubmitted, onInterviewInvitation } from "@/lib/email-trigg
 import { getInterviewTemplateForJob } from "@/lib/employer-interview/job-template-db";
 import { employerInterviewQuestionsToVideoJson } from "@/lib/employer-interview/to-video-interview-questions";
 import { shareCompletedAssessmentsForUser } from "@/lib/assessment/auto-share";
+import { getSettings } from "@/lib/settings";
 
 const bodySchema = z.object({
   jobId: z.string().min(1),
@@ -58,6 +59,14 @@ export async function POST(
 
   if (!job) {
     return NextResponse.json({ success: false, error: "Job not found" }, { status: 404 });
+  }
+
+  const settings = await getSettings();
+  if (job.applicationCount >= settings.maxApplicationsPerJob) {
+    return NextResponse.json(
+      { success: false, error: "This job is no longer accepting applications" },
+      { status: 403 },
+    );
   }
 
   const cv = await prisma.cV.findUnique({ where: { userId: seekerId }, select: { id: true } });

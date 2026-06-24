@@ -25,6 +25,7 @@ import { NewMessage } from "@/emails/NewMessage";
 import { ProfileReminder } from "@/emails/ProfileReminder";
 import { PasswordReset } from "@/emails/PasswordReset";
 import { appUrl } from "@/lib/email/app-url";
+import { getSettings, getAssessmentPassScore } from "@/lib/settings";
 
 async function safeSend(to: string, subject: string, template: ReactElement): Promise<void> {
   try {
@@ -40,24 +41,31 @@ export async function onJobSeekerRegistered(params: {
   name: string;
 }): Promise<void> {
   const prisma = getPrisma();
-  await safeSend(
-    params.email,
-    "Welcome to QudrahTech! | مرحباً بك في قدرتك",
-    WelcomeJobSeeker({ name: params.name || "there" }),
-  );
-  await createNotification({
-    userId: params.userId,
-    type: NotificationType.ASSESSMENT_INVITE,
-    title: "Complete your AI assessment",
-    titleAr: "أكمل تقييمك الذكي",
-    message: "Welcome! Complete your assessment to unlock applications.",
-    messageAr: "مرحباً! أكمل تقييمك لفتح التقديم على الوظائف.",
-    link: "/dashboard/job-seeker/assessment",
-  });
-  await prisma.user.update({
-    where: { id: params.userId },
-    data: { welcomeEmailSentAt: new Date() },
-  });
+  const settings = await getSettings();
+  if (settings.sendWelcomeEmail) {
+    await safeSend(
+      params.email,
+      "Welcome to QudrahTech! | مرحباً بك في قدرتك",
+      WelcomeJobSeeker({ name: params.name || "there" }),
+    );
+  }
+  if (settings.sendAssessmentInvite) {
+    await createNotification({
+      userId: params.userId,
+      type: NotificationType.ASSESSMENT_INVITE,
+      title: "Complete your AI assessment",
+      titleAr: "أكمل تقييمك الذكي",
+      message: "Welcome! Complete your assessment to unlock applications.",
+      messageAr: "مرحباً! أكمل تقييمك لفتح التقديم على الوظائف.",
+      link: "/dashboard/job-seeker/assessment",
+    });
+  }
+  if (settings.sendWelcomeEmail) {
+    await prisma.user.update({
+      where: { id: params.userId },
+      data: { welcomeEmailSentAt: new Date() },
+    });
+  }
   await logAudit({ userId: params.userId, action: "user.registered", entity: "User", entityId: params.userId });
 }
 
@@ -66,11 +74,14 @@ export async function onEmployerRegistered(params: {
   email: string;
   name: string;
 }): Promise<void> {
-  await safeSend(
-    params.email,
-    "Welcome to QudrahTech! Start Hiring Smarter",
-    WelcomeEmployer({ name: params.name || "there" }),
-  );
+  const settings = await getSettings();
+  if (settings.sendWelcomeEmail) {
+    await safeSend(
+      params.email,
+      "Welcome to QudrahTech! Start Hiring Smarter",
+      WelcomeEmployer({ name: params.name || "there" }),
+    );
+  }
   await logAudit({ userId: params.userId, action: "user.registered", entity: "User", entityId: params.userId });
 }
 
@@ -80,6 +91,8 @@ export async function onAssessmentInviteDelayed(params: {
   email: string;
   name: string;
 }): Promise<void> {
+  const settings = await getSettings();
+  if (!settings.sendAssessmentInvite) return;
   await safeSend(
     params.email,
     "Complete Your AI Assessment | أكمل تقييمك",
@@ -94,9 +107,21 @@ export async function onAssessmentComplete(params: {
   score: number;
   strengths?: Array<{ title?: string }>;
 }): Promise<void> {
-  const passed = params.score >= 50;
+  const settings = await getSettings();
+  const passScore = await getAssessmentPassScore();
+  const passed = params.score >= passScore;
   const s1 = params.strengths?.[0]?.title;
   const s2 = params.strengths?.[1]?.title;
+
+  if (!settings.sendAssessmentResults) {
+    await logAudit({
+      userId: params.userId,
+      action: "assessment.completed",
+      entity: "Assessment",
+      newData: { score: params.score, passed },
+    });
+    return;
+  }
 
   if (passed) {
     await safeSend(
@@ -191,6 +216,9 @@ export async function onApplicationStatusChanged(params: {
   status: ApplicationStatus;
   declineReason?: string | null;
 }): Promise<void> {
+  const settings = await getSettings();
+  if (!settings.sendApplicationStatus) return;
+
   let messageEn = `Your application is now ${params.status}.`;
   let messageAr = `حالة طلبك الآن: ${params.status}.`;
   if (params.status === ApplicationStatus.SHORTLISTED) {
@@ -240,6 +268,9 @@ export async function onInterviewInvitation(params: {
   company: string;
   jobId: string;
 }): Promise<void> {
+  const settings = await getSettings();
+  if (!settings.sendInterviewInvite) return;
+
   await safeSend(
     params.seekerEmail,
     "You Have a Video Interview! | لديك مقابلة فيديو",
@@ -356,11 +387,14 @@ export async function onOfferCreated(params: {
   currency: string;
   employerEmail: string;
 }): Promise<void> {
-  await safeSend(
-    params.candidateEmail,
-    "You Have Received a Job Offer! | لديك عرض عمل",
-    OfferLetterReceived({ company: params.company, jobTitle: params.jobTitle, offerId: params.offerId }),
-  );
+  const settings = await getSettings();
+  if (settings.sendOfferLetter) {
+    await safeSend(
+      params.candidateEmail,
+      "You Have Received a Job Offer! | لديك عرض عمل",
+      OfferLetterReceived({ company: params.company, jobTitle: params.jobTitle, offerId: params.offerId }),
+    );
+  }
   await createNotification({
     userId: params.candidateId,
     type: NotificationType.OFFER_RECEIVED,
@@ -453,6 +487,9 @@ export async function onJobMatchNotify(params: {
   company: string;
   matchPercent: number;
 }): Promise<void> {
+  const settings = await getSettings();
+  if (!settings.sendJobMatchEmail) return;
+
   await safeSend(
     params.email,
     "New Job Match for You! | وظيفة جديدة تناسبك",

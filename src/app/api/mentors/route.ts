@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getPrisma } from "@/lib/db";
+import { isMentorMarketOpen } from "@/lib/settings";
 
 const DEFAULT_PRICE_CEILING = 500;
 
@@ -33,6 +34,10 @@ function sortMentors<T extends { hourlyRate: number | null; averageRating: numbe
 }
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
+  if (!(await isMentorMarketOpen())) {
+    return NextResponse.json({ success: true, data: { mentors: [], total: 0, marketOpen: false } });
+  }
+
   const url = new URL(request.url);
   const q = url.searchParams.get("q")?.trim().toLowerCase() ?? "";
   const industry = url.searchParams.get("industry")?.trim() ?? "";

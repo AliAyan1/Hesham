@@ -8,7 +8,11 @@ import {
 } from "@prisma/client";
 import { getPrisma } from "@/lib/db";
 import { calculateVAT, fromHalalas, pollPaidPayment, toHalalas } from "@/lib/moyasar";
-import { subscriptionBaseAmount, SUBSCRIPTION_PLAN_PRICES_SAR, type SubscriptionPlanKey } from "@/lib/payments/pricing";
+import {
+  getSubscriptionPlanPrices,
+  subscriptionBaseAmount,
+  type SubscriptionPlanKey,
+} from "@/lib/payments/pricing";
 import { createDailyRoomForSession } from "@/lib/daily/client";
 import { ensureMentorMessageThread } from "@/lib/mentor/session-access";
 import { onMentorSessionConfirmed } from "@/lib/mentor/notifications";
@@ -24,10 +28,12 @@ export type PaymentMetadataInput = {
 async function resolveExpectedTotalHalalas(metadata: PaymentMetadataInput): Promise<number> {
   if (metadata.type === "SUBSCRIPTION") {
     const plan = metadata.plan?.toUpperCase() as SubscriptionPlanKey | undefined;
-    if (!plan || !(plan in SUBSCRIPTION_PLAN_PRICES_SAR)) {
+    const prices = await getSubscriptionPlanPrices();
+    if (!plan || !(plan in prices)) {
       throw new Error("invalid_plan");
     }
-    const { total } = calculateVAT(subscriptionBaseAmount(plan));
+    const base = await subscriptionBaseAmount(plan);
+    const { total } = calculateVAT(base, prices.vatPercentage);
     return toHalalas(total);
   }
 

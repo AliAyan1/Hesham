@@ -6,7 +6,7 @@ import { useSession } from "next-auth/react";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useMemo, useState } from "react";
 import { hasAccess } from "@/lib/subscription";
-import { calculateSessionPricing } from "@/lib/mentor/pricing";
+import { calculateSessionPricingSync } from "@/lib/mentor/pricing";
 import { MENTOR_SESSION_DURATIONS } from "@/lib/mentor/constants";
 import type { SubscriptionTier } from "@/types";
 import { Button } from "@/components/ui/Button";
@@ -72,7 +72,7 @@ export default function MentorBookClient({ mentorId }: { mentorId: string }) {
   const mentorHourlyRate = mentor?.hourlyRate ?? null;
   const pricing = useMemo(() => {
     if (!mentorHourlyRate) return null;
-    return calculateSessionPricing(mentorHourlyRate, duration);
+    return calculateSessionPricingSync(mentorHourlyRate, duration);
   }, [mentorHourlyRate, duration]);
 
   const bio =

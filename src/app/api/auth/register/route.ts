@@ -7,6 +7,7 @@ import type { ApiResponse, IUser } from "@/types";
 import { tierFromPlan } from "@/lib/subscription";
 import { UserRole } from "@prisma/client";
 import { onEmployerRegistered, onJobSeekerRegistered } from "@/lib/email-triggers";
+import { isRegistrationOpen as getRegistrationOpen } from "@/lib/settings";
 import { defaultMentorProfileCreate } from "@/lib/mentor/default-mentor-create";
 import { paymentsAreLive, moyasarPaymentsEnabled, isPaidPlanChoice } from "@/lib/payments-config";
 import { clientIp, rateLimit, rateLimitResponse } from "@/lib/rate-limit";
@@ -27,6 +28,13 @@ export async function POST(
 
     const prisma = getPrisma();
     await prisma.$connect();
+
+    if (!(await getRegistrationOpen())) {
+      return NextResponse.json(
+        { success: false, error: "Registration is currently closed" },
+        { status: 403 },
+      );
+    }
 
     const body: unknown = await request.json();
     const parsed = registerWithPlanSchema.safeParse(body);

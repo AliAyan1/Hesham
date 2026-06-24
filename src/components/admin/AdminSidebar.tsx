@@ -58,6 +58,7 @@ const SECTIONS: { titleKey: string; items: NavItem[] }[] = [
   {
     titleKey: "system",
     items: [
+      { href: "/dashboard/admin/cms", labelKey: "content", Icon: FileText },
       { href: "/dashboard/admin/audit-logs", labelKey: "auditLogs", Icon: Shield },
       { href: "/dashboard/admin/settings", labelKey: "settings", Icon: Settings },
     ],

@@ -1,0 +1,222 @@
+export type SiteContentSeed = {
+  key: string;
+  valueEn: string;
+  valueAr: string;
+  section: string;
+  label: string;
+  type?: "text" | "textarea" | "richtext";
+};
+
+export const SITE_CONTENT_SEED: SiteContentSeed[] = [
+  {
+    key: "hero_title",
+    valueEn: "Know Your Potential. Shape Your Future.",
+    valueAr: "اعرف إمكاناتك. شكّل مستقبلك.",
+    section: "landing",
+    label: "Hero Title",
+  },
+  {
+    key: "hero_subtitle",
+    valueEn: "AI-powered recruitment platform built for the Arab world",
+    valueAr: "منصة توظيف مدعومة بالذكاء الاصطناعي مصممة للعالم العربي",
+    section: "landing",
+    label: "Hero Subtitle",
+    type: "textarea",
+  },
+  {
+    key: "hero_cta",
+    valueEn: "Get Started Free",
+    valueAr: "ابدأ مجاناً",
+    section: "landing",
+    label: "Hero Button",
+  },
+  {
+    key: "features_title",
+    valueEn: "Everything You Need to Hire Smarter",
+    valueAr: "كل ما تحتاجه للتوظيف الذكي",
+    section: "landing",
+    label: "Features Title",
+  },
+  {
+    key: "pricing_title",
+    valueEn: "Simple, Transparent Pricing",
+    valueAr: "أسعار بسيطة وشفافة",
+    section: "landing",
+    label: "Pricing Title",
+  },
+  {
+    key: "pricing_subtitle",
+    valueEn: "Start free. Upgrade when ready.",
+    valueAr: "ابدأ مجاناً. قم بالترقية عندما تكون مستعداً.",
+    section: "landing",
+    label: "Pricing Subtitle",
+    type: "textarea",
+  },
+  {
+    key: "faq_title",
+    valueEn: "Frequently Asked Questions",
+    valueAr: "الأسئلة الشائعة",
+    section: "landing",
+    label: "FAQ Title",
+  },
+  {
+    key: "cta_title",
+    valueEn: "Ready to transform your hiring?",
+    valueAr: "هل أنت مستعد لتحويل عملية التوظيف؟",
+    section: "landing",
+    label: "CTA Title",
+  },
+  {
+    key: "cta_button",
+    valueEn: "Get Started Today",
+    valueAr: "ابدأ اليوم",
+    section: "landing",
+    label: "CTA Button",
+  },
+  {
+    key: "about_hero_title",
+    valueEn: "Empowering Careers Across the Arab World",
+    valueAr: "تمكين المسيرات المهنية في العالم العربي",
+    section: "about",
+    label: "About Hero Title",
+  },
+  {
+    key: "about_mission",
+    valueEn:
+      "We believe every professional deserves access to tools that help them discover their true potential and connect with the right opportunities.",
+    valueAr: "نؤمن بأن كل محترف يستحق الوصول إلى أدوات تساعده على اكتشاف إمكاناته الحقيقية.",
+    section: "about",
+    label: "Mission Statement",
+    type: "textarea",
+  },
+  {
+    key: "about_vision",
+    valueEn: "To become the leading AI recruitment platform in the MENA region",
+    valueAr: "أن نصبح منصة التوظيف الذكية الرائدة في منطقة الشرق الأوسط وشمال أفريقيا",
+    section: "about",
+    label: "Vision Statement",
+    type: "textarea",
+  },
+  {
+    key: "contact_address",
+    valueEn: "Jeddah, Saudi Arabia",
+    valueAr: "جدة، المملكة العربية السعودية",
+    section: "contact",
+    label: "Office Address",
+  },
+  {
+    key: "contact_email",
+    valueEn: "support@basalim-consulting.com",
+    valueAr: "support@basalim-consulting.com",
+    section: "contact",
+    label: "Support Email",
+  },
+  {
+    key: "contact_hours",
+    valueEn: "Sunday - Thursday, 9AM - 6PM AST",
+    valueAr: "الأحد - الخميس، 9 صباحاً - 6 مساءً",
+    section: "contact",
+    label: "Working Hours",
+  },
+  {
+    key: "faq_1_q",
+    valueEn: "Is there a free trial?",
+    valueAr: "هل يوجد نسخة تجريبية مجانية؟",
+    section: "faq",
+    label: "FAQ 1 Question",
+  },
+  {
+    key: "faq_1_a",
+    valueEn: "Yes — our Free plan is free forever with no credit card required.",
+    valueAr: "نعم — خطتنا المجانية مجانية للأبد بدون بطاقة ائتمان.",
+    section: "faq",
+    label: "FAQ 1 Answer",
+    type: "textarea",
+  },
+  {
+    key: "faq_2_q",
+    valueEn: "Can I upgrade anytime?",
+    valueAr: "هل يمكنني الترقية في أي وقت؟",
+    section: "faq",
+    label: "FAQ 2 Question",
+  },
+  {
+    key: "faq_2_a",
+    valueEn: "Yes — upgrade or downgrade anytime from your dashboard.",
+    valueAr: "نعم — يمكنك الترقية أو التخفيض في أي وقت من لوحة التحكم.",
+    section: "faq",
+    label: "FAQ 2 Answer",
+    type: "textarea",
+  },
+  {
+    key: "faq_3_q",
+    valueEn: "What payment methods are accepted?",
+    valueAr: "ما هي طرق الدفع المقبولة؟",
+    section: "faq",
+    label: "FAQ 3 Question",
+  },
+  {
+    key: "faq_3_a",
+    valueEn: "We accept Mada, Apple Pay, Tabby, Tamara, and Mastercard.",
+    valueAr: "نقبل مدى وأبل باي وتابي وتمارا وماستركارد.",
+    section: "faq",
+    label: "FAQ 3 Answer",
+    type: "textarea",
+  },
+  {
+    key: "faq_4_q",
+    valueEn: "Is the AI Assessment really free?",
+    valueAr: "هل التقييم الذكي مجاني حقاً؟",
+    section: "faq",
+    label: "FAQ 4 Question",
+  },
+  {
+    key: "faq_4_a",
+    valueEn: "Yes — the full psychometric assessment is free for all users on all plans.",
+    valueAr: "نعم — التقييم النفسي الكامل مجاني لجميع المستخدمين على جميع الخطط.",
+    section: "faq",
+    label: "FAQ 4 Answer",
+    type: "textarea",
+  },
+  {
+    key: "faq_5_q",
+    valueEn: "How does the mentor system work?",
+    valueAr: "كيف يعمل نظام الإرشاد المهني؟",
+    section: "faq",
+    label: "FAQ 5 Question",
+  },
+  {
+    key: "faq_5_a",
+    valueEn:
+      "Premium users can book sessions with approved mentors. Mentors earn 75% of each session fee.",
+    valueAr:
+      "يمكن للمستخدمين المميزين حجز جلسات مع المرشدين المعتمدين. يكسب المرشدون 75% من رسوم كل جلسة.",
+    section: "faq",
+    label: "FAQ 5 Answer",
+    type: "textarea",
+  },
+  {
+    key: "assessment_intro",
+    valueEn:
+      "This psychometric assessment will help us understand your strengths and match you with the right opportunities.",
+    valueAr: "سيساعدنا هذا التقييم النفسي على فهم نقاط قوتك ومطابقتك مع الفرص المناسبة.",
+    section: "platform",
+    label: "Assessment Introduction",
+    type: "textarea",
+  },
+  {
+    key: "welcome_message",
+    valueEn: "Welcome to QudrahTech! Your journey to the perfect career starts here.",
+    valueAr: "مرحباً بك في قدرتك! رحلتك نحو المسيرة المهنية المثالية تبدأ هنا.",
+    section: "platform",
+    label: "Welcome Message",
+    type: "textarea",
+  },
+  {
+    key: "footer_tagline",
+    valueEn: "Know Your Potential. Shape Your Future.",
+    valueAr: "اعرف إمكاناتك. شكّل مستقبلك.",
+    section: "platform",
+    label: "Footer Tagline",
+  },
+];

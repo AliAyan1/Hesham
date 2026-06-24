@@ -2,6 +2,7 @@ import { getTranslations } from "next-intl/server";
 import { PublicNavbar } from "@/components/layout/PublicNavbar";
 import { Footer } from "@/components/layout/Footer";
 import { ContactForm } from "@/components/contact/ContactForm";
+import { getContent } from "@/lib/cms";
 
 export default async function ContactPage({
   params,
@@ -10,6 +11,7 @@ export default async function ContactPage({
 }) {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "pages.contact" });
+  const content = await getContent(locale);
   const isRTL = locale === "ar" || locale === "ur";
 
   return (
@@ -32,15 +34,21 @@ export default async function ContactPage({
             <ul className="mt-8 space-y-5 text-sm leading-relaxed">
               <li>
                 <p className="font-semibold">📍 {t("locationLabel")}</p>
-                <p className="mt-1 text-white/70">{t("locationValue")}</p>
+                <p className="mt-1 text-white/70">
+                  {content["contact_address"] ?? t("locationValue")}
+                </p>
               </li>
               <li>
                 <p className="font-semibold">📧 {t("emailLabel")}</p>
-                <p className="mt-1 text-white/70">{t("emailValue")}</p>
+                <p className="mt-1 text-white/70">
+                  {content["contact_email"] ?? t("emailValue")}
+                </p>
               </li>
               <li>
                 <p className="font-semibold">🕐 {t("responseLabel")}</p>
-                <p className="mt-1 text-white/70">{t("responseValue")}</p>
+                <p className="mt-1 text-white/70">
+                  {content["contact_hours"] ?? t("responseValue")}
+                </p>
               </li>
               <li>
                 <p className="font-semibold">🌐 {t("platformLabel")}</p>

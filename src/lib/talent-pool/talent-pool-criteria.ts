@@ -12,12 +12,18 @@ export type TalentPoolMetrics = {
   atsScore: number | null;
 };
 
-export function meetsTalentPoolExitCriteria(metrics: TalentPoolMetrics): boolean {
+export function meetsTalentPoolExitCriteria(
+  metrics: TalentPoolMetrics,
+  thresholds: { minScore: number; minProfile: number } = {
+    minScore: ASSESSMENT_PASS_SCORE,
+    minProfile: TALENT_POOL_PROFILE_TARGET,
+  },
+): boolean {
   return (
     metrics.assessmentComplete &&
-    (metrics.assessmentScore ?? 0) >= ASSESSMENT_PASS_SCORE &&
+    (metrics.assessmentScore ?? 0) >= thresholds.minScore &&
     metrics.stepsCompleted >= ASSESSMENT_STEP_COUNT &&
-    metrics.profileCompletion >= TALENT_POOL_PROFILE_TARGET &&
+    metrics.profileCompletion >= thresholds.minProfile &&
     (metrics.atsScore ?? 0) >= TALENT_POOL_ATS_TARGET
   );
 }
@@ -40,11 +46,17 @@ export type TalentPoolProgress = {
   items: TalentPoolProgressItem[];
 };
 
-export function buildTalentPoolProgress(metrics: TalentPoolMetrics): TalentPoolProgress {
+export function buildTalentPoolProgress(
+  metrics: TalentPoolMetrics,
+  thresholds: { minScore: number; minProfile: number } = {
+    minScore: ASSESSMENT_PASS_SCORE,
+    minProfile: TALENT_POOL_PROFILE_TARGET,
+  },
+): TalentPoolProgress {
   const scoreDone =
-    metrics.assessmentComplete && (metrics.assessmentScore ?? 0) >= ASSESSMENT_PASS_SCORE;
+    metrics.assessmentComplete && (metrics.assessmentScore ?? 0) >= thresholds.minScore;
   const stepsDone = metrics.stepsCompleted >= ASSESSMENT_STEP_COUNT;
-  const profileDone = metrics.profileCompletion >= TALENT_POOL_PROFILE_TARGET;
+  const profileDone = metrics.profileCompletion >= thresholds.minProfile;
   const atsDone = (metrics.atsScore ?? 0) >= TALENT_POOL_ATS_TARGET;
 
   const items: TalentPoolProgressItem[] = [
@@ -56,7 +68,7 @@ export function buildTalentPoolProgress(metrics: TalentPoolMetrics): TalentPoolP
       progressFraction: scoreDone
         ? 1
         : metrics.assessmentScore != null
-          ? Math.min(1, metrics.assessmentScore / ASSESSMENT_PASS_SCORE)
+          ? Math.min(1, metrics.assessmentScore / thresholds.minScore)
           : 0,
     },
     {
@@ -69,7 +81,7 @@ export function buildTalentPoolProgress(metrics: TalentPoolMetrics): TalentPoolP
       id: "profileCompletion",
       done: profileDone,
       currentValue: `${metrics.profileCompletion}%`,
-      progressFraction: Math.min(1, metrics.profileCompletion / TALENT_POOL_PROFILE_TARGET),
+      progressFraction: Math.min(1, metrics.profileCompletion / thresholds.minProfile),
     },
     {
       id: "atsScore",

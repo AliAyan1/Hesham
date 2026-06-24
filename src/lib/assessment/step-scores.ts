@@ -66,24 +66,25 @@ export function stepStatus(
 export function canStartStep(
   scores: StepScoresMap,
   step: number,
-  opts: { forceRetake?: boolean; overallScore?: number | null },
+  opts: { forceRetake?: boolean; overallScore?: number | null; passScore?: number },
 ): boolean {
+  const passScore = opts.passScore ?? ASSESSMENT_PASS_SCORE;
   const entry = scores[stepKey(step)];
   if (!entry) return true;
   if (opts.forceRetake) return true;
-  if (entry.score < ASSESSMENT_PASS_SCORE) return true;
+  if (entry.score < passScore) return true;
   const overall = opts.overallScore ?? computeOverallFromSteps(scores);
-  if (overall != null && overall < ASSESSMENT_PASS_SCORE && entry.score < ASSESSMENT_PASS_SCORE) {
+  if (overall != null && overall < passScore && entry.score < passScore) {
     return true;
   }
   return false;
 }
 
-export function failedSteps(scores: StepScoresMap): number[] {
+export function failedSteps(scores: StepScoresMap, passScore = ASSESSMENT_PASS_SCORE): number[] {
   const failed: number[] = [];
   for (let i = 1; i <= ASSESSMENT_STEP_COUNT; i++) {
     const e = scores[stepKey(i)];
-    if (e && e.score < ASSESSMENT_PASS_SCORE) failed.push(i);
+    if (e && e.score < passScore) failed.push(i);
   }
   return failed;
 }

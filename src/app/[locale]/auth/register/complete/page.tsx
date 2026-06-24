@@ -15,6 +15,7 @@ import {
   SUBSCRIPTION_PLAN_PRICES_SAR,
   type SubscriptionPlanKey,
 } from "@/lib/payments/pricing";
+import type { PublicPlatformSettings } from "@/lib/settings";
 import { useSearchParams } from "next/navigation";
 
 type RoleChoice = "JOBSEEKER" | "EMPLOYER" | "MENTOR";
@@ -46,6 +47,19 @@ export default function RegisterCompletePage() {
   const [showPayment, setShowPayment] = useState(false);
   const [pendingRole, setPendingRole] = useState<RoleChoice | null>(null);
   const [finishing, setFinishing] = useState(false);
+  const [planPrices, setPlanPrices] = useState(SUBSCRIPTION_PLAN_PRICES_SAR);
+
+  useEffect(() => {
+    void fetch("/api/settings/public", { cache: "no-store" })
+      .then((r) => r.json() as Promise<PublicPlatformSettings>)
+      .then((settings) => {
+        setPlanPrices({
+          PROFESSIONAL: settings.proPlanPrice,
+          PREMIUM: settings.premiumPlanPrice,
+        });
+      })
+      .catch(() => undefined);
+  }, []);
 
   const urlPlan = useMemo(() => planFromUrl(sp.get("plan")), [sp]);
   const urlRole = useMemo(() => sp.get("role")?.toUpperCase() ?? null, [sp]);
@@ -197,7 +211,7 @@ export default function RegisterCompletePage() {
           isOpen={showPayment}
           onClose={() => setShowPayment(false)}
           title={tp("signupPaymentTitle", { plan: t(`subscription.${plan}`) })}
-          baseAmount={SUBSCRIPTION_PLAN_PRICES_SAR[paymentPlanKey]}
+          baseAmount={planPrices[paymentPlanKey]}
           description={tp("subscriptionDescription", { plan: t(`subscription.${plan}`) })}
           metadata={{
             type: "SUBSCRIPTION",
