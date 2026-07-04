@@ -88,3 +88,37 @@ export type NotificationDto = {
   link: string | null;
   createdAt: string;
 };
+
+export type EmployerInsightRow = {
+  applicationId: string;
+  applicationStatus: string;
+  appliedAt: string;
+  jobId: string;
+  jobTitle: string;
+  candidateId: string;
+  candidateName: string | null;
+  candidateEmail: string;
+  contactHidden: boolean;
+  matchScore: number | null;
+  assessmentScore: number | null;
+  assessmentCompleted: boolean;
+  assessmentFlagged: boolean;
+  generalInterviewScore: number | null;
+  jobInterviewStatus: string | null;
+  jobInterviewScore: number | null;
+  jobInterviewCompleted: boolean;
+  jobInterviewFlagged: boolean;
+  aiSummary: string | null;
+};
+
+export type EmployerInsightsPayload = {
+  stats: {
+    totalApplicants: number;
+    withJobInterview: number;
+    jobInterviewsCompleted: number;
+    withAssessment: number;
+    avgJobInterviewScore: number | null;
+  };
+  jobs: Array<{ id: string; title: string; applicantCount: number }>;
+  items: EmployerInsightRow[];
+};

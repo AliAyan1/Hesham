@@ -39,6 +39,7 @@ const storedPackSchema = z.object({
 export async function POST(
   request: NextRequest,
 ): Promise<NextResponse<ApiResponse<{ interviewId: string; questions: z.infer<typeof qSchema>[] }>>> {
+  try {
   const session = await getServerSession();
   if (!session?.user?.id || session.user.role !== UserRole.JOBSEEKER) {
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
@@ -232,4 +233,8 @@ export async function POST(
     { success: true, data: { interviewId: created.id, questions: pack.questions } },
     { status: 201 },
   );
+  } catch (err) {
+    console.error("[interview/generate-questions] error:", err);
+    return NextResponse.json({ success: false, error: "Interview setup failed" }, { status: 500 });
+  }
 }

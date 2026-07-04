@@ -88,9 +88,7 @@ export function InterviewRunScreen({
 
         <div className="w-full max-w-2xl space-y-4">
           <p className="text-center text-xs font-medium text-white/70">
-            {labels.questionOf
-              .replace("{current}", String(questionIndex + 1))
-              .replace("{total}", String(questionTotal))}
+            {labels.questionOf}
           </p>
           <div className="h-1.5 overflow-hidden rounded-full bg-white/15">
             <div

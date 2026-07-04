@@ -1,6 +1,6 @@
 "use client";
 
-import { BarChart3, Brain, Briefcase, ClipboardList, FileText, Sparkles, Star, Video } from "lucide-react";
+import { Brain, Briefcase, ClipboardList, FileText, Sparkles, Star, Video } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import { useFormatter, useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
@@ -21,8 +21,6 @@ import { Badge } from "@/components/ui/Badge";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { cn } from "@/lib/cn";
-import { hasAccess } from "@/lib/subscription";
-
 export default function EmployerDashboardClient({
   userName,
   subscriptionTier,
@@ -38,8 +36,6 @@ export default function EmployerDashboardClient({
   const locale = useLocale();
   const [data, setData] = useState<EmployerDashboardPayload | null>(null);
   const [status, setStatus] = useState<"loading" | "error" | "ready">("loading");
-  const canEmployerAnalytics = hasAccess(subscriptionTier, "employer_analytics");
-
   const loadEmployerDashboard = useCallback(async () => {
     try {
       const res = await fetch("/api/dashboard/employer", {
@@ -266,12 +262,7 @@ export default function EmployerDashboardClient({
           </h3>
           <p className="mt-1 text-sm text-[#6B7280]">{t("sectionQuickActionsSubtitle")}</p>
         </div>
-        <div
-          className={cn(
-            "grid grid-cols-1 gap-5 sm:grid-cols-2",
-            canEmployerAnalytics ? "xl:grid-cols-5" : "xl:grid-cols-4",
-          )}
-        >
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
           <DashboardActionCard
             href="/dashboard/employer/post-job"
             title={t("actionPostJob")}
@@ -304,16 +295,6 @@ export default function EmployerDashboardClient({
             iconColorClass="text-[#6D28D9]"
             Icon={ClipboardList}
           />
-          {canEmployerAnalytics ? (
-            <DashboardActionCard
-              href="/dashboard/employer/analytics"
-              title={t("actionViewAnalytics")}
-              description={t("quickActionAnalyticsDesc")}
-              iconBgClass="bg-[#FDF3E3]"
-              iconColorClass="text-[#C9973A]"
-              Icon={BarChart3}
-            />
-          ) : null}
         </div>
       </section>
 

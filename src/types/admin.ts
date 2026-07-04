@@ -200,3 +200,94 @@ export type AdminTalentPoolPayload = {
   };
   items: AdminTalentPoolRow[];
 };
+
+export type AdminJobRow = {
+  id: string;
+  title: string;
+  employerName: string | null;
+  employerEmail: string;
+  category: string;
+  type: string;
+  location: string | null;
+  isActive: boolean;
+  isFeatured: boolean;
+  applicationCount: number;
+  viewCount: number;
+  postedAt: string;
+  expiresAt: string | null;
+};
+
+export type AdminJobsPayload = {
+  stats: {
+    total: number;
+    active: number;
+    inactive: number;
+    postedToday: number;
+    totalApplications: number;
+  };
+  items: AdminJobRow[];
+};
+
+export type AdminInterviewRow = {
+  id: string;
+  userId: string;
+  candidateName: string | null;
+  candidateEmail: string;
+  interviewKind: string | null;
+  jobTitle: string | null;
+  status: string;
+  overallScore: number | null;
+  isFlagged: boolean;
+  shareWithEmployers: boolean;
+  duration: number | null;
+  startedAt: string | null;
+  completedAt: string | null;
+};
+
+export type AdminInterviewsPayload = {
+  stats: {
+    total: number;
+    completed: number;
+    inProgress: number;
+    flagged: number;
+    pending: number;
+  };
+  items: AdminInterviewRow[];
+};
+
+export type AdminSubscriptionPaymentRow = {
+  id: string;
+  userId: string;
+  userName: string | null;
+  userEmail: string;
+  userRole: string;
+  plan: string | null;
+  amount: number;
+  totalAmount: number;
+  status: string;
+  paidAt: string | null;
+  createdAt: string;
+};
+
+export type AdminSubscriptionUserRow = {
+  id: string;
+  name: string | null;
+  email: string;
+  role: string;
+  tier: string;
+  subscriptionStart: string | null;
+  subscriptionEnd: string | null;
+};
+
+export type AdminSubscriptionsPayload = {
+  stats: {
+    mrrEstimate: number;
+    paidThisMonth: number;
+    free: number;
+    professional: number;
+    premium: number;
+    totalPayments: number;
+  };
+  recentPayments: AdminSubscriptionPaymentRow[];
+  activeSubscribers: AdminSubscriptionUserRow[];
+};

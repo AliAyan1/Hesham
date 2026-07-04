@@ -1,7 +1,7 @@
 import { getTranslations } from "next-intl/server";
-import { AdminPlaceholder } from "@/components/admin/AdminPlaceholder";
+import AdminSubscriptionsClient from "./AdminSubscriptionsClient";
 
 export default async function AdminSubscriptionsPage() {
-  const t = await getTranslations("adminPanel.nav");
-  return <AdminPlaceholder title={t("subscriptions")} />;
+  const t = await getTranslations("adminPanel.subscriptionsPage");
+  return <AdminSubscriptionsClient title={t("title")} />;
 }

@@ -1,8 +1,9 @@
 "use client";
 
-import { ExternalLink, Search, TriangleAlert } from "lucide-react";
+import { ExternalLink, RefreshCw, Search, TriangleAlert } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocale } from "next-intl";
+import { CMS_SECTION_DEFS, cmsSectionLabel } from "@/lib/cms-sections";
 
 type CmsItem = {
   id: string;
@@ -24,28 +25,10 @@ type Toast = {
   message: string;
 };
 
-type SectionDef = {
-  id: string;
-  icon: string;
-  label: string;
-  previewHref: string;
-};
-
 type DraftState = Record<string, { valueEn: string; valueAr: string }>;
 type SaveStates = Record<string, SaveState>;
 
-const SECTION_DEFS: SectionDef[] = [
-  { id: "landing", icon: "🏠", label: "Landing Page", previewHref: "/" },
-  { id: "about", icon: "📋", label: "About Page", previewHref: "/about" },
-  { id: "contact", icon: "📞", label: "Contact Page", previewHref: "/contact" },
-  { id: "faq", icon: "❓", label: "FAQ Questions", previewHref: "/#faq" },
-  {
-    id: "platform",
-    icon: "⚙️",
-    label: "Platform Messages",
-    previewHref: "/dashboard/job-seeker/assessment",
-  },
-];
+const SECTION_DEFS = CMS_SECTION_DEFS;
 
 const CHARACTER_LIMITS: Record<string, number> = {
   hero_title: 60,
@@ -69,6 +52,33 @@ function buildLocalizedHref(locale: string, href: string): string {
   return `/${locale}${href}`;
 }
 
+function filterCmsItems(items: CmsItem[], query: string): CmsItem[] {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) return items;
+
+  const matchingSectionIds = new Set(
+    SECTION_DEFS.filter(
+      (section) =>
+        section.label.toLowerCase().includes(normalized) ||
+        section.id.toLowerCase().includes(normalized) ||
+        normalized.includes(section.id),
+    ).map((section) => section.id),
+  );
+
+  return items.filter((item) => {
+    if (matchingSectionIds.has(item.section)) return true;
+    const sectionLabel = cmsSectionLabel(item.section).toLowerCase();
+    return (
+      item.key.toLowerCase().includes(normalized) ||
+      item.label.toLowerCase().includes(normalized) ||
+      item.section.toLowerCase().includes(normalized) ||
+      sectionLabel.includes(normalized) ||
+      item.valueEn.toLowerCase().includes(normalized) ||
+      item.valueAr.toLowerCase().includes(normalized)
+    );
+  });
+}
+
 export default function AdminCmsClient() {
   const locale = useLocale();
   const [items, setItems] = useState<CmsItem[]>([]);
@@ -78,6 +88,7 @@ export default function AdminCmsClient() {
   const [saveStates, setSaveStates] = useState<SaveStates>({});
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [initializing, setInitializing] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   const pushToast = useCallback((kind: Toast["kind"], message: string) => {
@@ -114,24 +125,17 @@ export default function AdminCmsClient() {
     void load();
   }, [load]);
 
-  const filteredItems = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
-    return items.filter((item) => {
-      if (!normalized) return true;
-      return (
-        item.key.toLowerCase().includes(normalized) ||
-        item.label.toLowerCase().includes(normalized) ||
-        item.section.toLowerCase().includes(normalized) ||
-        item.valueEn.toLowerCase().includes(normalized) ||
-        item.valueAr.toLowerCase().includes(normalized)
-      );
-    });
-  }, [items, query]);
+  const filteredItems = useMemo(() => filterCmsItems(items, query), [items, query]);
 
   const visibleSections = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    if (!normalized) {
+      const sectionIds = new Set(items.map((item) => item.section));
+      return SECTION_DEFS.filter((section) => sectionIds.has(section.id));
+    }
     const sectionIds = new Set(filteredItems.map((item) => item.section));
     return SECTION_DEFS.filter((section) => sectionIds.has(section.id));
-  }, [filteredItems]);
+  }, [filteredItems, items, query]);
 
   useEffect(() => {
     if (!visibleSections.some((section) => section.id === activeSection)) {
@@ -210,6 +214,26 @@ export default function AdminCmsClient() {
     [drafts, pushToast],
   );
 
+  const initializeContent = useCallback(async () => {
+    setInitializing(true);
+    try {
+      const res = await fetch("/api/admin/cms/seed", { credentials: "include" });
+      const json = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok || !json.ok) {
+        throw new Error(json.error ?? "Failed to initialize content");
+      }
+      await load();
+      pushToast("success", "Content fields loaded");
+    } catch (error) {
+      pushToast(
+        "error",
+        error instanceof Error ? error.message : "Failed to initialize content",
+      );
+    } finally {
+      setInitializing(false);
+    }
+  }, [load, pushToast]);
+
   if (loading) {
     return (
       <div className="rounded-2xl border border-[#E5E7EB] bg-white p-8 text-sm text-[#6B7280]">
@@ -256,10 +280,35 @@ export default function AdminCmsClient() {
               <TriangleAlert className="h-4 w-4" aria-hidden />
               You have unsaved changes.
             </div>
-          ) : null}
+          ) : (
+            <button
+              type="button"
+              disabled={initializing}
+              onClick={() => void initializeContent()}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#D1D5DB] px-4 py-2 text-sm font-semibold text-[#374151] hover:bg-[#F9FAFB] disabled:opacity-50"
+            >
+              <RefreshCw className={`h-4 w-4 ${initializing ? "animate-spin" : ""}`} aria-hidden />
+              Sync missing fields
+            </button>
+          )}
         </div>
       </div>
 
+      {!items.length ? (
+        <div className="rounded-2xl border border-dashed border-[#D1D5DB] bg-white p-10 text-center">
+          <p className="text-sm text-[#6B7280]">
+            No editable content is loaded yet. Click below to create all website text fields.
+          </p>
+          <button
+            type="button"
+            disabled={initializing}
+            onClick={() => void initializeContent()}
+            className="mt-4 inline-flex min-h-11 items-center justify-center rounded-xl bg-[#0F4C75] px-5 py-3 text-sm font-semibold text-white hover:bg-[#0D2137] disabled:opacity-50"
+          >
+            {initializing ? "Loading fields..." : "Load content fields"}
+          </button>
+        </div>
+      ) : (
       <div className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
         <aside className="rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm">
           <div className="space-y-2">
@@ -429,11 +478,25 @@ export default function AdminCmsClient() {
             })
           ) : (
             <div className="rounded-2xl border border-dashed border-[#D1D5DB] bg-white p-10 text-center text-sm text-[#6B7280]">
-              No content found for this search.
+              {query.trim() ? (
+                <>
+                  <p>No content found for &ldquo;{query.trim()}&rdquo;.</p>
+                  <button
+                    type="button"
+                    onClick={() => setQuery("")}
+                    className="mt-4 inline-flex min-h-10 items-center justify-center rounded-xl border border-[#D1D5DB] px-4 text-sm font-semibold text-[#374151] hover:bg-[#F9FAFB]"
+                  >
+                    Clear search
+                  </button>
+                </>
+              ) : (
+                <p>No editable fields in this section yet.</p>
+              )}
             </div>
           )}
         </section>
       </div>
+      )}
 
       <div className="pointer-events-none fixed right-4 top-4 z-50 flex w-full max-w-sm flex-col gap-3">
         {toasts.map((toast) => (

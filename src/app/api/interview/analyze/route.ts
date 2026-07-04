@@ -63,6 +63,7 @@ const analysisSchema = z.object({
 export async function POST(
   request: NextRequest,
 ): Promise<NextResponse<ApiResponse<z.infer<typeof analysisSchema> & { interviewId: string }>>> {
+  try {
   const session = await getServerSession();
   if (!session?.user?.id || session.user.role !== UserRole.JOBSEEKER) {
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
@@ -224,78 +225,90 @@ export async function POST(
   });
 
   if (!isFlagged && analysis.overallScore < 50) {
-    await addTalentPoolEntry({
-      userId: session.user.id,
-      reason: TalentPoolReason.INTERVIEW_LOW_SCORE,
-      sourceInterviewId: row.id,
-      improvements: analysis.improvements,
-    });
+    try {
+      await addTalentPoolEntry({
+        userId: session.user.id,
+        reason: TalentPoolReason.INTERVIEW_LOW_SCORE,
+        sourceInterviewId: row.id,
+        improvements: analysis.improvements,
+      });
+    } catch (err) {
+      console.error("[interview/analyze] talent pool failed:", err);
+    }
   }
 
   const userName = session.user.name ?? null;
 
-  await createUserNotification({
-    userId: session.user.id,
-    title: isFlagged ? "Interview flagged for review" : "Your interview analysis is complete!",
-    titleAr: isFlagged ? "تم الإبلاغ عن المقابلة" : "تحليل المقابلة جاهز!",
-    message: isFlagged
-      ? "Your interview was flagged for review."
-      : `Your interview analysis is complete! Score: ${analysis.overallScore}/100`,
-    messageAr: isFlagged
-      ? "تم الإبلاغ عن مقابلتك."
-      : `اكتمل تحليل المقابلة! الدرجة: ${analysis.overallScore}/100`,
-    type: isFlagged ? NotificationType.ASSESSMENT_FLAGGED : NotificationType.INTERVIEW_READY,
-    link: "/dashboard/job-seeker/interview",
-  });
-
-  if (isFlagged) {
-    await notifyEmployersAboutJobSeeker({
-      jobSeekerId: session.user.id,
-      jobSeekerName: userName,
-      title: "{name}'s interview was flagged ⚠️",
-      titleAr: "تم الإبلاغ عن مقابلة المرشح",
-      message: "{name}'s video interview was flagged for review.",
-      messageAr: "تم الإبلاغ عن مقابلة المرشح.",
-      linkPath: "/dashboard/employer/candidates",
+  try {
+    await createUserNotification({
+      userId: session.user.id,
+      title: isFlagged ? "Interview flagged for review" : "Your interview analysis is complete!",
+      titleAr: isFlagged ? "تم الإبلاغ عن المقابلة" : "تحليل المقابلة جاهز!",
+      message: isFlagged
+        ? "Your interview was flagged for review."
+        : `Your interview analysis is complete! Score: ${analysis.overallScore}/100`,
+      messageAr: isFlagged
+        ? "تم الإبلاغ عن مقابلتك."
+        : `اكتمل تحليل المقابلة! الدرجة: ${analysis.overallScore}/100`,
+      type: isFlagged ? NotificationType.ASSESSMENT_FLAGGED : NotificationType.INTERVIEW_READY,
+      link: "/dashboard/job-seeker/interview",
     });
-  } else {
-    await notifyEmployersAboutJobSeeker({
-      jobSeekerId: session.user.id,
-      jobSeekerName: userName,
-      title: "{name} completed their video interview",
-      titleAr: "أكمل المرشح مقابلة فيديو",
-      message: "{name} completed a video interview.",
-      messageAr: "أكمل المرشح مقابلة فيديو.",
-      linkPath: "/dashboard/employer/candidates",
-    });
-  }
 
-  if (!isFlagged && session.user.email) {
-    let applicationId: string | undefined;
-    let employerEmail: string | undefined;
-    if (row.jobId) {
-      const app = await prisma.application.findFirst({
-        where: { jobId: row.jobId, jobSeekerId: session.user.id },
-        select: {
-          id: true,
-          job: { select: { employer: { select: { email: true } } } },
-        },
+    if (isFlagged) {
+      await notifyEmployersAboutJobSeeker({
+        jobSeekerId: session.user.id,
+        jobSeekerName: userName,
+        title: "{name}'s interview was flagged ⚠️",
+        titleAr: "تم الإبلاغ عن مقابلة المرشح",
+        message: "{name}'s video interview was flagged for review.",
+        messageAr: "تم الإبلاغ عن مقابلة المرشح.",
+        linkPath: "/dashboard/employer/candidates",
       });
-      applicationId = app?.id;
-      employerEmail = app?.job.employer.email ?? undefined;
+    } else {
+      await notifyEmployersAboutJobSeeker({
+        jobSeekerId: session.user.id,
+        jobSeekerName: userName,
+        title: "{name} completed their video interview",
+        titleAr: "أكمل المرشح مقابلة فيديو",
+        message: "{name} completed a video interview.",
+        messageAr: "أكمل المرشح مقابلة فيديو.",
+        linkPath: "/dashboard/employer/candidates",
+      });
     }
-    await onInterviewComplete({
-      seekerId: session.user.id,
-      seekerEmail: session.user.email,
-      seekerName: userName ?? "Candidate",
-      score: analysis.overallScore,
-      employerEmail,
-      applicationId,
-    });
+
+    if (!isFlagged && session.user.email) {
+      let applicationId: string | undefined;
+      let employerEmail: string | undefined;
+      if (row.jobId) {
+        const app = await prisma.application.findFirst({
+          where: { jobId: row.jobId, jobSeekerId: session.user.id },
+          select: {
+            id: true,
+            job: { select: { employer: { select: { email: true } } } },
+          },
+        });
+        applicationId = app?.id;
+        employerEmail = app?.job.employer.email ?? undefined;
+      }
+      await onInterviewComplete({
+        seekerId: session.user.id,
+        seekerEmail: session.user.email,
+        seekerName: userName ?? "Candidate",
+        score: analysis.overallScore,
+        employerEmail,
+        applicationId,
+      });
+    }
+  } catch (err) {
+    console.error("[interview/analyze] notifications/email failed:", err);
   }
 
   return NextResponse.json(
     { success: true, data: { interviewId: row.id, ...analysis } },
     { status: 200 },
   );
+  } catch (err) {
+    console.error("[interview/analyze] error:", err);
+    return NextResponse.json({ success: false, error: "Analysis failed" }, { status: 500 });
+  }
 }

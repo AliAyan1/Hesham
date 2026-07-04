@@ -48,13 +48,17 @@ export function DashboardNavbar({ locale }: DashboardNavbarProps): ReactNode {
   const dash = dashboardHref(session.data ?? null);
   const userRole = session.data?.user?.role as UserRole | undefined;
 
-  const searchPh = t("dashboardSearchPlaceholder");
+  const searchPh =
+    userRole === "EMPLOYER"
+      ? t("employerDashboardSearchPlaceholder")
+      : t("dashboardSearchPlaceholder");
 
   const menuPaths = useMemo(() => {
     if (!userRole) return { profile: "", settings: "", showSettings: false };
     const profile = dashboardProfilePath(userRole);
     const settings = dashboardSettingsPath(userRole);
-    return { profile, settings, showSettings: profile !== settings };
+    const showSettings = userRole !== "EMPLOYER" && profile !== settings;
+    return { profile, settings, showSettings };
   }, [userRole]);
 
   return (

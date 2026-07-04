@@ -1,7 +1,7 @@
 import { getTranslations } from "next-intl/server";
-import { AdminPlaceholder } from "@/components/admin/AdminPlaceholder";
+import AdminJobsClient from "./AdminJobsClient";
 
 export default async function AdminJobsPage() {
-  const t = await getTranslations("adminPanel.nav");
-  return <AdminPlaceholder title={t("jobs")} />;
+  const t = await getTranslations("adminPanel.jobsPage");
+  return <AdminJobsClient title={t("title")} />;
 }

@@ -19,9 +19,12 @@ import type {
   AdminActivityItem,
   AdminApplicationStatusBar,
   AdminGrowthPoint,
+  AdminInterviewsPayload,
+  AdminJobsPayload,
   AdminRevenueMonth,
   AdminScoreBucket,
   AdminStatsPayload,
+  AdminSubscriptionsPayload,
   FlaggedAssessmentRow,
   FlaggedInterviewRow,
   PendingMentorRow,
@@ -824,5 +827,207 @@ export async function fetchAdminUsersList(params: {
     page: params.page,
     pageSize: params.pageSize,
     stats,
+  };
+}
+
+export async function fetchAdminJobsPayload(statusFilter?: string): Promise<AdminJobsPayload> {
+  const prisma = getPrisma();
+  const todayStart = startOfDay(new Date());
+
+  const where: Prisma.JobWhereInput = {};
+  if (statusFilter === "active") where.isActive = true;
+  else if (statusFilter === "inactive") where.isActive = false;
+
+  const [rows, total, active, inactive, postedToday, appsAgg] = await Promise.all([
+    prisma.job.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      take: 100,
+      include: {
+        employer: { select: { name: true, email: true } },
+      },
+    }),
+    prisma.job.count({ where }),
+    prisma.job.count({ where: { isActive: true } }),
+    prisma.job.count({ where: { isActive: false } }),
+    prisma.job.count({ where: { createdAt: { gte: todayStart } } }),
+    prisma.job.aggregate({ _sum: { applicationCount: true } }),
+  ]);
+
+  return {
+    stats: {
+      total,
+      active,
+      inactive,
+      postedToday,
+      totalApplications: appsAgg._sum.applicationCount ?? 0,
+    },
+    items: rows.map((j) => ({
+      id: j.id,
+      title: j.title,
+      employerName: j.employer.name,
+      employerEmail: j.employer.email,
+      category: j.category,
+      type: j.type,
+      location: j.location,
+      isActive: j.isActive,
+      isFeatured: j.isFeatured,
+      applicationCount: j.applicationCount,
+      viewCount: j.viewCount,
+      postedAt: j.createdAt.toISOString(),
+      expiresAt: j.expiresAt?.toISOString() ?? null,
+    })),
+  };
+}
+
+export async function fetchAdminInterviewsPayload(
+  statusFilter?: string,
+): Promise<AdminInterviewsPayload> {
+  const prisma = getPrisma();
+
+  const where: Prisma.VideoInterviewWhereInput = {};
+  if (statusFilter === "completed") where.status = InterviewStatus.COMPLETED;
+  else if (statusFilter === "flagged") {
+    where.OR = [{ isFlagged: true }, { status: InterviewStatus.FLAGGED }];
+  } else if (statusFilter === "in-progress") where.status = InterviewStatus.IN_PROGRESS;
+  else if (statusFilter === "pending") where.status = InterviewStatus.PENDING;
+
+  const [rows, total, completed, inProgress, flagged, pending] = await Promise.all([
+    prisma.videoInterview.findMany({
+      where,
+      orderBy: { updatedAt: "desc" },
+      take: 100,
+      include: {
+        user: { select: { id: true, name: true, email: true } },
+      },
+    }),
+    prisma.videoInterview.count(),
+    prisma.videoInterview.count({ where: { status: InterviewStatus.COMPLETED } }),
+    prisma.videoInterview.count({ where: { status: InterviewStatus.IN_PROGRESS } }),
+    prisma.videoInterview.count({
+      where: { OR: [{ isFlagged: true }, { status: InterviewStatus.FLAGGED }] },
+    }),
+    prisma.videoInterview.count({ where: { status: InterviewStatus.PENDING } }),
+  ]);
+
+  const jobIds = [...new Set(rows.map((r) => r.jobId).filter(Boolean))] as string[];
+  const jobs =
+    jobIds.length > 0
+      ? await prisma.job.findMany({
+          where: { id: { in: jobIds } },
+          select: { id: true, title: true },
+        })
+      : [];
+  const jobTitleById = new Map(jobs.map((j) => [j.id, j.title]));
+
+  return {
+    stats: { total, completed, inProgress, flagged, pending },
+    items: rows.map((iv) => ({
+      id: iv.id,
+      userId: iv.userId,
+      candidateName: iv.user.name,
+      candidateEmail: iv.user.email,
+      interviewKind: iv.interviewKind,
+      jobTitle: iv.jobId ? (jobTitleById.get(iv.jobId) ?? null) : null,
+      status: iv.status,
+      overallScore: iv.overallScore,
+      isFlagged: iv.isFlagged,
+      shareWithEmployers: iv.shareWithEmployers,
+      duration: iv.duration,
+      startedAt: iv.startedAt?.toISOString() ?? null,
+      completedAt: iv.completedAt?.toISOString() ?? null,
+    })),
+  };
+}
+
+export async function fetchAdminSubscriptionsPayload(): Promise<AdminSubscriptionsPayload> {
+  const prisma = getPrisma();
+  const now = new Date();
+  const monthStart = startOfMonth(now);
+  const monthEnd = addMonths(monthStart, 1);
+
+  const [tierCounts, paidSubs, recentPayments, activeSubscribers] = await Promise.all([
+    prisma.user.groupBy({
+      by: ["subscriptionTier"],
+      _count: { _all: true },
+    }),
+    prisma.user.findMany({
+      where: { subscriptionTier: { in: ["PROFESSIONAL", "PREMIUM"] } },
+      select: { subscriptionTier: true },
+    }),
+    prisma.payment.findMany({
+      where: { type: "SUBSCRIPTION" },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+      include: {
+        user: { select: { id: true, name: true, email: true, role: true } },
+      },
+    }),
+    prisma.user.findMany({
+      where: { subscriptionTier: { in: ["PROFESSIONAL", "PREMIUM"] } },
+      orderBy: { subscriptionStart: "desc" },
+      take: 100,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        subscriptionTier: true,
+        subscriptionStart: true,
+        subscriptionEnd: true,
+      },
+    }),
+  ]);
+
+  const tierMap = Object.fromEntries(
+    tierCounts.map((g) => [g.subscriptionTier, g._count._all]),
+  ) as Record<string, number>;
+
+  const mrrEstimate = paidSubs.reduce(
+    (s, u) => s + subscriptionAmountForTier(u.subscriptionTier),
+    0,
+  );
+
+  const paidThisMonth = recentPayments
+    .filter(
+      (p) =>
+        p.status === "PAID" &&
+        p.paidAt &&
+        p.paidAt >= monthStart &&
+        p.paidAt < monthEnd,
+    )
+    .reduce((s, p) => s + p.totalAmount, 0);
+
+  return {
+    stats: {
+      mrrEstimate: Math.round(mrrEstimate),
+      paidThisMonth: Math.round(paidThisMonth),
+      free: tierMap.FREE ?? 0,
+      professional: tierMap.PROFESSIONAL ?? 0,
+      premium: tierMap.PREMIUM ?? 0,
+      totalPayments: recentPayments.length,
+    },
+    recentPayments: recentPayments.map((p) => ({
+      id: p.id,
+      userId: p.userId,
+      userName: p.user.name,
+      userEmail: p.user.email,
+      userRole: p.user.role,
+      plan: p.subscriptionPlan,
+      amount: p.amount,
+      totalAmount: p.totalAmount,
+      status: p.status,
+      paidAt: p.paidAt?.toISOString() ?? null,
+      createdAt: p.createdAt.toISOString(),
+    })),
+    activeSubscribers: activeSubscribers.map((u) => ({
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      role: u.role,
+      tier: u.subscriptionTier,
+      subscriptionStart: u.subscriptionStart?.toISOString() ?? null,
+      subscriptionEnd: u.subscriptionEnd?.toISOString() ?? null,
+    })),
   };
 }

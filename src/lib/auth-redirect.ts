@@ -101,7 +101,20 @@ export async function signOutThenNavigate(path: string, locale: string): Promise
   const target = normalized.startsWith(prefix)
     ? normalized
     : `${prefix}${normalized === "/" ? "" : normalized}`;
-  await signOut({ callbackUrl: target });
+
+  try {
+    const result = await signOut({ callbackUrl: target, redirect: false });
+    if (typeof window !== "undefined") {
+      window.location.href = result?.url ?? target;
+    }
+    return;
+  } catch {
+    // Fall back to plain navigation when Auth.js returns a non-JSON server error.
+  }
+
+  if (typeof window !== "undefined") {
+    window.location.href = target;
+  }
 }
 
 /** Sign out and return to the public landing page (not login — middleware would bounce back to dashboard). */

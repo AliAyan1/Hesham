@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getAllContentItems, clearCache } from "@/lib/cms";
+import { ensureSiteContentSeeded } from "@/lib/cms-seed";
 import { getPrisma } from "@/lib/db";
 import { adminCacheHeaders, requireAdminApi } from "@/lib/admin/require-admin";
 
@@ -17,6 +18,8 @@ export async function GET(): Promise<NextResponse> {
   if (authResult instanceof NextResponse) return authResult;
 
   try {
+    const updatedBy = authResult.session.user.email ?? authResult.session.user.id;
+    await ensureSiteContentSeeded(updatedBy);
     const items = await getAllContentItems();
     return NextResponse.json({ ok: true, items }, { headers: adminCacheHeaders() });
   } catch (error) {

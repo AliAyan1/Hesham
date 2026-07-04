@@ -22,7 +22,7 @@ export function dashboardSettingsPath(role: UserRole): string {
     case "JOBSEEKER":
       return "/dashboard/job-seeker/profile";
     case "EMPLOYER":
-      return "/dashboard/employer/settings";
+      return "/dashboard/employer/profile";
     case "ADMIN":
       return "/dashboard/admin/settings";
     case "MENTOR":

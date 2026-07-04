@@ -4,7 +4,6 @@ import { useParams } from "next/navigation";
 import { useRouter } from "@/i18n/navigation";
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
-import { PaymentModal } from "@/components/payments/PaymentModal";
 
 type ObligationDto = {
   id: string;
@@ -37,7 +36,6 @@ export default function ObligationClient() {
   const [row, setRow] = useState<ObligationDto | null>(null);
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
 
   useEffect(() => {
     void fetch(`/api/employer/obligation/${encodeURIComponent(id)}`, { credentials: "include" })
@@ -59,7 +57,7 @@ export default function ObligationClient() {
     setLoading(false);
     const json = (await res.json()) as SignResponse;
     if (res.ok && json.success) {
-      setShowPaymentModal(true);
+      router.push("/dashboard/employer/candidates");
     }
   }
 
@@ -104,21 +102,6 @@ export default function ObligationClient() {
           {loading ? t("signing") : t("agreeAndSign")}
         </button>
       </div>
-
-      <PaymentModal
-        isOpen={showPaymentModal}
-        onClose={() => setShowPaymentModal(false)}
-        title={t("recruitmentFeeTitle")}
-        baseAmount={row.recruitmentFee}
-        description={t("recruitmentFeeDescription", { candidate: candidateName, job: jobTitle })}
-        metadata={{
-          type: "RECRUITMENT_FEE",
-          obligationId: row.id,
-        }}
-        onSuccess={() => {
-          router.push("/dashboard/employer/candidates");
-        }}
-      />
     </>
   );
 }

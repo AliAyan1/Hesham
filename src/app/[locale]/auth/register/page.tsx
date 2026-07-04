@@ -25,7 +25,6 @@ import type { RegisterFormData } from "@/types";
 import {
   finishGoogleSignup,
   hardNavigate,
-  markOnboardingComplete,
   signOutThenNavigate,
   type SignupPlanChoice,
 } from "@/lib/auth-redirect";
@@ -478,7 +477,8 @@ export default function RegisterPage() {
         }
 
         await update();
-        await markOnboardingComplete(update);
+        clearRegisterPlan();
+        setPostSignupRedirect(true);
 
         let paymentsConfigured = moyasarConfigured;
         try {
@@ -504,9 +504,11 @@ export default function RegisterPage() {
           return;
         }
 
-        clearRegisterPlan();
-        setPostSignupRedirect(true);
-        hardNavigate(dashboardPathForRole(parsed.data.role), locale);
+        const nextPath =
+          parsed.data.role === UserRole.JOBSEEKER
+            ? "/onboarding"
+            : dashboardPathForRole(parsed.data.role);
+        hardNavigate(nextPath, locale);
       } catch (err: unknown) {
         if (axios.isAxiosError(err) && err.response?.status === 409) {
           setServerError(t("auth.emailTaken"));
@@ -935,7 +937,11 @@ export default function RegisterPage() {
             setShowSignupPayment(false);
             setPostSignupRedirect(true);
             await update();
-            hardNavigate(dashboardPathForRole(signupRole), locale);
+            const nextPath =
+              signupRole === UserRole.JOBSEEKER
+                ? "/onboarding"
+                : dashboardPathForRole(signupRole);
+            hardNavigate(nextPath, locale);
           })();
         }}
       />

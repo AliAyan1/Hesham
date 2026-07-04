@@ -2,12 +2,15 @@
 
 import axios from "axios";
 import { useSearchParams } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { containsContactInfo, MESSAGE_FILTER_ERROR } from "@/lib/message-filter";
 import { ErrorState } from "@/components/ui/ErrorState";
-import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { LoadingSkeleton } from "@/components/ui/LoadingSkeleton";
+import { cn } from "@/lib/cn";
 
 type ThreadRow = {
   id: string;
@@ -22,6 +25,8 @@ type MsgRow = { id: string; senderId: string; body: string; createdAt: string };
 export function MessagesPageClient() {
   const t = useTranslations("messages");
   const tc = useTranslations("common");
+  const { data: session } = useSession();
+  const userId = session?.user?.id ?? "";
   const searchParams = useSearchParams();
   const toParam = searchParams.get("to");
 
@@ -36,7 +41,6 @@ export function MessagesPageClient() {
   const [filterErr, setFilterErr] = useState<string | null>(null);
 
   const loadThreads = useCallback(async () => {
-    setLoading(true);
     setErr(false);
     try {
       const res = await axios.get<{ success: boolean; data: { threads: ThreadRow[] } }>("/api/messages");
@@ -60,32 +64,38 @@ export function MessagesPageClient() {
     }
   }, [toParam]);
 
+  const loadMessages = useCallback(async (threadId: string) => {
+    try {
+      const res = await axios.get<{ success: boolean; data: { messages: MsgRow[] } }>(
+        `/api/messages/${encodeURIComponent(threadId)}`,
+      );
+      if (res.data?.success) setMessages(res.data.data.messages);
+    } catch {
+      setMessages([]);
+    }
+  }, []);
+
   useEffect(() => {
     void loadThreads();
+    const timer = window.setInterval(() => {
+      void loadThreads();
+    }, 10000);
+    return () => window.clearInterval(timer);
   }, [loadThreads]);
-
-  const selected = threads.find((x) => x.id === selectedId);
 
   useEffect(() => {
     if (!selectedId) {
       setMessages([]);
       return;
     }
-    let cancel = false;
-    void (async () => {
-      try {
-        const res = await axios.get<{ success: boolean; data: { messages: MsgRow[] } }>(
-          `/api/messages/${encodeURIComponent(selectedId)}`,
-        );
-        if (!cancel && res.data?.success) setMessages(res.data.data.messages);
-      } catch {
-        if (!cancel) setMessages([]);
-      }
-    })();
-    return () => {
-      cancel = true;
-    };
-  }, [selectedId]);
+    void loadMessages(selectedId);
+    const timer = window.setInterval(() => {
+      void loadMessages(selectedId);
+    }, 10000);
+    return () => window.clearInterval(timer);
+  }, [loadMessages, selectedId]);
+
+  const selected = threads.find((x) => x.id === selectedId);
 
   async function send() {
     const rid = selected?.otherUserId || recipientId.trim();
@@ -98,29 +108,49 @@ export function MessagesPageClient() {
     setFilterErr(null);
     setSending(true);
     try {
-      const res = await axios.post<{ success: boolean; error?: string; data: { threadId: string } }>(
-        "/api/messages",
-        {
-          recipientId: rid,
-          body,
-        },
-      );
-      if (!res.data?.success) {
-        setFilterErr(
-          res.data?.error === MESSAGE_FILTER_ERROR ? t("filterWarning") : (res.data?.error ?? t("sendFailed")),
+      if (selectedId) {
+        const res = await axios.post<{ success: boolean; error?: string }>(
+          `/api/messages/${encodeURIComponent(selectedId)}`,
+          { body },
         );
-        return;
+        if (!res.data?.success) {
+          setFilterErr(
+            res.data?.error === MESSAGE_FILTER_ERROR ? t("filterWarning") : (res.data?.error ?? t("sendFailed")),
+          );
+          return;
+        }
+      } else {
+        const res = await axios.post<{ success: boolean; error?: string; data: { threadId: string } }>(
+          "/api/messages",
+          { recipientId: rid, body },
+        );
+        if (!res.data?.success) {
+          setFilterErr(
+            res.data?.error === MESSAGE_FILTER_ERROR ? t("filterWarning") : (res.data?.error ?? t("sendFailed")),
+          );
+          return;
+        }
+        setSelectedId(res.data.data.threadId);
       }
       setDraft("");
       await loadThreads();
-      setSelectedId(res.data.data.threadId);
+      if (selectedId) await loadMessages(selectedId);
     } finally {
       setSending(false);
     }
   }
 
-  if (loading && !threads.length) return <LoadingSpinner size="full" label={tc("loading")} />;
+  if (loading && !threads.length) return <LoadingSkeleton rows={5} />;
   if (err) return <ErrorState title={t("loadError")} retryLabel={tc("retry")} onRetry={loadThreads} />;
+
+  if (!threads.length && !recipientId && !toParam) {
+    return (
+      <EmptyState
+        title={t("emptyThreads")}
+        description={t("noMessagesYet")}
+      />
+    );
+  }
 
   return (
     <div className="grid min-h-[420px] gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
@@ -138,11 +168,13 @@ export function MessagesPageClient() {
               >
                 <span className="block truncate font-medium text-[#0D2137]">{th.otherName}</span>
                 <span className="line-clamp-2 text-xs text-[#6B7280]">{th.lastBody || t("emptyPreview")}</span>
+                <span className="mt-1 block text-[10px] text-[#9CA3AF]">
+                  {new Date(th.lastAt).toLocaleString()}
+                </span>
               </button>
             </li>
           ))}
         </ul>
-        {!threads.length ? <p className="px-2 py-4 text-xs text-[#6B7280]">{t("emptyThreads")}</p> : null}
       </aside>
 
       <section className="flex flex-col rounded-xl border border-[#EEF2F7] bg-white shadow-sm">
@@ -154,7 +186,7 @@ export function MessagesPageClient() {
             <label className="mt-2 block text-xs font-medium text-[#374151]">
               {t("recipientIdLabel")}
               <input
-                className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
+                className="mt-1 min-h-11 w-full rounded-lg border px-3 py-2 text-sm"
                 value={recipientId}
                 onChange={(e) => setRecipientId(e.target.value)}
                 placeholder={t("recipientPlaceholder")}
@@ -164,18 +196,31 @@ export function MessagesPageClient() {
         </header>
 
         <div className="flex-1 space-y-3 overflow-y-auto p-4" style={{ maxHeight: "360px" }}>
-          {messages.map((m) => (
-            <div key={m.id} className="rounded-lg bg-[#F8FAFC] px-3 py-2 text-sm">
-              <p className="text-xs text-[#6B7280]">{new Date(m.createdAt).toLocaleString()}</p>
-              <p className="mt-1 whitespace-pre-wrap text-[#111827]">{m.body}</p>
-            </div>
-          ))}
+          {messages.map((m) => {
+            const mine = m.senderId === userId;
+            return (
+              <div
+                key={m.id}
+                className={cn("flex", mine ? "justify-end" : "justify-start")}
+              >
+                <div
+                  className={cn(
+                    "max-w-[85%] rounded-2xl px-3 py-2 text-sm",
+                    mine ? "bg-[#0F4C75] text-white" : "bg-[#F3F4F6] text-[#111827]",
+                  )}
+                >
+                  <p className="text-[10px] opacity-80">{new Date(m.createdAt).toLocaleString()}</p>
+                  <p className="mt-1 whitespace-pre-wrap">{m.body}</p>
+                </div>
+              </div>
+            );
+          })}
           {!messages.length ? <p className="text-sm text-[#6B7280]">{t("noMessagesYet")}</p> : null}
         </div>
 
         <footer className="border-t border-[#EEF2F7] p-3">
           <textarea
-            className="w-full rounded-lg border px-3 py-2 text-sm"
+            className="min-h-11 w-full rounded-lg border px-3 py-2 text-sm"
             rows={3}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
@@ -183,8 +228,8 @@ export function MessagesPageClient() {
           />
           {filterErr ? <p className="mb-2 text-xs text-red-600">{filterErr}</p> : null}
           <div className="mt-2 flex justify-end">
-            <Button type="button" className="min-h-10" loading={sending} onClick={() => void send()}>
-              {t("send")}
+            <Button type="button" className="min-h-11 min-w-[100px]" loading={sending} onClick={() => void send()}>
+              {sending ? t("sending") : t("send")}
             </Button>
           </div>
         </footer>

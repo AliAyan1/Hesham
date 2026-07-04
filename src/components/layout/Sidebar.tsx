@@ -32,7 +32,6 @@ import { useTranslations } from "next-intl";
 import { SubscriptionTier, type UserRole } from "@/types";
 
 import { cn } from "@/lib/cn";
-import { hasAccess } from "@/lib/subscription";
 import { Avatar } from "@/components/ui/Avatar";
 import { useDashboardUI } from "@/components/layout/dashboard-ui";
 
@@ -59,6 +58,7 @@ type LabelKey =
   | "postJob"
   | "candidates"
   | "analytics"
+  | "insights"
   | "assessments"
   | "settings"
   | "users"
@@ -67,7 +67,12 @@ type LabelKey =
   | "sessions"
   | "mentorSessions"
   | "mentorPayouts"
-  | "payments";
+  | "payments"
+  | "savedJobs"
+  | "content"
+  | "auditLogs"
+  | "jobSeekers"
+  | "employers";
 
 type NavItem = { href: string; labelKey: LabelKey; Icon: LucideIcon };
 
@@ -91,6 +96,7 @@ const ICON: Record<LabelKey, LucideIcon> = {
   postJob: Megaphone,
   candidates: Users,
   analytics: BarChart3,
+  insights: LineChart,
   assessments: Brain,
   settings: Settings,
   users: Users,
@@ -100,6 +106,11 @@ const ICON: Record<LabelKey, LucideIcon> = {
   mentorSessions: Calendar,
   mentorPayouts: LineChart,
   payments: Wallet,
+  savedJobs: Bookmark,
+  content: FolderKanban,
+  auditLogs: ClipboardList,
+  jobSeekers: UserRound,
+  employers: Briefcase,
 };
 
 function dashboardRoot(role: UserRole): string {
@@ -127,10 +138,11 @@ function groupsFor(role: UserRole): NavGroup[] {
           items: [
             { href: "/dashboard/job-seeker/profile", labelKey: "profile", Icon: ICON.profile },
             { href: "/dashboard/job-seeker/cv-builder", labelKey: "cv", Icon: ICON.cv },
-            { href: "/dashboard/job-seeker/jobs", labelKey: "jobs", Icon: ICON.jobs },
+            { href: "/jobs", labelKey: "jobs", Icon: ICON.jobs },
             { href: "/dashboard/job-seeker/applications", labelKey: "applications", Icon: ICON.applications },
+            { href: "/dashboard/job-seeker/saved-jobs", labelKey: "savedJobs", Icon: ICON.savedJobs },
             { href: "/dashboard/job-seeker/invites", labelKey: "invites", Icon: ICON.applications },
-            { href: "/dashboard/job-seeker/messages", labelKey: "messages", Icon: ICON.messages },
+            { href: "/dashboard/messages", labelKey: "messages", Icon: ICON.messages },
           ],
         },
         {
@@ -147,6 +159,7 @@ function groupsFor(role: UserRole): NavGroup[] {
           items: [
             { href: "/dashboard/job-seeker/notifications", labelKey: "notifications", Icon: ICON.notifications },
             { href: "/dashboard/job-seeker/payments", labelKey: "payments", Icon: ICON.payments },
+            { href: "/dashboard/job-seeker/settings", labelKey: "settings", Icon: ICON.settings },
           ],
         },
       ];
@@ -162,7 +175,7 @@ function groupsFor(role: UserRole): NavGroup[] {
             { href: "/dashboard/employer/post-job", labelKey: "postJob", Icon: ICON.postJob },
             { href: "/dashboard/employer/jobs", labelKey: "jobs", Icon: ICON.jobs },
             { href: "/dashboard/employer/candidates", labelKey: "candidates", Icon: ICON.candidates },
-            { href: "/dashboard/employer/messages", labelKey: "messages", Icon: ICON.messages },
+            { href: "/dashboard/messages", labelKey: "messages", Icon: ICON.messages },
             { href: "/dashboard/employer/interviews", labelKey: "aiInterviews", Icon: ICON.aiInterviews },
             {
               href: "/dashboard/employer/talent-pool",
@@ -174,8 +187,7 @@ function groupsFor(role: UserRole): NavGroup[] {
         {
           sectionKey: "groupInsights",
           items: [
-            { href: "/dashboard/employer/analytics", labelKey: "analytics", Icon: ICON.analytics },
-            { href: "/dashboard/employer/assessments", labelKey: "assessments", Icon: ICON.assessments },
+            { href: "/dashboard/employer/insights", labelKey: "insights", Icon: ICON.insights },
           ],
         },
         {
@@ -183,7 +195,6 @@ function groupsFor(role: UserRole): NavGroup[] {
           items: [
             { href: "/dashboard/employer/notifications", labelKey: "notifications", Icon: ICON.notifications },
             { href: "/dashboard/employer/payments", labelKey: "payments", Icon: ICON.payments },
-            { href: "/dashboard/employer/settings", labelKey: "settings", Icon: ICON.settings },
           ],
         },
       ];
@@ -195,20 +206,26 @@ function groupsFor(role: UserRole): NavGroup[] {
         {
           sectionKey: "groupPlatform",
           items: [
-            { href: "/dashboard/admin/users", labelKey: "users", Icon: ICON.users },
+            { href: "/dashboard/admin/analytics", labelKey: "analytics", Icon: ICON.analytics },
+            { href: "/dashboard/admin/users/job-seekers", labelKey: "jobSeekers", Icon: ICON.jobSeekers },
+            { href: "/dashboard/admin/users/employers", labelKey: "employers", Icon: ICON.employers },
+            { href: "/dashboard/admin/users/mentors", labelKey: "mentorManagement", Icon: ICON.mentorManagement },
             { href: "/dashboard/admin/jobs", labelKey: "jobs", Icon: ICON.jobs },
             { href: "/dashboard/admin/assessments", labelKey: "assessments", Icon: ICON.assessments },
             { href: "/dashboard/admin/talent-pool", labelKey: "talentPool", Icon: ICON.talentPool },
             { href: "/dashboard/admin/mentors", labelKey: "mentorManagement", Icon: ICON.mentorManagement },
             { href: "/dashboard/admin/sessions", labelKey: "mentorSessions", Icon: ICON.mentorManagement },
-            { href: "/dashboard/admin/payouts", labelKey: "mentorPayouts", Icon: ICON.revenue },
             { href: "/dashboard/admin/revenue", labelKey: "revenue", Icon: ICON.revenue },
-            { href: "/dashboard/admin/analytics", labelKey: "analytics", Icon: ICON.analytics },
+            { href: "/dashboard/admin/payouts", labelKey: "mentorPayouts", Icon: ICON.revenue },
           ],
         },
         {
           sectionKey: "groupAccount",
-          items: [{ href: "/dashboard/admin/settings", labelKey: "settings", Icon: ICON.settings }],
+          items: [
+            { href: "/dashboard/admin/audit-logs", labelKey: "auditLogs", Icon: ICON.auditLogs },
+            { href: "/dashboard/admin/cms", labelKey: "content", Icon: ICON.content },
+            { href: "/dashboard/admin/settings", labelKey: "settings", Icon: ICON.settings },
+          ],
         },
       ];
     default:
@@ -265,15 +282,7 @@ export function Sidebar({ locale, role }: SidebarProps) {
         ? "bg-[#2563EB]"
         : "bg-[#B8860F]";
 
-  const groups = groupsFor(role).map((group) => ({
-    ...group,
-    items: group.items.filter((item) => {
-      if (role === "EMPLOYER" && item.labelKey === "analytics") {
-        return hasAccess(subscriptionTier, "employer_analytics");
-      }
-      return true;
-    }),
-  }));
+  const groups = groupsFor(role);
 
   const userEmail =
     session.data?.user?.email !== undefined &&

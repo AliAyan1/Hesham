@@ -1971,6 +1971,10 @@
     },
     "upgradeTitle": "Upgrade for AI interviews",
     "upgradeBody": "Available on Professional and Premium.",
-    "upgradeCta": "View plans"
+    "upgradeCta": "View plans",
+    "questionProgress": "السؤال {current} من {total}",
+    "analyzingHint": "عادةً يستغرق ذلك أقل من دقيقة. يُرجى إبقاء هذه الصفحة مفتوحة.",
+    "beginFailed": "تعذّر بدء المقابلة. تحقق من أذونات الكاميرا والميكروفون ومشاركة الشاشة ثم حاول مرة أخرى.",
+    "analyzeFailed": "تعذّر إكمال تحليل مقابلتك. تم حفظ إجاباتك — اضغط إعادة المحاولة."
   }
 }

@@ -4,7 +4,7 @@ import { Link } from "@/i18n/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { useSession } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { SubscriptionTier } from "@/types";
 import { hasAccess } from "@/lib/subscription";
 import { useProctoring } from "@/hooks/useProctoring";
@@ -33,6 +33,8 @@ type AnalysisPack = {
   overallFeedback: string;
   overallFeedbackAr: string;
 };
+
+type FlowError = "begin" | "finalize" | null;
 
 function pickRecorderMime(): string {
   if (typeof MediaRecorder === "undefined") return "";
@@ -95,7 +97,8 @@ export default function InterviewSessionClient({
   const [submitPack, setSubmitPack] = useState<AnalysisPack | null>(null);
   const [share, setShare] = useState(true);
   const [loading, setLoading] = useState(false);
-  const [loadErr, setLoadErr] = useState(false);
+  const [flowError, setFlowError] = useState<FlowError>(null);
+  const [analyzing, setAnalyzing] = useState(false);
   const [readonlyPack, setReadonlyPack] = useState<AnalysisPack | null>(null);
   const [shareLocked, setShareLocked] = useState(false);
   const [processingAnswer, setProcessingAnswer] = useState(false);
@@ -316,6 +319,30 @@ export default function InterviewSessionClient({
   const q = questions[idx];
   const qText = q ? pickQuestionText(q, locale) : "";
 
+  const runLabels = useMemo(() => {
+    const current = Math.max(1, idx + 1);
+    const total = Math.max(1, questions.length);
+    let questionOf = `Question ${current} of ${total}`;
+    try {
+      questionOf = t("questionProgress", { current, total });
+    } catch {
+      /* keep English fallback if intl formatting fails */
+    }
+    return {
+      laraName: t("laraName"),
+      laraSubtitle: t("laraSubtitleBrand"),
+      laraSpeaking: t("laraSpeaking"),
+      listening: t("listening"),
+      yourAnswer: t("yourAnswerLabel"),
+      processing: t("processing"),
+      answerRecorded: t("answerRecorded"),
+      questionOf,
+      endInterview: t("endInterview"),
+      mute: t("muteMic"),
+      unmute: t("unmuteMic"),
+    };
+  }, [t, idx, questions.length]);
+
   const autoAnswerStopRef = useRef<() => void>(() => {});
   const autoAnswerStartRef = useRef<() => void>(() => {});
 
@@ -525,7 +552,7 @@ export default function InterviewSessionClient({
     if (kind === "job" && !jobId) return;
     void unlockAudio();
     setLoading(true);
-    setLoadErr(false);
+    setFlowError(null);
     let dispLocal: MediaStream | null = null;
     let camLocal: MediaStream | null = null;
     let micLocal: MediaStream | null = null;
@@ -630,7 +657,7 @@ export default function InterviewSessionClient({
         void playIntroAndFirstQuestion(loadedQuestions);
       }
     } catch {
-      setLoadErr(true);
+      setFlowError("begin");
       try {
         fullRecorderRef.current?.stop();
       } catch {
@@ -667,7 +694,9 @@ export default function InterviewSessionClient({
       return { questionId: qq.id, transcript: txx };
     });
 
+    setAnalyzing(true);
     setLoading(true);
+    setFlowError(null);
     try {
       const rec = fullRecorderRef.current;
       if (rec && rec.state !== "inactive") {
@@ -730,15 +759,21 @@ export default function InterviewSessionClient({
 
       setSubmitPack(j.data);
       setPhase("report");
+      setAnalyzing(false);
 
-      await fetch("/api/assessment/share", {
-        method: "PATCH",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kind: "interview", id: interviewId, share }),
-      });
+      try {
+        await fetch("/api/assessment/share", {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ kind: "interview", id: interviewId, share }),
+        });
+      } catch {
+        /* share preference is optional — analysis result is already saved */
+      }
     } catch {
-      setLoadErr(true);
+      setFlowError("finalize");
+      setAnalyzing(false);
     } finally {
       setLoading(false);
     }
@@ -784,8 +819,34 @@ export default function InterviewSessionClient({
     );
   }
 
-  if (loadErr) {
-    return <ErrorState title={tc("error")} retryLabel={tc("retry")} onRetry={() => window.location.reload()} />;
+  if (analyzing) {
+    return (
+      <div className="flex min-h-[320px] flex-col items-center justify-center gap-3 rounded-xl border bg-white p-8 shadow-sm">
+        <LoadingSpinner size="md" label={t("analyzing")} />
+        <p className="max-w-md text-center text-sm text-[#6B7280]">{t("analyzingHint")}</p>
+      </div>
+    );
+  }
+
+  if (flowError) {
+    const title = flowError === "begin" ? t("beginFailed") : t("analyzeFailed");
+    const onRetry =
+      flowError === "begin"
+        ? () => {
+            setFlowError(null);
+            void begin();
+          }
+        : () => {
+            setFlowError(null);
+            void finalizeInterview();
+          };
+    return (
+      <ErrorState
+        title={title}
+        retryLabel={tc("retry")}
+        onRetry={onRetry}
+      />
+    );
   }
 
   const reportView = (pack: AnalysisPack) => (
@@ -970,19 +1031,7 @@ export default function InterviewSessionClient({
           }}
           onEndInterview={() => void finalizeInterview()}
           endDisabled={loading || Boolean(proctoring.isFlagged)}
-          labels={{
-            laraName: t("laraName"),
-            laraSubtitle: t("laraSubtitleBrand"),
-            laraSpeaking: t("laraSpeaking"),
-            listening: t("listening"),
-            yourAnswer: t("yourAnswerLabel"),
-            processing: t("processing"),
-            answerRecorded: t("answerRecorded"),
-            questionOf: t("questionProgress"),
-            endInterview: t("endInterview"),
-            mute: t("muteMic"),
-            unmute: t("unmuteMic"),
-          }}
+          labels={runLabels}
         />
       </div>
     );

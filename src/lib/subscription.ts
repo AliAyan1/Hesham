@@ -18,8 +18,6 @@ export const PROFESSIONAL_FEATURES = [
   "job_matching_ai",
   /** Employer: AI-generated bilingual job description in Post Job wizard. */
   "ai_job_description",
-  /** Employer: hiring analytics dashboard (Professional+). */
-  "employer_analytics",
   "training_recommendations",
   "ai_improve_summary",
   "ai_enhance_bullets",
