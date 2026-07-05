@@ -4,6 +4,8 @@ import { getServerSession } from "@/lib/get-server-session";
 import { getPrisma } from "@/lib/db";
 import type { ApiResponse, EmployerCandidatePayload } from "@/types";
 import { sanitizeUserForEmployer } from "@/lib/sanitize-user";
+import { createUserNotification } from "@/lib/notifications/create-user-notification";
+import { NotificationType } from "@prisma/client";
 
 export async function GET(
   _request: NextRequest,
@@ -26,7 +28,7 @@ export async function GET(
       id: true,
       status: true,
       offerAcceptedAt: true,
-      job: { select: { title: true } },
+      job: { select: { id: true, title: true } },
       jobSeeker: {
         select: {
           id: true,
@@ -65,6 +67,27 @@ export async function GET(
     return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
   }
 
+  let applicationStatus = row.status;
+
+  /** Opening a candidate profile marks the application as Viewed (REVIEWED). */
+  if (applicationStatus === ApplicationStatus.PENDING) {
+    await prisma.application.update({
+      where: { id: applicationId },
+      data: { status: ApplicationStatus.REVIEWED },
+    });
+    applicationStatus = ApplicationStatus.REVIEWED;
+
+    await createUserNotification({
+      userId: row.jobSeeker.id,
+      type: NotificationType.APPLICATION_UPDATE,
+      title: "Employer viewed your application",
+      titleAr: "اطّلع صاحب العمل على طلبك",
+      message: `Your application for ${row.job.title} was viewed by the employer.`,
+      messageAr: `تمت مشاهدة طلبك لوظيفة ${row.job.title} من قبل صاحب العمل.`,
+      link: `/dashboard/job-seeker/applications`,
+    });
+  }
+
   const seekerId = row.jobSeeker.id;
 
   const sharedAssessment = await prisma.assessment.findFirst({
@@ -91,28 +114,59 @@ export async function GET(
     },
   });
 
-  const sharedInterview = await prisma.videoInterview.findFirst({
-    where: {
-      userId: seekerId,
-      status: { in: [InterviewStatus.COMPLETED, InterviewStatus.FLAGGED] },
-    },
-    orderBy: { completedAt: "desc" },
-    select: {
-      id: true,
-      overallScore: true,
-      communicationScore: true,
-      confidenceScore: true,
-      clarityScore: true,
-      relevanceScore: true,
-      transcripts: true,
-      questions: true,
-      aiAnalysis: true,
-      strengths: true,
-      improvements: true,
-      recordingUrl: true,
-      isFlagged: true,
-    },
-  });
+  const sharedInterview =
+    (await prisma.videoInterview.findFirst({
+      where: {
+        userId: seekerId,
+        jobId: row.job.id,
+        interviewKind: "job",
+        status: { in: [InterviewStatus.COMPLETED, InterviewStatus.FLAGGED] },
+      },
+      orderBy: { completedAt: "desc" },
+      select: {
+        id: true,
+        overallScore: true,
+        communicationScore: true,
+        confidenceScore: true,
+        clarityScore: true,
+        relevanceScore: true,
+        transcripts: true,
+        questions: true,
+        aiAnalysis: true,
+        strengths: true,
+        improvements: true,
+        recordingUrl: true,
+        isFlagged: true,
+        recordingData: true,
+        jobId: true,
+        interviewKind: true,
+      },
+    })) ??
+    (await prisma.videoInterview.findFirst({
+      where: {
+        userId: seekerId,
+        status: { in: [InterviewStatus.COMPLETED, InterviewStatus.FLAGGED] },
+      },
+      orderBy: { completedAt: "desc" },
+      select: {
+        id: true,
+        overallScore: true,
+        communicationScore: true,
+        confidenceScore: true,
+        clarityScore: true,
+        relevanceScore: true,
+        transcripts: true,
+        questions: true,
+        aiAnalysis: true,
+        strengths: true,
+        improvements: true,
+        recordingUrl: true,
+        isFlagged: true,
+        recordingData: true,
+        jobId: true,
+        interviewKind: true,
+      },
+    }));
 
   const procOr: Array<{ assessmentId?: string; interviewId?: string }> = [];
   if (sharedAssessment) procOr.push({ assessmentId: sharedAssessment.id });
@@ -158,7 +212,7 @@ export async function GET(
   );
 
   const contactUnlocked =
-    row.status === ApplicationStatus.HIRED || row.offerAcceptedAt != null;
+    applicationStatus === ApplicationStatus.HIRED || row.offerAcceptedAt != null;
 
   const publicCandidate = sanitizeUserForEmployer(row.jobSeeker, contactUnlocked);
   const maskedSeeker = {
@@ -188,7 +242,7 @@ export async function GET(
 
   const payload: EmployerCandidatePayload = {
     applicationId: row.id,
-    applicationStatus: row.status,
+    applicationStatus,
     appliedForJobTitle: row.job.title,
     contactUnlocked,
     candidate: maskedSeeker,
@@ -225,10 +279,7 @@ export async function GET(
           improvements: sharedInterview.improvements,
           recordingUrl: sharedInterview.recordingUrl,
           isFlagged: sharedInterview.isFlagged,
-          hasRecording:
-            (await prisma.videoInterview.count({
-              where: { id: sharedInterview.id, recordingData: { not: null } },
-            })) > 0,
+          hasRecording: Boolean(sharedInterview.recordingData?.length),
         }
       : null,
     proctoringSummary,

@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { SubscriptionTier } from "@/types";
 import { hasAccess } from "@/lib/subscription";
 import { useProctoring } from "@/hooks/useProctoring";
+import { useFacialAnalysis } from "@/hooks/useFacialAnalysis";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { InterviewRunScreen } from "@/components/interview/InterviewRunScreen";
@@ -42,6 +43,27 @@ function pickRecorderMime(): string {
   if (MediaRecorder.isTypeSupported("audio/webm")) return "audio/webm";
   if (MediaRecorder.isTypeSupported("audio/mp4")) return "audio/mp4";
   return "";
+}
+
+function pickSessionRecorderMime(): string {
+  if (typeof MediaRecorder === "undefined") return "";
+  const candidates = [
+    "video/webm;codecs=vp9,opus",
+    "video/webm;codecs=vp8,opus",
+    "video/webm",
+    "video/mp4",
+  ];
+  for (const mime of candidates) {
+    if (MediaRecorder.isTypeSupported(mime)) return mime;
+  }
+  return pickRecorderMime();
+}
+
+function buildSessionRecordingStream(mic: MediaStream, cam: MediaStream): MediaStream {
+  const stream = new MediaStream();
+  mic.getAudioTracks().forEach((track) => stream.addTrack(track));
+  cam.getVideoTracks().forEach((track) => stream.addTrack(track));
+  return stream;
 }
 
 export default function InterviewSessionClient({
@@ -87,6 +109,7 @@ export default function InterviewSessionClient({
   const fullRecorderRef = useRef<MediaRecorder | null>(null);
   const fullCloneRef = useRef<MediaStream | null>(null);
   const fullChunksRef = useRef<BlobPart[]>([]);
+  const sessionMimeRef = useRef("");
   const answerRecorderRef = useRef<MediaRecorder | null>(null);
   const answerChunksRef = useRef<BlobPart[]>([]);
   const introPlayedRef = useRef(false);
@@ -127,6 +150,13 @@ export default function InterviewSessionClient({
       setPhase("prep");
       procRef.current = false;
     },
+  });
+
+  useFacialAnalysis({
+    cameraStream,
+    isActive: phase === "run" && Boolean(interviewId) && kind !== "practice",
+    interviewId: interviewId ?? "",
+    questionNumber: idx + 1,
   });
 
   useEffect(() => {
@@ -587,11 +617,14 @@ export default function InterviewSessionClient({
       micStreamRef.current = micLocal;
       setMicStreamForAuto(micLocal);
 
-      const mime = pickRecorderMime();
-      cloneLocal = micLocal.clone();
+      const sessionMime = pickSessionRecorderMime();
+      sessionMimeRef.current = sessionMime;
+      cloneLocal = buildSessionRecordingStream(micLocal, camLocal);
       fullCloneRef.current = cloneLocal;
       fullChunksRef.current = [];
-      const fullRec = mime ? new MediaRecorder(cloneLocal, { mimeType: mime }) : new MediaRecorder(cloneLocal);
+      const fullRec = sessionMime
+        ? new MediaRecorder(cloneLocal, { mimeType: sessionMime })
+        : new MediaRecorder(cloneLocal);
       fullRec.ondataavailable = (e) => {
         if (e.data.size > 0) fullChunksRef.current.push(e.data);
       };
@@ -713,15 +746,18 @@ export default function InterviewSessionClient({
       fullCloneRef.current?.getTracks().forEach((tr) => tr.stop());
       fullCloneRef.current = null;
 
-      const mime = pickRecorderMime();
-      const blob = new Blob(fullChunksRef.current, {
-        type: mime ? mime.split(";")[0] : "audio/webm",
-      });
-      if (blob.size > 2000) {
+      const sessionMime = sessionMimeRef.current || pickSessionRecorderMime();
+      const baseMime = sessionMime ? sessionMime.split(";")[0] : "video/webm";
+      const blob = new Blob(fullChunksRef.current, { type: baseMime });
+      if (blob.size > 500) {
+        const ext = baseMime.includes("mp4") ? "mp4" : "webm";
         const fd = new FormData();
         fd.append("interviewId", interviewId);
-        fd.append("file", blob, "interview-session.webm");
-        await fetch("/api/interview/recording", { method: "POST", body: fd, credentials: "include" });
+        fd.append("file", blob, `interview-session.${ext}`);
+        const uploadRes = await fetch("/api/interview/recording", { method: "POST", body: fd, credentials: "include" });
+        if (!uploadRes.ok) {
+          console.warn("Interview recording upload failed", await uploadRes.text().catch(() => ""));
+        }
       }
 
       const durationSec = startedAt ? Math.floor((Date.now() - startedAt) / 1000) : 0;

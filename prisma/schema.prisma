@@ -553,9 +553,34 @@ model VideoInterview {
   createdAt            DateTime        @default(now())
   updatedAt            DateTime        @updatedAt
   proctoringSessions   ProctoringSession[]
+  facialSnapshots      InterviewFacialSnapshot[]
+  /// Aggregated facial expression metrics from live snapshots.
+  facialAnalysisSummary Json?
+  /// Comprehensive AI interview report (employer-facing sections).
+  enhancedReport       Json?
 
   @@index([userId, status])
   @@index([userId, interviewKind, status])
+}
+
+model InterviewFacialSnapshot {
+  id               String         @id @default(cuid())
+  videoInterviewId String
+  videoInterview   VideoInterview @relation(fields: [videoInterviewId], references: [id], onDelete: Cascade)
+  timestamp        DateTime
+  questionNumber   Int
+  confidence       Float
+  stress           Float
+  engagement       Float
+  authenticity     Float
+  primaryEmotion   String
+  eyeContact       String
+  posture          String
+  microExpressions Json
+  overallImpression String
+  createdAt        DateTime       @default(now())
+
+  @@index([videoInterviewId, timestamp])
 }
 
 model ProctoringSession {

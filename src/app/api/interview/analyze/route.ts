@@ -11,6 +11,7 @@ import type { ApiResponse } from "@/types";
 import { addTalentPoolEntry } from "@/lib/talent-pool/add-talent-pool-entry";
 import { onInterviewComplete } from "@/lib/email-triggers";
 import { getAnalysisLanguageInstruction } from "@/lib/interview/locale-language";
+import { generateEnhancedInterviewReport } from "@/lib/interview/generate-enhanced-report";
 
 const itemSchema = z.object({
   questionId: z.string(),
@@ -223,6 +224,8 @@ export async function POST(
       isFlagged,
     },
   });
+
+  void generateEnhancedInterviewReport(row.id).catch(() => {});
 
   if (!isFlagged && analysis.overallScore < 50) {
     try {

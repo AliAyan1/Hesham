@@ -6,7 +6,7 @@ import { getPrisma } from "@/lib/db";
 import { hasAccess } from "@/lib/subscription";
 import type { ApiResponse, SubscriptionTier } from "@/types";
 
-const MAX_BYTES = 52_428_800; // ~50 MB
+const MAX_BYTES = 104_857_600; // ~100 MB
 
 const fieldsSchema = z.object({
   interviewId: z.string().min(1),
@@ -45,7 +45,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespon
   }
 
   if (!(file instanceof Blob) || file.size < 16) {
-    return NextResponse.json({ success: false, error: "Audio file required" }, { status: 400 });
+    return NextResponse.json({ success: false, error: "Recording file required" }, { status: 400 });
   }
 
   if (file.size > MAX_BYTES) {
@@ -53,13 +53,20 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespon
   }
 
   const buf = Buffer.from(await file.arrayBuffer());
-  const mime = (file.type && file.type.startsWith("audio/") ? file.type : "audio/webm").slice(0, 120);
+  const rawType = file.type?.trim() ?? "";
+  const mime = (rawType.startsWith("video/") || rawType.startsWith("audio/") ? rawType : "video/webm").slice(0, 120);
 
   const row = await prisma.videoInterview.findFirst({
     where: {
       id: parsedFields.data.interviewId,
       userId: session.user.id,
-      status: InterviewStatus.IN_PROGRESS,
+      OR: [
+        { status: InterviewStatus.IN_PROGRESS },
+        {
+          status: { in: [InterviewStatus.COMPLETED, InterviewStatus.FLAGGED] },
+          recordingData: null,
+        },
+      ],
     },
     select: { id: true },
   });

@@ -20,7 +20,6 @@ type Row = {
   company: string;
   status: ApplicationStatus;
   createdAt: string;
-  offerAcceptedAt: string | null;
 };
 
 export function ApplicationsListClient() {
@@ -31,8 +30,6 @@ export function ApplicationsListClient() {
   const [items, setItems] = useState<Row[]>([]);
   const [status, setStatus] = useState<"loading" | "error" | "ready">("loading");
   const [withdrawing, setWithdrawing] = useState<string | null>(null);
-  const [accepting, setAccepting] = useState<string | null>(null);
-  const tApp = useTranslations("jobSeekerApplications");
 
   const load = useCallback(async () => {
     setStatus("loading");
@@ -63,6 +60,12 @@ export function ApplicationsListClient() {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    const onFocus = () => void load();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [load]);
+
   async function withdraw(id: string) {
     setWithdrawing(id);
     try {
@@ -78,17 +81,8 @@ export function ApplicationsListClient() {
     }
   }
 
-  async function acceptOffer(id: string) {
-    setAccepting(id);
-    try {
-      const res = await fetch(`/api/job-seeker/applications/${encodeURIComponent(id)}/accept-offer`, {
-        method: "POST",
-        credentials: "include",
-      });
-      if (res.ok) await load();
-    } finally {
-      setAccepting(null);
-    }
+  function canWithdraw(row: Row): boolean {
+    return row.status === ApplicationStatus.PENDING || row.status === ApplicationStatus.REVIEWED;
   }
 
   if (status === "loading" && items.length === 0) {
@@ -119,7 +113,6 @@ export function ApplicationsListClient() {
             <th className="px-4 py-4 text-xs font-bold uppercase tracking-wide text-[#6B7280]">{t("statusCol")}</th>
             <th className="px-4 py-4 text-xs font-bold uppercase tracking-wide text-[#6B7280]">{t("actionView")}</th>
             <th className="px-4 py-4 text-xs font-bold uppercase tracking-wide text-[#6B7280]">{tj("withdraw")}</th>
-            <th className="px-4 py-4 text-xs font-bold uppercase tracking-wide text-[#6B7280]">{tApp("acceptOffer")}</th>
           </tr>
         </thead>
         <tbody>
@@ -142,7 +135,7 @@ export function ApplicationsListClient() {
                 </Link>
               </td>
               <td className="px-4 py-4">
-                {row.status === ApplicationStatus.PENDING ? (
+                {canWithdraw(row) ? (
                   <Button
                     variant="outline"
                     size="sm"
@@ -153,24 +146,6 @@ export function ApplicationsListClient() {
                   >
                     {tj("withdraw")}
                   </Button>
-                ) : (
-                  <span className="text-xs text-[#9CA3AF]">—</span>
-                )}
-              </td>
-              <td className="px-4 py-4">
-                {row.status === ApplicationStatus.SHORTLISTED && !row.offerAcceptedAt ? (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    type="button"
-                    className="min-h-10"
-                    loading={accepting === row.id}
-                    onClick={() => void acceptOffer(row.id)}
-                  >
-                    {tApp("acceptOffer")}
-                  </Button>
-                ) : row.offerAcceptedAt ? (
-                  <span className="text-xs font-semibold text-emerald-700">{tApp("offerAccepted")}</span>
                 ) : (
                   <span className="text-xs text-[#9CA3AF]">—</span>
                 )}

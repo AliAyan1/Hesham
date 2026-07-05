@@ -4,7 +4,6 @@ import { getTranslations } from "next-intl/server";
 import { UserRole } from "@/types";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import type { BreadcrumbItem } from "@/components/layout/Breadcrumbs";
-import { Card } from "@/components/ui/Card";
 import { JobShortlistClient } from "./JobShortlistClient";
 
 export default async function EmployerJobShortlistPage({
@@ -28,9 +27,10 @@ export default async function EmployerJobShortlistPage({
 
   return (
     <DashboardLayout locale={locale} role={UserRole.EMPLOYER} breadcrumbs={breadcrumbs}>
-      <Card title={t("title")}>
+      <div className="space-y-2">
+        <h1 className="text-2xl font-bold text-[#0D2137]">{t("title")}</h1>
         <JobShortlistClient jobId={jobId} />
-      </Card>
+      </div>
     </DashboardLayout>
   );
 }

@@ -152,7 +152,7 @@ export async function PUT(
   });
 
   if (activating) {
-    void runAutoShortlistForJob(jobId, session.user.id).then(() =>
+    void runAutoShortlistForJob(jobId, session.user.id, { notify: false }).then(() =>
       notifyJobSeekersOnNewJob(jobId),
     );
   }

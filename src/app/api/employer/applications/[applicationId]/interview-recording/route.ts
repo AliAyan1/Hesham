@@ -55,9 +55,16 @@ export async function GET(
     return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
   }
 
-  const mime = iv.recordingMimeType?.trim() || "audio/webm";
-  const filename =
-    mime.includes("webm") ? "candidate-interview.webm" : mime.includes("mpeg") ? "candidate-interview.mp3" : "candidate-interview.audio";
+  const mime = iv.recordingMimeType?.trim() || "video/webm";
+  const filename = mime.startsWith("video/")
+    ? mime.includes("mp4")
+      ? "candidate-interview.mp4"
+      : "candidate-interview.webm"
+    : mime.includes("mpeg")
+      ? "candidate-interview.mp3"
+      : mime.includes("webm")
+        ? "candidate-interview.webm"
+        : "candidate-interview-recording";
 
   return new Response(new Uint8Array(iv.recordingData), {
     status: 200,

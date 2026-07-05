@@ -11,6 +11,8 @@ import { ErrorState } from "@/components/ui/ErrorState";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { Button } from "@/components/ui/Button";
 import { OfferUploadSection } from "@/components/employer/OfferUploadSection";
+import { ApplicationWorkflowStatusControl } from "@/components/employer/ApplicationWorkflowStatusControl";
+import { EMPLOYER_WORKFLOW_STATUSES, type EmployerWorkflowStatus } from "@/lib/applications/workflow-status";
 
 function pickStr(obj: Record<string, unknown>, ...keys: string[]): string | undefined {
   for (const k of keys) {
@@ -95,6 +97,8 @@ export function CandidateViewClient({ applicationId }: { applicationId: string }
   const [rejectOpen, setRejectOpen] = useState(false);
   const [declineReason, setDeclineReason] = useState("");
   const [statusSaving, setStatusSaving] = useState(false);
+  const [recordingDownloadError, setRecordingDownloadError] = useState<string | null>(null);
+  const [recordingDownloading, setRecordingDownloading] = useState(false);
 
   useEffect(() => {
     let cancel = false;
@@ -262,21 +266,29 @@ export function CandidateViewClient({ applicationId }: { applicationId: string }
 
       <section className="rounded-xl border bg-white p-6 shadow-sm">
         <h2 className="font-bold text-[#0D2137]">{tec("applicationStatus")}</h2>
-        <select
-          className="mt-3 min-h-11 rounded-lg border bg-white px-3 text-sm"
-          value={data.applicationStatus}
+        <p className="mt-1 text-xs text-[#6B7280]">{tec("statusWorkflowHint")}</p>
+        <ApplicationWorkflowStatusControl
+          value={
+            (EMPLOYER_WORKFLOW_STATUSES.includes(
+              data.applicationStatus as EmployerWorkflowStatus,
+            )
+              ? data.applicationStatus
+              : ApplicationStatus.PENDING) as ApplicationStatus
+          }
           disabled={statusSaving}
-          onChange={(e) => {
-            const v = e.target.value as ApplicationStatus;
-            void onStatusPick(v);
-          }}
+          label={(key) => dash(key as never)}
+          onChange={(s) => void onStatusPick(s)}
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="mt-4 min-h-10"
+          disabled={statusSaving}
+          onClick={() => onStatusPick(ApplicationStatus.REJECTED)}
         >
-          {(Object.values(ApplicationStatus) as ApplicationStatus[]).map((s) => (
-            <option key={s} value={s}>
-              {tj(`status.${s.toLowerCase()}` as never)}
-            </option>
-          ))}
-        </select>
+          {tj("status.rejected")}
+        </Button>
       </section>
 
       <section className="rounded-xl border bg-white p-6 shadow-sm">
@@ -392,29 +404,55 @@ export function CandidateViewClient({ applicationId }: { applicationId: string }
               type="button"
               variant="outline"
               className="border-brand-teal text-brand-teal hover:bg-brand-lightTeal/30"
-              disabled={!data.sharedInterview.hasRecording}
+              disabled={!data.sharedInterview.hasRecording || recordingDownloading}
               onClick={() => {
                 const url = `/api/employer/applications/${encodeURIComponent(applicationId)}/interview-recording?interviewId=${encodeURIComponent(data.sharedInterview!.id)}`;
                 void (async () => {
+                  setRecordingDownloadError(null);
+                  setRecordingDownloading(true);
                   try {
                     const res = await fetch(url, { credentials: "include" });
-                    if (!res.ok) return;
+                    if (!res.ok) {
+                      const body = (await res.json().catch(() => null)) as { error?: string } | null;
+                      setRecordingDownloadError(body?.error ?? tec("downloadInterviewRecordingFailed"));
+                      return;
+                    }
                     const blob = await res.blob();
+                    if (blob.size < 32) {
+                      setRecordingDownloadError(tec("downloadInterviewRecordingFailed"));
+                      return;
+                    }
+                    const cd = res.headers.get("Content-Disposition") ?? "";
+                    const match = /filename="([^"]+)"/i.exec(cd);
+                    const filename = match?.[1] ?? "candidate-interview.webm";
                     const dl = URL.createObjectURL(blob);
                     const a = document.createElement("a");
                     a.href = dl;
-                    a.download = "candidate-interview.webm";
+                    a.download = filename;
                     a.click();
                     URL.revokeObjectURL(dl);
                   } catch {
-                    /* ignore */
+                    setRecordingDownloadError(tec("downloadInterviewRecordingFailed"));
+                  } finally {
+                    setRecordingDownloading(false);
                   }
                 })();
               }}
             >
-              {tec("downloadInterviewRecording")}
+              {recordingDownloading ? tc("loading") : tec("downloadInterviewRecording")}
             </Button>
+            {recordingDownloadError ? (
+              <p className="text-xs text-red-600" role="alert">
+                {recordingDownloadError}
+              </p>
+            ) : null}
             <p className="text-xs text-[#6B7280]">{tec("downloadInterviewRecordingHint")}</p>
+            <Link
+              href={`/dashboard/employer/candidates/${applicationId}/interview-report`}
+              className="mt-3 inline-flex min-h-10 items-center rounded-lg bg-[#0F4C75] px-4 text-xs font-semibold text-white hover:bg-[#0D2137]"
+            >
+              {tec("viewInterviewReport")}
+            </Link>
           </div>
         ) : (
           <p className="mt-2 text-sm text-[#6B7280]">{tec("noSharedInterview")}</p>

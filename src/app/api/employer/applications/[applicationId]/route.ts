@@ -7,6 +7,10 @@ import type { ApiResponse } from "@/types";
 import { createUserNotification } from "@/lib/notifications/create-user-notification";
 import { addTalentPoolEntry } from "@/lib/talent-pool/add-talent-pool-entry";
 import { onApplicationStatusChanged } from "@/lib/email-triggers";
+import {
+  applicationStatusLabelAr,
+  applicationStatusLabelEn,
+} from "@/lib/applications/workflow-status";
 const patchSchema = z
   .object({
     status: z.nativeEnum(ApplicationStatus),
@@ -111,8 +115,8 @@ export async function PATCH(
     type: NotificationType.APPLICATION_UPDATE,
     title: "Application status updated",
     titleAr: "تحديث حالة الطلب",
-    message: `Your application for ${existing.job.title} at ${company} is now ${nextStatus}.`,
-    messageAr: `طلبك لوظيفة ${existing.job.title} لدى ${company}: الحالة ${nextStatus}.`,
+    message: `Your application for ${existing.job.title} at ${company} is now: ${applicationStatusLabelEn(nextStatus)}.`,
+    messageAr: `طلبك لوظيفة ${existing.job.title} لدى ${company}: ${applicationStatusLabelAr(nextStatus)}.`,
     link: `/dashboard/job-seeker/applications`,
   });
 

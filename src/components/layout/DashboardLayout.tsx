@@ -7,6 +7,7 @@ import { MentorSidebar } from "@/components/layout/MentorSidebar";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { DashboardHydrationGate } from "@/components/layout/DashboardHydrationGate";
 import { Breadcrumbs, type BreadcrumbItem } from "@/components/layout/Breadcrumbs";
+import { TestingModeBanner } from "@/components/layout/TestingModeBanner";
 
 export interface DashboardLayoutProps {
   locale: string;
@@ -25,6 +26,7 @@ export function DashboardLayout({
     <DashboardUIProvider>
       <DashboardHydrationGate>
         <div className="min-h-screen w-full min-w-0 overflow-x-hidden bg-[#F8FAFC] text-gray-900">
+          <TestingModeBanner />
           <DashboardNavbar locale={locale} />
           {role === UserRole.MENTOR ? (
             <MentorSidebar locale={locale} />

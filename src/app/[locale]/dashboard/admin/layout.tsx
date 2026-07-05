@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { ensureAdminPage } from "@/lib/admin/require-admin";
+import { TestingModeBanner } from "@/components/layout/TestingModeBanner";
 
 export default async function AdminDashboardLayout({
   children,
@@ -17,6 +18,7 @@ export default async function AdminDashboardLayout({
 
   return (
     <div className="min-h-screen w-full min-w-0 overflow-x-hidden bg-[#F8FAFC]">
+      <TestingModeBanner />
       <div className="flex w-full min-w-0">
         <AdminSidebar userName={userName} userEmail={userEmail} />
         <main className="min-w-0 flex-1 p-4 pb-24 md:p-8">{children}</main>

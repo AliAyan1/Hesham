@@ -36,6 +36,7 @@ import { ErrorState } from "@/components/ui/ErrorState";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { cn } from "@/lib/cn";
 import { hasAccess } from "@/lib/subscription";
+import { isTestingMode } from "@/lib/testing-mode";
 import { MIN_PROFILE_COMPLETION_FOR_AI_JOB_MATCH } from "@/lib/profile-page-completion";
 
 const FREE_UPGRADE_BANNER_KEY = "qt_free_upgrade_banner_dismissed_v1";
@@ -126,7 +127,7 @@ export default function JobSeekerDashboardClient({ userName }: { userName: strin
     let cancelled = false;
     void (async () => {
       try {
-        const res = await fetch("/api/jobs/matches?limit=5", { credentials: "include" });
+        const res = await fetch("/api/jobs/matches", { credentials: "include" });
         if (!res.ok) return;
         const json: unknown = await res.json();
         if (
@@ -152,9 +153,11 @@ export default function JobSeekerDashboardClient({ userName }: { userName: strin
 
   const recoDisplay = useMemo(() => {
     const pct = data?.profileCompletion ?? 0;
-    if (pct >= MIN_PROFILE_COMPLETION_FOR_AI_JOB_MATCH) return reco;
+    const tier = data?.subscriptionTier as SubscriptionTier | undefined;
+    const canAi = tier ? hasAccess(tier, "job_matching_ai") : false;
+    if (!canAi || pct >= MIN_PROFILE_COMPLETION_FOR_AI_JOB_MATCH) return reco;
     return reco.map((r) => ({ ...r, matchScore: null, reason: null, aiPowered: false }));
-  }, [reco, data?.profileCompletion]);
+  }, [reco, data?.profileCompletion, data?.subscriptionTier]);
 
   function retry() {
     void loadDashboard();
@@ -196,17 +199,15 @@ export default function JobSeekerDashboardClient({ userName }: { userName: strin
     </Link>
   );
 
-  const thirdStatValue = canJobMatchingAi ? data.jobMatchesCount : data.jobsAvailableCount;
-  const thirdStatLabel = canJobMatchingAi ? t("jobMatches") : t("statJobsAvailable");
-  const thirdStatFooter = canJobMatchingAi ? (
-    <span className="font-medium text-[#C9973A]">{t("statFootnoteJobMatches")}</span>
-  ) : (
+  const thirdStatValue = data.jobsAvailableCount;
+  const thirdStatLabel = t("statJobsAvailable");
+  const thirdStatFooter = (
     <span className="text-gray-500">{t("statFootnoteBrowsePool")}</span>
   );
 
   return (
     <div className="space-y-8">
-      {tier === "FREE" && !hideUpgradeBanner ? (
+      {tier === "FREE" && !hideUpgradeBanner && !isTestingMode() ? (
         <section className="rounded-2xl border border-[#0F4C75]/20 bg-gradient-to-r from-[#EFF6FF] to-white p-5 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">
@@ -478,14 +479,32 @@ export default function JobSeekerDashboardClient({ userName }: { userName: strin
         </div>
       </section>
 
-      {recoDisplay.length > 0 ? (
-        <section aria-labelledby="js-reco-heading" className="space-y-4">
-          <div>
-            <h3 id="js-reco-heading" className="text-xl font-semibold text-[#0D2137]">
-              {t("recommendedJobsTitle")}
-            </h3>
-            <p className="mt-1 text-sm text-[#6B7280]">{t("recommendedJobsSubtitle")}</p>
+      <section aria-labelledby="js-reco-heading" className="space-y-4">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h3 id="js-reco-heading" className="text-xl font-semibold text-[#0D2137]">
+                {t("recommendedJobsTitle")}
+              </h3>
+              <p className="mt-1 text-sm text-[#6B7280]">
+                {recoDisplay.length > 0
+                  ? t("recommendedJobsSubtitle")
+                  : t("browseJobsPrompt")}
+              </p>
+            </div>
+            <Link
+              href="/dashboard/job-seeker/jobs"
+              className="inline-flex min-h-11 items-center text-sm font-semibold text-brand-teal hover:underline"
+            >
+              {t("actionBrowseJobs")} →
+            </Link>
           </div>
+          {recoDisplay.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-gray-200 bg-white px-6 py-10 text-center">
+              <Briefcase className="mx-auto mb-3 h-10 w-10 text-brand-teal" aria-hidden />
+              <p className="text-sm font-semibold text-[#0D2137]">{tj("noJobs")}</p>
+              <p className="mt-1 text-sm text-[#6B7280]">{t("browseJobsPrompt")}</p>
+            </div>
+          ) : (
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {recoDisplay.map((r) => (
               <article
@@ -523,8 +542,8 @@ export default function JobSeekerDashboardClient({ userName }: { userName: strin
               </article>
             ))}
           </div>
+          )}
         </section>
-      ) : null}
 
       <section aria-labelledby="js-applications" className="space-y-5">
         <div className="flex flex-wrap items-end justify-between gap-3">

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/cn";
+import { isTestingMode } from "@/lib/testing-mode";
 
 export type RequiredPlan = "professional" | "premium";
 
@@ -21,12 +22,15 @@ export function FeatureLock({
   className,
   children,
 }: FeatureLockProps) {
+  // TESTING MODE - REVERT BEFORE LAUNCH: show all features unlocked.
+  const showLocked = locked && !isTestingMode();
+
   return (
     <div className={cn("relative", className)}>
-      <div className={cn(locked && "pointer-events-none select-none blur-[1px] opacity-70")}>
+      <div className={cn(showLocked && "pointer-events-none select-none blur-[1px] opacity-70")}>
         {children}
       </div>
-      {locked ? (
+      {showLocked ? (
         <div className="absolute inset-0 z-10 grid place-items-center rounded-2xl bg-[#0D2137]/55 p-4 backdrop-blur-[2px]">
           <div className="w-full max-w-md rounded-2xl border border-white/10 bg-white/10 p-5 text-white shadow-xl">
             <div className="flex items-start gap-3">

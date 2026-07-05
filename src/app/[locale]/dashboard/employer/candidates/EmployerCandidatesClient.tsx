@@ -14,6 +14,8 @@ import { Button } from "@/components/ui/Button";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { InitialsAvatar } from "@/components/dashboard/InitialsAvatar";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { ApplicationWorkflowStatusControl } from "@/components/employer/ApplicationWorkflowStatusControl";
+import { EMPLOYER_WORKFLOW_STATUSES } from "@/lib/applications/workflow-status";
 
 type Row = {
   id: string;
@@ -52,6 +54,8 @@ export function EmployerCandidatesClient() {
   const [rejectModal, setRejectModal] = useState<{ id: string } | null>(null);
   const [declineReason, setDeclineReason] = useState("");
   const [rejectSubmitting, setRejectSubmitting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -119,6 +123,40 @@ export function EmployerCandidatesClient() {
     }
   }
 
+  function toggleSelected(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function bulkStatus(status: ApplicationStatus) {
+    if (selectedIds.size < 1) return;
+    if (status === ApplicationStatus.REJECTED) return;
+    setBulkBusy(true);
+    try {
+      await axios.patch("/api/employer/applications/bulk-status", {
+        applicationIds: [...selectedIds],
+        status,
+      });
+      setSelectedIds(new Set());
+      await load();
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
+  const statusCounts = items.reduce(
+    (acc, row) => {
+      acc[row.status] = (acc[row.status] ?? 0) + 1;
+      acc.all += 1;
+      return acc;
+    },
+    { all: 0 } as Record<string, number>,
+  );
+
   if (loading && !items.length) return <LoadingSpinner size="full" label={tc("loading")} />;
   if (err) return <ErrorState title={t("dashboardLoadError")} retryLabel={tc("retry")} onRetry={load} />;
 
@@ -154,6 +192,47 @@ export function EmployerCandidatesClient() {
               </Button>
             </div>
           </div>
+        </div>
+      ) : null}
+
+      <div className="flex flex-wrap gap-2">
+        {(
+          [
+            { key: "", label: `${tec("filterAny")} (${items.length})` },
+            { key: ApplicationStatus.PENDING, label: `Waiting (${statusCounts[ApplicationStatus.PENDING] ?? 0})` },
+            { key: ApplicationStatus.REVIEWED, label: `Viewed (${statusCounts[ApplicationStatus.REVIEWED] ?? 0})` },
+            { key: ApplicationStatus.SHORTLISTED, label: `Shortlisted (${statusCounts[ApplicationStatus.SHORTLISTED] ?? 0})` },
+            { key: ApplicationStatus.REJECTED, label: `Declined (${statusCounts[ApplicationStatus.REJECTED] ?? 0})` },
+          ] as const
+        ).map((pill) => (
+          <button
+            key={pill.key || "all"}
+            type="button"
+            className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
+              appStatus === pill.key ? "bg-[#0F4C75] text-white" : "bg-[#F3F4F6] text-[#374151]"
+            }`}
+            onClick={() => {
+              setPage(1);
+              setAppStatus(pill.key as ApplicationStatus | "");
+            }}
+          >
+            {pill.label}
+          </button>
+        ))}
+      </div>
+
+      {selectedIds.size >= 2 ? (
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border bg-[#EFF6FF] p-3 text-sm">
+          <span className="font-semibold">{selectedIds.size} selected</span>
+          <Button type="button" size="sm" variant="outline" disabled={bulkBusy} onClick={() => void bulkStatus(ApplicationStatus.REVIEWED)}>
+            Mark viewed
+          </Button>
+          <Button type="button" size="sm" variant="outline" disabled={bulkBusy} onClick={() => void bulkStatus(ApplicationStatus.PENDING)}>
+            Mark waiting
+          </Button>
+          <Button type="button" size="sm" disabled={bulkBusy} onClick={() => void bulkStatus(ApplicationStatus.SHORTLISTED)}>
+            Shortlist all
+          </Button>
         </div>
       ) : null}
 
@@ -255,6 +334,13 @@ export function EmployerCandidatesClient() {
               key={row.id}
               className="flex flex-col gap-4 rounded-xl border border-[#EEF2F7] bg-white p-5 shadow-sm lg:flex-row lg:items-center"
             >
+              <input
+                type="checkbox"
+                className="h-4 w-4 shrink-0 rounded border-gray-300"
+                checked={selectedIds.has(row.id)}
+                onChange={() => toggleSelected(row.id)}
+                aria-label={`Select ${row.candidateName ?? "candidate"}`}
+              />
               <div className="flex min-w-0 flex-1 items-start gap-3">
                 <InitialsAvatar
                   name={row.candidateName}
@@ -288,19 +374,37 @@ export function EmployerCandidatesClient() {
               <Badge variant={applicationStatusBadgeVariant(row.status)} size="sm" className="w-fit capitalize">
                 {t(applicationStatusTranslationKey(row.status) as never)}
               </Badge>
-              <div className="flex flex-wrap gap-2">
-                <select
-                  aria-label={t("statusCol")}
-                  className="min-h-10 rounded-lg border bg-white px-2 text-xs font-semibold"
-                  value={row.status}
-                  onChange={(e) => void onStatusChange(row.id, e.target.value as ApplicationStatus)}
+              {row.status === ApplicationStatus.REJECTED || row.status === ApplicationStatus.HIRED ? (
+                <div className="flex flex-wrap gap-2">
+                  <Link
+                    href={`/dashboard/employer/candidates/${row.id}`}
+                    className="inline-flex min-h-10 items-center rounded-lg border-2 border-brand-blue px-3 text-xs font-semibold text-brand-blue hover:bg-brand-lightBlue"
+                  >
+                    {tec("viewProfile")}
+                  </Link>
+                </div>
+              ) : (
+              <div className="flex flex-col gap-3 lg:items-end">
+                <ApplicationWorkflowStatusControl
+                  value={
+                    EMPLOYER_WORKFLOW_STATUSES.includes(row.status as (typeof EMPLOYER_WORKFLOW_STATUSES)[number])
+                      ? row.status
+                      : ApplicationStatus.PENDING
+                  }
+                  compact
+                  label={(key) => t(key as never)}
+                  onChange={(s) => void onStatusChange(row.id, s)}
+                />
+                <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="min-h-10 text-xs"
+                  onClick={() => void onStatusChange(row.id, ApplicationStatus.REJECTED)}
                 >
-                  {(Object.values(ApplicationStatus) as ApplicationStatus[]).map((s) => (
-                    <option key={s} value={s}>
-                      {tj(`status.${s.toLowerCase()}` as never)}
-                    </option>
-                  ))}
-                </select>
+                  {tj("status.rejected")}
+                </Button>
                 <Link
                   href={`/dashboard/employer/messages?to=${encodeURIComponent(row.candidateId)}`}
                   className="inline-flex min-h-10 items-center rounded-lg border border-[#E5E7EB] px-3 text-xs font-semibold text-[#374151] hover:bg-gray-50"
@@ -313,7 +417,9 @@ export function EmployerCandidatesClient() {
                 >
                   {tec("viewProfile")}
                 </Link>
+                </div>
               </div>
+              )}
             </article>
           ))}
         </div>

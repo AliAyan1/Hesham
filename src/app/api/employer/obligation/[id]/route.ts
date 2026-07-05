@@ -4,6 +4,7 @@ import { z } from "zod";
 import { getServerSession } from "@/lib/get-server-session";
 import { getPrisma } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
+import { isTestingMode } from "@/lib/testing-mode";
 
 const signSchema = z.object({
   signedByName: z.string().min(2).max(120),
@@ -66,12 +67,14 @@ export async function POST(
 
   const vat = row.recruitmentFee * 0.15;
   const total = row.recruitmentFee + vat;
+  const skipPayment = isTestingMode(); // TESTING MODE - REVERT BEFORE LAUNCH
 
   await prisma.obligationLetter.update({
     where: { id },
     data: {
       signedAt: new Date(),
       signedByName: parsed.data.signedByName,
+      ...(skipPayment ? { status: ObligationStatus.SIGNED } : {}),
     },
   });
 
@@ -83,18 +86,22 @@ export async function POST(
       amount: row.recruitmentFee,
       vatAmount: vat,
       totalAmount: total,
-      status: PaymentStatus.PENDING,
+      status: skipPayment ? PaymentStatus.PAID : PaymentStatus.PENDING,
+      ...(skipPayment ? { paidAt: new Date() } : {}),
     },
     update: {
       amount: row.recruitmentFee,
       vatAmount: vat,
       totalAmount: total,
+      ...(skipPayment
+        ? { status: PaymentStatus.PAID, paidAt: new Date() }
+        : {}),
     },
   });
 
   await logAudit({
     userId: session.user.id,
-    action: "obligation.signed_pending_payment",
+    action: skipPayment ? "obligation.signed_testing_mode" : "obligation.signed_pending_payment",
     entity: "ObligationLetter",
     entityId: id,
   });

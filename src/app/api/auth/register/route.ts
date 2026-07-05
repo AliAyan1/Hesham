@@ -10,6 +10,7 @@ import { onEmployerRegistered, onJobSeekerRegistered } from "@/lib/email-trigger
 import { isRegistrationOpen as getRegistrationOpen } from "@/lib/settings";
 import { defaultMentorProfileCreate } from "@/lib/mentor/default-mentor-create";
 import { paymentsAreLive, moyasarPaymentsEnabled, isPaidPlanChoice } from "@/lib/payments-config";
+import { isTestingMode } from "@/lib/testing-mode";
 import { clientIp, rateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
 /**
@@ -55,11 +56,17 @@ export async function POST(
     let subscriptionTier =
       role === UserRole.MENTOR ? ("FREE" as const) : tierFromPlan(plan);
 
-    if (moyasarPaymentsEnabled() && isPaidPlanChoice(plan) && role !== UserRole.MENTOR) {
+    // TESTING MODE - REVERT BEFORE LAUNCH: grant selected plan immediately (no payment gate).
+    if (
+      !isTestingMode() &&
+      moyasarPaymentsEnabled() &&
+      isPaidPlanChoice(plan) &&
+      role !== UserRole.MENTOR
+    ) {
       subscriptionTier = "FREE";
     }
 
-    if (paymentsAreLive() && subscriptionTier !== "FREE") {
+    if (!isTestingMode() && paymentsAreLive() && subscriptionTier !== "FREE") {
       return NextResponse.json(
         {
           success: false,

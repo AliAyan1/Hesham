@@ -56,7 +56,12 @@ export async function TrustedAssessmentsSection({
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#1D9E75]">{t("trustEyebrow")}</p>
             <h2 id="trust-assessments-heading" className="mt-4 text-white">
-              <span className="block max-w-xl text-xl font-semibold leading-snug tracking-tight sm:text-2xl">{t("trustHeading")}</span>
+              <span
+                className="block max-w-xl text-xl font-semibold leading-snug tracking-tight sm:text-2xl"
+                suppressHydrationWarning
+              >
+                {t("trustHeading")}
+              </span>
               <span className="mt-4 block max-w-xl text-[36px] font-extrabold leading-[1.15] tracking-tight">
                 {t("trustTitleLine")}
               </span>

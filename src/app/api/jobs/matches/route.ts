@@ -13,8 +13,12 @@ import {
 } from "@/lib/profile-page-completion";
 
 const qpSchema = z.object({
-  limit: z.coerce.number().int().min(1).max(10).optional().default(5),
+  /** Omit or pass 0 to return every active job from all employers. */
+  limit: z.coerce.number().int().min(0).max(200).optional(),
 });
+
+const AI_MATCH_CANDIDATE_CAP = 50;
+const AI_MATCH_RESULT_CAP = 10;
 
 type PrefsShape = {
   preferredCategories?: string[];
@@ -27,7 +31,46 @@ const matchRowSchema = z.object({
   reason: z.string().max(600),
 });
 
-const matchRowsSchema = z.array(matchRowSchema).max(10);
+const matchRowsSchema = z.array(matchRowSchema).max(AI_MATCH_RESULT_CAP);
+
+type JobRow = {
+  id: string;
+  title: string;
+  category: string;
+  description: string;
+  type: string;
+  location: string | null;
+  createdAt: Date;
+};
+
+type Item = {
+  jobId: string;
+  title: string;
+  category: string;
+  matchScore: number | null;
+  reason: string | null;
+  aiPowered: boolean;
+};
+
+function itemsWithoutScores(source: JobRow[]): Item[] {
+  return source.map((j) => ({
+    jobId: j.id,
+    title: j.title,
+    category: j.category,
+    matchScore: null,
+    reason: null,
+    aiPowered: false,
+  }));
+}
+
+function sortJobItems(items: Item[]): Item[] {
+  return [...items].sort((a, b) => {
+    if (a.matchScore != null && b.matchScore != null) return b.matchScore - a.matchScore;
+    if (a.matchScore != null) return -1;
+    if (b.matchScore != null) return 1;
+    return 0;
+  });
+}
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const session = await getServerSession();
@@ -36,10 +79,14 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
 
   const url = new URL(request.url);
+  const rawLimit = url.searchParams.get("limit");
   const parsedLimit = qpSchema.safeParse({
-    limit: url.searchParams.get("limit"),
+    limit: rawLimit === null || rawLimit === "" ? undefined : rawLimit,
   });
-  const limit = parsedLimit.success ? parsedLimit.data.limit : 5;
+  const limit =
+    parsedLimit.success && parsedLimit.data.limit != null && parsedLimit.data.limit > 0
+      ? parsedLimit.data.limit
+      : null;
 
   const prisma = getPrisma();
   const userId = session.user.id;
@@ -62,12 +109,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   const tier = (userRow?.subscriptionTier ?? "FREE") as Tier;
   const prefs = (profile?.jobPreferences ?? null) as PrefsShape | null;
-  const categories = prefs?.preferredCategories?.filter(Boolean) ?? [];
 
+  /** Every active job from any employer — no plan or category filter. */
   const jobs = await prisma.job.findMany({
     where: { isActive: true },
     orderBy: { createdAt: "desc" },
-    take: 40,
     select: {
       id: true,
       title: true,
@@ -75,44 +121,24 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       description: true,
       type: true,
       location: true,
+      createdAt: true,
     },
   });
 
-  type Item = {
-    jobId: string;
-    title: string;
-    category: string;
-    matchScore: number | null;
-    reason: string | null;
-    aiPowered: boolean;
-  };
+  const canRunAi =
+    hasAccess(tier, "job_matching_ai") &&
+    profileCompletionPct >= MIN_PROFILE_COMPLETION_FOR_AI_JOB_MATCH;
 
-  function itemsWithoutScores(source: typeof jobs): Item[] {
-    return source.slice(0, limit).map((j) => ({
-      jobId: j.id,
-      title: j.title,
-      category: j.category,
-      matchScore: null,
-      reason: null,
-      aiPowered: false,
-    }));
-  }
-
-  if (!hasAccess(tier, "job_matching_ai")) {
-    const filtered =
-      categories.length === 0
-        ? jobs
-        : jobs.filter((j) => categories.includes(j.category));
-
+  if (!canRunAi) {
+    const items = itemsWithoutScores(jobs);
     return NextResponse.json(
-      { success: true, data: { items: itemsWithoutScores(filtered) } },
-      { status: 200 },
-    );
-  }
-
-  if (profileCompletionPct < MIN_PROFILE_COMPLETION_FOR_AI_JOB_MATCH) {
-    return NextResponse.json(
-      { success: true, data: { items: itemsWithoutScores(jobs) } },
+      {
+        success: true,
+        data: {
+          items: limit != null ? items.slice(0, limit) : items,
+          total: jobs.length,
+        },
+      },
       { status: 200 },
     );
   }
@@ -121,8 +147,15 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
     openai = getOpenAI();
   } catch {
+    const items = itemsWithoutScores(jobs);
     return NextResponse.json(
-      { success: true, data: { items: itemsWithoutScores(jobs) } },
+      {
+        success: true,
+        data: {
+          items: limit != null ? items.slice(0, limit) : items,
+          total: jobs.length,
+        },
+      },
       { status: 200 },
     );
   }
@@ -135,7 +168,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     titles: cv?.experience,
   };
 
-  const jobSummaries = jobs.map((j) => ({
+  const jobsForAi = jobs.slice(0, AI_MATCH_CANDIDATE_CAP);
+  const jobSummaries = jobsForAi.map((j) => ({
     id: j.id,
     title: j.title,
     category: j.category,
@@ -146,7 +180,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   const prompt =
     "Given candidate profile JSON and job list JSON, return ONLY JSON array of up to " +
-    String(limit) +
+    String(AI_MATCH_RESULT_CAP) +
     ' objects {\"jobId\":string,\"score\":number 0-100,\"reason\":string briefly why it fits} ranked best first.' +
     "\n\nPROFILE:\n" +
     JSON.stringify(profileBlob).slice(0, 14000) +
@@ -178,35 +212,57 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         : [];
     const rows = matchRowsSchema.safeParse(matchesRaw);
 
-    const byId = new Map(jobs.map((j) => [j.id, j]));
-
-    let items: Item[] = [];
-
-    if (rows.success && rows.data.length) {
-      items = rows.data
-        .filter((row) => byId.has(row.jobId))
-        .slice(0, limit)
-        .map((row) => {
-          const j = byId.get(row.jobId)!;
-          return {
-            jobId: row.jobId,
-            title: j.title,
-            category: j.category,
-            matchScore: Math.round(row.score),
-            reason: row.reason,
-            aiPowered: true,
-          };
-        });
+    const scoreByJobId = new Map<string, { score: number; reason: string }>();
+    if (rows.success) {
+      for (const row of rows.data) {
+        scoreByJobId.set(row.jobId, { score: Math.round(row.score), reason: row.reason });
+      }
     }
 
-    if (!items.length) {
-      items = itemsWithoutScores(jobs);
-    }
+    let items: Item[] = jobs.map((j) => {
+      const match = scoreByJobId.get(j.id);
+      if (!match) {
+        return {
+          jobId: j.id,
+          title: j.title,
+          category: j.category,
+          matchScore: null,
+          reason: null,
+          aiPowered: false,
+        };
+      }
+      return {
+        jobId: j.id,
+        title: j.title,
+        category: j.category,
+        matchScore: match.score,
+        reason: match.reason,
+        aiPowered: true,
+      };
+    });
 
-    return NextResponse.json({ success: true, data: { items } }, { status: 200 });
-  } catch {
+    items = sortJobItems(items);
+
     return NextResponse.json(
-      { success: true, data: { items: itemsWithoutScores(jobs) } },
+      {
+        success: true,
+        data: {
+          items: limit != null ? items.slice(0, limit) : items,
+          total: jobs.length,
+        },
+      },
+      { status: 200 },
+    );
+  } catch {
+    const items = itemsWithoutScores(jobs);
+    return NextResponse.json(
+      {
+        success: true,
+        data: {
+          items: limit != null ? items.slice(0, limit) : items,
+          total: jobs.length,
+        },
+      },
       { status: 200 },
     );
   }

@@ -76,7 +76,7 @@ export async function POST(
     select: { id: true },
   });
 
-  void runAutoShortlistForJob(job.id, session.user.id).then(() =>
+  void runAutoShortlistForJob(job.id, session.user.id, { notify: false }).then(() =>
     notifyJobSeekersOnNewJob(job.id),
   );
 
