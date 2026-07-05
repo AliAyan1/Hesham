@@ -1,6 +1,5 @@
 import type { Session } from "next-auth";
 import { dashboardPathForRole } from "@/lib/subscription";
-import { isTestingMode } from "@/lib/testing-mode";
 
 type SessionUpdate = (data?: Record<string, unknown>) => Promise<Session | null>;
 
@@ -17,11 +16,8 @@ export async function markOnboardingComplete(update: SessionUpdate): Promise<voi
 export type SignupPlanChoice = "free" | "professional" | "premium";
 
 function postGoogleSignupPath(role: string, plan?: SignupPlanChoice | null): string {
-  // TESTING MODE - REVERT BEFORE LAUNCH: skip upgrade checkout after Google signup.
-  if (!isTestingMode()) {
-    if (plan === "professional") return "/upgrade?plan=professional";
-    if (plan === "premium") return "/upgrade?plan=premium";
-  }
+  if (plan === "professional") return "/upgrade?plan=professional";
+  if (plan === "premium") return "/upgrade?plan=premium";
   return dashboardPathForRole(String(role).toUpperCase());
 }
 
@@ -32,15 +28,6 @@ export async function finishGoogleSignup(
   locale: string,
   plan?: SignupPlanChoice | null,
 ): Promise<void> {
-  // TESTING MODE - REVERT BEFORE LAUNCH: grant plan tier without Moyasar checkout.
-  if (isTestingMode() && (plan === "professional" || plan === "premium")) {
-    await fetch("/api/upgrade", {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ plan }),
-    });
-  }
   await markOnboardingComplete(update);
   await update({ role });
   hardNavigate(postGoogleSignupPath(role, plan), locale);

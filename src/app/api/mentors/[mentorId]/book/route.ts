@@ -8,7 +8,6 @@ import type { SubscriptionTier } from "@prisma/client";
 import { calculateSessionPricing } from "@/lib/mentor/pricing-server";
 import { onMentorSessionBooked } from "@/lib/mentor/notifications";
 import { isMentorMarketOpen } from "@/lib/settings";
-import { isTestingMode } from "@/lib/testing-mode";
 
 const bodySchema = z.object({
   scheduledAt: z.string().datetime(),
@@ -100,30 +99,6 @@ export async function POST(
     menteeName: mentee?.name ?? "Candidate",
     scheduledAt,
   });
-
-  // TESTING MODE - REVERT BEFORE LAUNCH: confirm mentor session without payment.
-  if (isTestingMode()) {
-    const { createDailyRoomForSession } = await import("@/lib/daily/client");
-    const { ensureMentorMessageThread } = await import("@/lib/mentor/session-access");
-    const { onMentorSessionConfirmed } = await import("@/lib/mentor/notifications");
-
-    const room = await createDailyRoomForSession(row.id, parsed.data.duration);
-    await prisma.mentorSession.update({
-      where: { id: row.id },
-      data: {
-        status: SessionStatus.CONFIRMED,
-        dailyRoomName: room.roomName,
-        dailyRoomUrl: room.roomUrl,
-      },
-    });
-    await ensureMentorMessageThread(row.id);
-    await onMentorSessionConfirmed({
-      menteeUserId: session.user.id,
-      mentorName: mentor.user.name ?? "Mentor",
-      scheduledAt,
-      sessionId: row.id,
-    });
-  }
 
   return NextResponse.json({ success: true, data: row }, { status: 201 });
 }

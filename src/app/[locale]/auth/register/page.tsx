@@ -30,7 +30,6 @@ import {
 } from "@/lib/auth-redirect";
 import { signInWithGoogle } from "@/lib/google-oauth";
 import { dashboardPathForRole } from "@/lib/subscription";
-import { isTestingMode } from "@/lib/testing-mode";
 import { PaymentModal } from "@/components/payments/PaymentModal";
 import {
   SUBSCRIPTION_PLAN_PRICES_SAR,
@@ -491,9 +490,7 @@ export default function RegisterPage() {
         }
 
         const needsPayment =
-          !isTestingMode() &&
-          paymentsConfigured &&
-          (plan === "professional" || plan === "premium");
+          paymentsConfigured && (plan === "professional" || plan === "premium");
 
         if (needsPayment) {
           savePaymentReturnContext({

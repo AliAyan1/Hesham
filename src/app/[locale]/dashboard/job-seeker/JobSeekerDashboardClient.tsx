@@ -36,7 +36,6 @@ import { ErrorState } from "@/components/ui/ErrorState";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { cn } from "@/lib/cn";
 import { hasAccess } from "@/lib/subscription";
-import { isTestingMode } from "@/lib/testing-mode";
 import { MIN_PROFILE_COMPLETION_FOR_AI_JOB_MATCH } from "@/lib/profile-page-completion";
 
 const FREE_UPGRADE_BANNER_KEY = "qt_free_upgrade_banner_dismissed_v1";
@@ -207,7 +206,7 @@ export default function JobSeekerDashboardClient({ userName }: { userName: strin
 
   return (
     <div className="space-y-8">
-      {tier === "FREE" && !hideUpgradeBanner && !isTestingMode() ? (
+      {tier === "FREE" && !hideUpgradeBanner ? (
         <section className="rounded-2xl border border-[#0F4C75]/20 bg-gradient-to-r from-[#EFF6FF] to-white p-5 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">

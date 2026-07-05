@@ -12,7 +12,6 @@ import {
   type SubscriptionPlanKey,
 } from "@/lib/payments/pricing";
 import type { PublicPlatformSettings } from "@/lib/settings-types";
-import { isTestingMode } from "@/lib/testing-mode";
 
 type AccountPick = "EMPLOYER" | "JOBSEEKER";
 
@@ -103,26 +102,6 @@ export function UpgradeConfirm({
     setErr(null);
     if (!selectedPlan || !planKey) return;
     upgradedPlanSlug.current = selectedPlan;
-
-    // TESTING MODE - REVERT BEFORE LAUNCH: upgrade tier without Moyasar modal.
-    if (isTestingMode()) {
-      startTransition(async () => {
-        try {
-          const res = await fetch("/api/upgrade", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify({ plan: selectedPlan }),
-          });
-          if (!res.ok) throw new Error("upgrade_failed");
-          await afterPaymentSuccess();
-        } catch {
-          setErr(t("upgradeError"));
-        }
-      });
-      return;
-    }
-
     setShowPaymentModal(true);
   }
 

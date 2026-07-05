@@ -13,7 +13,6 @@ import { Button } from "@/components/ui/Button";
 import type { MentorCertificationDto } from "@/lib/mentor/certification-types";
 import { MentorCertificationsDisplay } from "@/components/mentor/MentorCertificationsDisplay";
 import { PaymentModal } from "@/components/payments/PaymentModal";
-import { isTestingMode } from "@/lib/testing-mode";
 
 type MentorDetail = {
   id: string;
@@ -96,11 +95,6 @@ export default function MentorBookClient({ mentorId }: { mentorId: string }) {
         return;
       }
       setPendingSessionId(res.data.data.id);
-      // TESTING MODE - REVERT BEFORE LAUNCH: session confirmed server-side, skip Moyasar.
-      if (isTestingMode()) {
-        router.push("/dashboard/job-seeker/sessions");
-        return;
-      }
       setShowPaymentModal(true);
     } catch {
       setError(t("bookingFailed"));

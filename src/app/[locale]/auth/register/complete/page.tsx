@@ -9,7 +9,6 @@ import { AuthShell } from "@/components/auth/AuthShell";
 import { PaymentModal } from "@/components/payments/PaymentModal";
 import { dashboardPathForRole } from "@/lib/subscription";
 import { finishGoogleSignup, hardNavigate } from "@/lib/auth-redirect";
-import { isTestingMode } from "@/lib/testing-mode";
 import { planFromStorage } from "@/lib/register-plan-storage";
 import { savePaymentReturnContext, clearPaymentReturnContext } from "@/lib/payments/return-context";
 import {
@@ -115,9 +114,7 @@ export default function RegisterCompletePage() {
         }
 
         const needsPayment =
-          !isTestingMode() &&
-          paymentsConfigured &&
-          (plan === "professional" || plan === "premium");
+          paymentsConfigured && (plan === "professional" || plan === "premium");
 
         if (needsPayment) {
           savePaymentReturnContext({
