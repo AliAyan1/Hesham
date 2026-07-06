@@ -1,5 +1,5 @@
 import type { PlatformSettings } from "@prisma/client";
-import { getPrisma } from "@/lib/db";
+import { getPrisma, isPrismaConnectionError } from "@/lib/db";
 import { DEFAULT_PLATFORM_SETTINGS } from "@/lib/settings-defaults";
 import type { PublicPlatformSettings, PlatformSettingsDto } from "@/lib/settings-types";
 
@@ -82,11 +82,20 @@ export async function getSettings(): Promise<PlatformSettings> {
     return settingsCache;
   }
 
-  const prisma = getPrisma();
-  const row = await prisma.platformSettings.findFirst();
-  settingsCache = withDefaults(row);
-  settingsCacheTime = now;
-  return settingsCache;
+  try {
+    const prisma = getPrisma();
+    const row = await prisma.platformSettings.findFirst();
+    settingsCache = withDefaults(row);
+    settingsCacheTime = now;
+    return settingsCache;
+  } catch (error) {
+    if (isPrismaConnectionError(error)) {
+      console.warn("[settings] Database unreachable, using cached or default settings");
+      if (settingsCache) return settingsCache;
+      return withDefaults(null);
+    }
+    throw error;
+  }
 }
 
 export async function getPublicSettings(): Promise<PublicPlatformSettings> {

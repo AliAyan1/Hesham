@@ -55,7 +55,11 @@ export async function POST(
     let subscriptionTier =
       role === UserRole.MENTOR ? ("FREE" as const) : tierFromPlan(plan);
 
-    if (moyasarPaymentsEnabled() && isPaidPlanChoice(plan) && role !== UserRole.MENTOR) {
+    if (
+      moyasarPaymentsEnabled() &&
+      isPaidPlanChoice(plan) &&
+      role !== UserRole.MENTOR
+    ) {
       subscriptionTier = "FREE";
     }
 

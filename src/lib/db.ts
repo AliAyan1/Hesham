@@ -25,7 +25,10 @@ export function getPrisma(): PrismaClient {
     globalForPrisma.prisma = undefined;
   }
 
-  const adapter = new PrismaPg({ connectionString: getDatabaseUrl() });
+  const adapter = new PrismaPg({
+    connectionString: getDatabaseUrl(),
+    connectionTimeoutMillis: 10_000,
+  });
   const client = new PrismaClient({
     adapter,
     log:
@@ -38,4 +41,11 @@ export function getPrisma(): PrismaClient {
   globalForPrisma.prismaRevision = PRISMA_CLIENT_REVISION;
 
   return client;
+}
+
+/** True when Postgres is unreachable (Railway sleep, network blip, etc.). */
+export function isPrismaConnectionError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const code = "code" in error ? String((error as { code: unknown }).code) : "";
+  return code === "P1001" || code === "P1002" || code === "P1017";
 }

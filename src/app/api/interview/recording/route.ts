@@ -8,6 +8,8 @@ import type { ApiResponse, SubscriptionTier } from "@/types";
 
 const MAX_BYTES = 104_857_600; // ~100 MB
 
+export const maxDuration = 120;
+
 const fieldsSchema = z.object({
   interviewId: z.string().min(1),
 });

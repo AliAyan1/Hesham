@@ -3,6 +3,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getServerSession } from "@/lib/get-server-session";
 import { getPrisma } from "@/lib/db";
 
+export const maxDuration = 120;
+
 export async function GET(
   request: NextRequest,
   ctx: { params: Promise<{ applicationId: string }> },

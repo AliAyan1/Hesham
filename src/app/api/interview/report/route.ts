@@ -7,7 +7,10 @@ import {
   type CandidateInterviewReportView,
   type EnhancedInterviewReport,
 } from "@/lib/interview/enhanced-report-types";
+import { ensureEnhancedInterviewReport } from "@/lib/interview/generate-enhanced-report";
 import type { ApiResponse } from "@/types";
+
+export const maxDuration = 60;
 
 function toCandidateView(
   report: EnhancedInterviewReport,
@@ -149,7 +152,11 @@ export async function GET(
   const parsed = row.enhancedReport
     ? enhancedInterviewReportSchema.safeParse(row.enhancedReport)
     : null;
-  const report = parsed?.success ? parsed.data : null;
+  let report = parsed?.success ? parsed.data : null;
+
+  if (!report && isEmployer) {
+    report = await ensureEnhancedInterviewReport(row.id);
+  }
 
   const mode = isEmployer ? "employer" : "candidate";
 

@@ -37,7 +37,6 @@ import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { cn } from "@/lib/cn";
 import { hasAccess } from "@/lib/subscription";
 import { MIN_PROFILE_COMPLETION_FOR_AI_JOB_MATCH } from "@/lib/profile-page-completion";
-
 const FREE_UPGRADE_BANNER_KEY = "qt_free_upgrade_banner_dismissed_v1";
 
 type MatchReco = {

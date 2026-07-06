@@ -114,7 +114,8 @@ export default function RegisterCompletePage() {
         }
 
         const needsPayment =
-          paymentsConfigured && (plan === "professional" || plan === "premium");
+          paymentsConfigured &&
+          (plan === "professional" || plan === "premium");
 
         if (needsPayment) {
           savePaymentReturnContext({

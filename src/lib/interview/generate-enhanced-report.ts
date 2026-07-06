@@ -1,6 +1,7 @@
 import { getPrisma } from "@/lib/db";
 import { fetchClaudeJsonText } from "@/lib/ai/claude-json";
 import { parseJsonFromModel } from "@/lib/ai/parse-model-json";
+import { buildFallbackEnhancedReport } from "@/lib/interview/build-fallback-enhanced-report";
 import { computeFacialAnalysisSummary } from "@/lib/interview/compute-facial-summary";
 import {
   enhancedInterviewReportSchema,
@@ -106,16 +107,26 @@ export async function generateEnhancedInterviewReport(interviewId: string): Prom
     maxTokens: 12000,
   });
 
-  if (!claude.ok) return null;
+  let report: EnhancedInterviewReport | null = null;
 
-  let report: EnhancedInterviewReport;
-  try {
-    const json = parseJsonFromModel(claude.text);
-    const validated = enhancedInterviewReportSchema.safeParse(json);
-    if (!validated.success) return null;
-    report = validated.data;
-  } catch {
-    return null;
+  if (claude.ok) {
+    try {
+      const json = parseJsonFromModel(claude.text);
+      const validated = enhancedInterviewReportSchema.safeParse(json);
+      if (validated.success) {
+        report = validated.data;
+      } else {
+        console.warn("[generate-enhanced-report] schema validation failed:", validated.error.issues.slice(0, 3));
+      }
+    } catch (e) {
+      console.warn("[generate-enhanced-report] parse failed:", e);
+    }
+  } else {
+    console.warn("[generate-enhanced-report] Claude unavailable:", claude.error);
+  }
+
+  if (!report) {
+    report = buildFallbackEnhancedReport(row, jobTitle);
   }
 
   await prisma.videoInterview.update({
@@ -127,4 +138,52 @@ export async function generateEnhancedInterviewReport(interviewId: string): Prom
   });
 
   return report;
+}
+
+/** Fast path for UI: return cached or fallback report immediately; upgrade via Claude in background. */
+export async function ensureEnhancedInterviewReport(interviewId: string): Promise<EnhancedInterviewReport | null> {
+  const prisma = getPrisma();
+  const row = await prisma.videoInterview.findUnique({
+    where: { id: interviewId },
+    select: { enhancedReport: true, interviewKind: true },
+  });
+
+  if (!row || row.interviewKind === "practice") return null;
+
+  if (row.enhancedReport) {
+    const existing = enhancedInterviewReportSchema.safeParse(row.enhancedReport);
+    if (existing.success) return existing.data;
+  }
+
+  const full = await prisma.videoInterview.findUnique({
+    where: { id: interviewId },
+    include: {
+      user: { select: { name: true, email: true } },
+      facialSnapshots: { orderBy: { timestamp: "asc" } },
+    },
+  });
+  if (!full) return null;
+
+  let jobTitle = "Role";
+  if (full.jobId) {
+    const job = await prisma.job.findUnique({ where: { id: full.jobId }, select: { title: true } });
+    if (job?.title) jobTitle = job.title;
+  }
+
+  const fallback = buildFallbackEnhancedReport(full, jobTitle);
+  const facialSummary = computeFacialAnalysisSummary(full.facialSnapshots);
+
+  await prisma.videoInterview.update({
+    where: { id: interviewId },
+    data: {
+      enhancedReport: fallback as object,
+      facialAnalysisSummary: (facialSummary ?? { snapshotCount: 0 }) as object,
+    },
+  });
+
+  void generateEnhancedInterviewReport(interviewId).catch((err) => {
+    console.warn("[ensure-enhanced-report] background Claude upgrade failed:", err);
+  });
+
+  return fallback;
 }

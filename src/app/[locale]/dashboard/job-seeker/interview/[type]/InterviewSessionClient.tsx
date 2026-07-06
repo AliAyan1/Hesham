@@ -15,6 +15,10 @@ import { InterviewRunScreen } from "@/components/interview/InterviewRunScreen";
 import { useInterviewAutoAnswer } from "@/hooks/useInterviewAutoAnswer";
 import { useLaraTts } from "@/hooks/useLaraTts";
 import { getLaraIntro, normalizeInterviewLocale, pickQuestionText } from "@/lib/interview/locale-language";
+import {
+  startCompositeInterviewRecording,
+  type CompositeRecordingHandle,
+} from "@/lib/interview/composite-recording-stream";
 
 type QuestionItem = {
   id: string;
@@ -46,24 +50,48 @@ function pickRecorderMime(): string {
 }
 
 function pickSessionRecorderMime(): string {
-  if (typeof MediaRecorder === "undefined") return "";
+  if (typeof MediaRecorder === "undefined") return "video/webm";
   const candidates = [
     "video/webm;codecs=vp9,opus",
     "video/webm;codecs=vp8,opus",
     "video/webm",
-    "video/mp4",
   ];
   for (const mime of candidates) {
     if (MediaRecorder.isTypeSupported(mime)) return mime;
   }
-  return pickRecorderMime();
+  return "video/webm";
 }
 
-function buildSessionRecordingStream(mic: MediaStream, cam: MediaStream): MediaStream {
-  const stream = new MediaStream();
-  mic.getAudioTracks().forEach((track) => stream.addTrack(track));
-  cam.getVideoTracks().forEach((track) => stream.addTrack(track));
-  return stream;
+async function stopSessionRecorder(rec: MediaRecorder): Promise<void> {
+  return new Promise<void>((resolve) => {
+    rec.onstop = () => resolve();
+    try {
+      if (rec.state === "recording") {
+        rec.requestData();
+      }
+      rec.stop();
+    } catch {
+      resolve();
+    }
+  });
+}
+
+async function uploadSessionRecording(interviewId: string, blob: Blob): Promise<boolean> {
+  const ext = blob.type.includes("mp4") ? "mp4" : "webm";
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const fd = new FormData();
+      fd.append("interviewId", interviewId);
+      fd.append("file", blob, `interview-session.${ext}`);
+      const res = await fetch("/api/interview/recording", { method: "POST", body: fd, credentials: "include" });
+      if (res.ok) return true;
+      if (res.status === 413) return false;
+      await new Promise((r) => setTimeout(r, 800 * (attempt + 1)));
+    } catch {
+      await new Promise((r) => setTimeout(r, 800 * (attempt + 1)));
+    }
+  }
+  return false;
 }
 
 export default function InterviewSessionClient({
@@ -108,6 +136,7 @@ export default function InterviewSessionClient({
   const cameraStreamRef = useRef<MediaStream | null>(null);
   const fullRecorderRef = useRef<MediaRecorder | null>(null);
   const fullCloneRef = useRef<MediaStream | null>(null);
+  const compositeRef = useRef<CompositeRecordingHandle | null>(null);
   const fullChunksRef = useRef<BlobPart[]>([]);
   const sessionMimeRef = useRef("");
   const answerRecorderRef = useRef<MediaRecorder | null>(null);
@@ -200,6 +229,8 @@ export default function InterviewSessionClient({
       cameraStreamRef.current?.getTracks().forEach((tr) => tr.stop());
       micStreamRef.current?.getTracks().forEach((tr) => tr.stop());
       fullCloneRef.current?.getTracks().forEach((tr) => tr.stop());
+      compositeRef.current?.stop();
+      compositeRef.current = null;
       try {
         fullRecorderRef.current?.stop();
         answerRecorderRef.current?.stop();
@@ -619,7 +650,9 @@ export default function InterviewSessionClient({
 
       const sessionMime = pickSessionRecorderMime();
       sessionMimeRef.current = sessionMime;
-      cloneLocal = buildSessionRecordingStream(micLocal, camLocal);
+      const composite = startCompositeInterviewRecording(dispLocal, camLocal, micLocal);
+      compositeRef.current = composite;
+      cloneLocal = composite.stream;
       fullCloneRef.current = cloneLocal;
       fullChunksRef.current = [];
       const fullRec = sessionMime
@@ -657,6 +690,8 @@ export default function InterviewSessionClient({
         }
         fullRecorderRef.current = null;
         fullCloneRef.current?.getTracks().forEach((tr) => tr.stop());
+      compositeRef.current?.stop();
+      compositeRef.current = null;
         fullCloneRef.current = null;
         micStreamRef.current?.getTracks().forEach((tr) => tr.stop());
         micStreamRef.current = null;
@@ -698,6 +733,8 @@ export default function InterviewSessionClient({
       }
       fullRecorderRef.current = null;
       fullCloneRef.current?.getTracks().forEach((tr) => tr.stop());
+      compositeRef.current?.stop();
+      compositeRef.current = null;
       fullCloneRef.current = null;
       micStreamRef.current?.getTracks().forEach((tr) => tr.stop());
       micStreamRef.current = null;
@@ -733,30 +770,22 @@ export default function InterviewSessionClient({
     try {
       const rec = fullRecorderRef.current;
       if (rec && rec.state !== "inactive") {
-        await new Promise<void>((resolve) => {
-          rec.onstop = () => resolve();
-          try {
-            rec.stop();
-          } catch {
-            resolve();
-          }
-        });
+        await stopSessionRecorder(rec);
       }
       fullRecorderRef.current = null;
       fullCloneRef.current?.getTracks().forEach((tr) => tr.stop());
+      compositeRef.current?.stop();
+      compositeRef.current = null;
       fullCloneRef.current = null;
 
       const sessionMime = sessionMimeRef.current || pickSessionRecorderMime();
-      const baseMime = sessionMime ? sessionMime.split(";")[0] : "video/webm";
+      const baseMime = "video/webm";
       const blob = new Blob(fullChunksRef.current, { type: baseMime });
-      if (blob.size > 500) {
-        const ext = baseMime.includes("mp4") ? "mp4" : "webm";
-        const fd = new FormData();
-        fd.append("interviewId", interviewId);
-        fd.append("file", blob, `interview-session.${ext}`);
-        const uploadRes = await fetch("/api/interview/recording", { method: "POST", body: fd, credentials: "include" });
-        if (!uploadRes.ok) {
-          console.warn("Interview recording upload failed", await uploadRes.text().catch(() => ""));
+      let recordingUploaded = false;
+      if (blob.size > 100) {
+        recordingUploaded = await uploadSessionRecording(interviewId, blob);
+        if (!recordingUploaded) {
+          console.warn("Interview recording upload failed after retries", { bytes: blob.size });
         }
       }
 
@@ -779,6 +808,10 @@ export default function InterviewSessionClient({
         data?: AnalysisPack;
       };
       if (!res.ok || !j.success || !j.data) throw new Error("analyze");
+
+      if (!recordingUploaded && blob.size > 100) {
+        await uploadSessionRecording(interviewId, blob);
+      }
 
       micStreamRef.current?.getTracks().forEach((tr) => tr.stop());
       micStreamRef.current = null;

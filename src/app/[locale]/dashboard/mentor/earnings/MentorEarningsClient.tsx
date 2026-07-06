@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
-import { Button } from "@/components/ui/Button";
 
 type EarningsData = {
   totalEarnings: number;
@@ -32,11 +31,6 @@ export default function MentorEarningsClient() {
   const t = useTranslations("session");
   const tm = useTranslations("mentor");
   const [data, setData] = useState<EarningsData | null>(null);
-  const [bankName, setBankName] = useState("");
-  const [accountHolder, setAccountHolder] = useState("");
-  const [iban, setIban] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
 
   useEffect(() => {
     void fetch("/api/mentor/earnings", { credentials: "include" })
@@ -45,30 +39,6 @@ export default function MentorEarningsClient() {
         if (j.success && j.data) setData(j.data);
       });
   }, []);
-
-  async function requestPayout() {
-    setBusy(true);
-    setMsg(null);
-    try {
-      const res = await fetch("/api/mentor/payout-request", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bankName, accountHolder, iban }),
-      });
-      const j = (await res.json()) as { success?: boolean; error?: string };
-      if (!j.success) {
-        setMsg(j.error ?? t("payoutFailed"));
-        return;
-      }
-      setMsg(t("payoutRequested"));
-      const reload = await fetch("/api/mentor/earnings", { credentials: "include" });
-      const rj = (await reload.json()) as { success?: boolean; data?: EarningsData };
-      if (rj.success && rj.data) setData(rj.data);
-    } finally {
-      setBusy(false);
-    }
-  }
 
   if (!data) {
     return <p className="text-sm text-[#6B7280]">{tm("loading")}</p>;
@@ -91,20 +61,12 @@ export default function MentorEarningsClient() {
         />
       </div>
 
-      <section className="rounded-xl border bg-white p-6">
-        <h2 className="font-bold text-[#0D2137]">{t("payout")}</h2>
-        <p className="mt-1 text-sm text-[#6B7280]">
-          {t("pending")}: SAR {Math.round(data.pendingPayout)}
+      <section className="rounded-xl border border-[#C9973A]/30 bg-[#FDF3E3] p-6">
+        <h2 className="font-bold text-[#0D2137]">{tm("payoutSection")}</h2>
+        <p className="mt-2 text-sm text-[#374151]">
+          {tm("pendingPayout")}: SAR {Math.round(data.pendingPayout)}
         </p>
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
-          <input className="min-h-11 rounded-lg border px-3 text-sm" placeholder={t("bankName")} value={bankName} onChange={(e) => setBankName(e.target.value)} />
-          <input className="min-h-11 rounded-lg border px-3 text-sm" placeholder={t("accountHolder")} value={accountHolder} onChange={(e) => setAccountHolder(e.target.value)} />
-          <input className="min-h-11 rounded-lg border px-3 text-sm" placeholder="IBAN" value={iban} onChange={(e) => setIban(e.target.value)} />
-        </div>
-        {msg ? <p className="mt-2 text-sm text-[#0F4C75]">{msg}</p> : null}
-        <Button type="button" className="mt-4" loading={busy} disabled={data.pendingPayout < 1} onClick={() => void requestPayout()}>
-          {t("payout")}
-        </Button>
+        <p className="mt-3 text-sm text-[#6B7280]">{t("payoutAdminNote")}</p>
       </section>
 
       <section>
@@ -137,17 +99,19 @@ export default function MentorEarningsClient() {
         </div>
       </section>
 
-      <section>
-        <h2 className="mb-3 font-bold">{t("payoutHistory")}</h2>
-        <ul className="space-y-2 text-sm">
-          {data.payoutHistory.map((p) => (
-            <li key={p.id} className="rounded-lg border bg-white p-3">
-              {new Date(p.date).toLocaleDateString()} · SAR {Math.round(p.amount)} · {p.status}
-              {p.reference ? ` · ${p.reference}` : ""}
-            </li>
-          ))}
-        </ul>
-      </section>
+      {data.payoutHistory.length > 0 ? (
+        <section>
+          <h2 className="mb-3 font-bold">{t("payoutHistory")}</h2>
+          <ul className="space-y-2 text-sm">
+            {data.payoutHistory.map((p) => (
+              <li key={p.id} className="rounded-lg border bg-white p-3">
+                {new Date(p.date).toLocaleDateString()} · SAR {Math.round(p.amount)} · {p.status}
+                {p.reference ? ` · ${p.reference}` : ""}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
     </div>
   );
 }

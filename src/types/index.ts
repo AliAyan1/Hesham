@@ -140,6 +140,7 @@ export type EmployerCandidatePayload = {
     recordingUrl: string | null;
     isFlagged: boolean;
     hasRecording?: boolean;
+    recordingKind?: "video" | "audio" | null;
   } | null;
   proctoringSummary: {
     flagCount: number;

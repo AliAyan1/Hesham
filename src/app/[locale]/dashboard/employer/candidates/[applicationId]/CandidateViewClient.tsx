@@ -97,8 +97,6 @@ export function CandidateViewClient({ applicationId }: { applicationId: string }
   const [rejectOpen, setRejectOpen] = useState(false);
   const [declineReason, setDeclineReason] = useState("");
   const [statusSaving, setStatusSaving] = useState(false);
-  const [recordingDownloadError, setRecordingDownloadError] = useState<string | null>(null);
-  const [recordingDownloading, setRecordingDownloading] = useState(false);
 
   useEffect(() => {
     let cancel = false;
@@ -404,49 +402,14 @@ export function CandidateViewClient({ applicationId }: { applicationId: string }
               type="button"
               variant="outline"
               className="border-brand-teal text-brand-teal hover:bg-brand-lightTeal/30"
-              disabled={!data.sharedInterview.hasRecording || recordingDownloading}
+              disabled={!data.sharedInterview.hasRecording}
               onClick={() => {
                 const url = `/api/employer/applications/${encodeURIComponent(applicationId)}/interview-recording?interviewId=${encodeURIComponent(data.sharedInterview!.id)}`;
-                void (async () => {
-                  setRecordingDownloadError(null);
-                  setRecordingDownloading(true);
-                  try {
-                    const res = await fetch(url, { credentials: "include" });
-                    if (!res.ok) {
-                      const body = (await res.json().catch(() => null)) as { error?: string } | null;
-                      setRecordingDownloadError(body?.error ?? tec("downloadInterviewRecordingFailed"));
-                      return;
-                    }
-                    const blob = await res.blob();
-                    if (blob.size < 32) {
-                      setRecordingDownloadError(tec("downloadInterviewRecordingFailed"));
-                      return;
-                    }
-                    const cd = res.headers.get("Content-Disposition") ?? "";
-                    const match = /filename="([^"]+)"/i.exec(cd);
-                    const filename = match?.[1] ?? "candidate-interview.webm";
-                    const dl = URL.createObjectURL(blob);
-                    const a = document.createElement("a");
-                    a.href = dl;
-                    a.download = filename;
-                    a.click();
-                    URL.revokeObjectURL(dl);
-                  } catch {
-                    setRecordingDownloadError(tec("downloadInterviewRecordingFailed"));
-                  } finally {
-                    setRecordingDownloading(false);
-                  }
-                })();
+                window.location.href = url;
               }}
             >
-              {recordingDownloading ? tc("loading") : tec("downloadInterviewRecording")}
+              {tec("downloadInterviewVideo")}
             </Button>
-            {recordingDownloadError ? (
-              <p className="text-xs text-red-600" role="alert">
-                {recordingDownloadError}
-              </p>
-            ) : null}
-            <p className="text-xs text-[#6B7280]">{tec("downloadInterviewRecordingHint")}</p>
             <Link
               href={`/dashboard/employer/candidates/${applicationId}/interview-report`}
               className="mt-3 inline-flex min-h-10 items-center rounded-lg bg-[#0F4C75] px-4 text-xs font-semibold text-white hover:bg-[#0D2137]"

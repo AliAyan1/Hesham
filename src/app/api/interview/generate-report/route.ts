@@ -3,13 +3,15 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { getServerSession } from "@/lib/get-server-session";
 import { getPrisma } from "@/lib/db";
-import { generateEnhancedInterviewReport } from "@/lib/interview/generate-enhanced-report";
+import { generateEnhancedInterviewReport, ensureEnhancedInterviewReport } from "@/lib/interview/generate-enhanced-report";
 import { enhancedInterviewReportSchema } from "@/lib/interview/enhanced-report-types";
 import type { ApiResponse } from "@/types";
 
 const bodySchema = z.object({
   interviewId: z.string().min(1),
 });
+
+export const maxDuration = 180;
 
 export async function POST(
   request: NextRequest,
@@ -52,7 +54,7 @@ export async function POST(
     }
   }
 
-  const report = await generateEnhancedInterviewReport(parsed.data.interviewId);
+  const report = await ensureEnhancedInterviewReport(parsed.data.interviewId);
   if (!report) {
     return NextResponse.json({ success: false, error: "Report generation failed" }, { status: 503 });
   }

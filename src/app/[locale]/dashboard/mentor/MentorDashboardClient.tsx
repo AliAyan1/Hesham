@@ -206,14 +206,12 @@ export default function MentorDashboardClient() {
         )}
       </section>
 
-      <section className="rounded-xl border bg-white p-6 shadow-sm">
+      <section className="rounded-xl border border-[#C9973A]/30 bg-[#FDF3E3] p-6">
         <h2 className="font-bold text-[#0D2137]">{t("payoutSection")}</h2>
-        <p className="mt-2 text-sm">
+        <p className="mt-2 text-sm text-[#374151]">
           {t("pendingPayout")}: SAR {Math.round(data.mentor.pendingPayout)}
         </p>
-        <Button type="button" className="mt-4" variant="outline">
-          {t("requestPayout")}
-        </Button>
+        <p className="mt-3 text-sm text-[#6B7280]">{t("payoutAdminNote")}</p>
       </section>
     </div>
   );

@@ -138,6 +138,7 @@ export async function GET(
         recordingUrl: true,
         isFlagged: true,
         recordingData: true,
+        recordingMimeType: true,
         jobId: true,
         interviewKind: true,
       },
@@ -163,6 +164,7 @@ export async function GET(
         recordingUrl: true,
         isFlagged: true,
         recordingData: true,
+        recordingMimeType: true,
         jobId: true,
         interviewKind: true,
       },
@@ -280,6 +282,11 @@ export async function GET(
           recordingUrl: sharedInterview.recordingUrl,
           isFlagged: sharedInterview.isFlagged,
           hasRecording: Boolean(sharedInterview.recordingData?.length),
+          recordingKind: sharedInterview.recordingData?.length
+            ? sharedInterview.recordingMimeType?.startsWith("video/")
+              ? "video"
+              : "audio"
+            : null,
         }
       : null,
     proctoringSummary,

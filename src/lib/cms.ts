@@ -1,5 +1,6 @@
 import type { SiteContent } from "@prisma/client";
-import { getPrisma } from "@/lib/db";
+import { SITE_CONTENT_SEED } from "@/lib/cms-defaults";
+import { getPrisma, isPrismaConnectionError } from "@/lib/db";
 
 type ContentLocale = "en" | "ar";
 type SiteContentMap = Record<string, SiteContent>;
@@ -33,6 +34,12 @@ function formatContent(items: SiteContentMap, locale: ContentLocale): CmsPublicC
   );
 }
 
+function getDefaultContent(locale: ContentLocale): CmsPublicContent {
+  return Object.fromEntries(
+    SITE_CONTENT_SEED.map((item) => [item.key, locale === "ar" ? item.valueAr : item.valueEn]),
+  );
+}
+
 export async function getContent(locale: string = "en"): Promise<CmsPublicContent> {
   const now = Date.now();
   const normalizedLocale = normalizeLocale(locale);
@@ -41,12 +48,20 @@ export async function getContent(locale: string = "en"): Promise<CmsPublicConten
     return formatContent(cache, normalizedLocale);
   }
 
-  const prisma = getPrisma();
-  const items = await prisma.siteContent.findMany();
-  cache = Object.fromEntries(items.map((item) => [item.key, item]));
-  cacheTime = now;
-
-  return formatContent(cache, normalizedLocale);
+  try {
+    const prisma = getPrisma();
+    const items = await prisma.siteContent.findMany();
+    cache = Object.fromEntries(items.map((item) => [item.key, item]));
+    cacheTime = now;
+    return formatContent(cache, normalizedLocale);
+  } catch (error) {
+    if (isPrismaConnectionError(error)) {
+      console.warn("[cms] Database unreachable, using cached or default content");
+      if (cache) return formatContent(cache, normalizedLocale);
+      return getDefaultContent(normalizedLocale);
+    }
+    throw error;
+  }
 }
 
 export async function getAllContentItems(): Promise<CmsAdminItem[]> {
