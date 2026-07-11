@@ -13,8 +13,7 @@ export default function LocaleError({
 }) {
   const t = useTranslations("common");
   useEffect(() => {
-    // Avoid console spam in production; keep for local debugging only.
-    void error;
+    console.error("[locale/error]", error.message, error.digest ?? "");
   }, [error]);
 
   return (

@@ -43,9 +43,23 @@ export function getPrisma(): PrismaClient {
   return client;
 }
 
-/** True when Postgres is unreachable (Railway sleep, network blip, etc.). */
+/** True when Postgres is unreachable or the pool is exhausted (Railway sleep, Vercel limit, etc.). */
 export function isPrismaConnectionError(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
   const code = "code" in error ? String((error as { code: unknown }).code) : "";
-  return code === "P1001" || code === "P1002" || code === "P1017";
+  if (
+    code === "P1001" ||
+    code === "P1002" ||
+    code === "P1008" ||
+    code === "P1011" ||
+    code === "P1017" ||
+    code === "P2037"
+  ) {
+    return true;
+  }
+  const message =
+    "message" in error ? String((error as { message: unknown }).message) : String(error);
+  return /ECONNREFUSED|ETIMEDOUT|ECONNRESET|not reachable|too many connections|connection timed out|Can't reach database/i.test(
+    message,
+  );
 }

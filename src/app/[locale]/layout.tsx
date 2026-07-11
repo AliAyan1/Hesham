@@ -75,8 +75,13 @@ export default async function LocaleLayout({
 
   const messages = await getMessages();
   const isRTL = RTL_LOCALES.includes(locale as Locale);
-  const rawSession = await auth();
-  const session = rawSession?.user?.id ? rawSession : null;
+  let session = null;
+  try {
+    const rawSession = await auth();
+    session = rawSession?.user?.id ? rawSession : null;
+  } catch (error) {
+    console.error("[locale/layout] auth() failed; continuing as guest", error);
+  }
 
   return (
     <HtmlLocaleSync locale={locale as Locale}>

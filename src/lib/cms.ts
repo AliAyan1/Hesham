@@ -7,6 +7,8 @@ type SiteContentMap = Record<string, SiteContent>;
 
 let cache: SiteContentMap | null = null;
 let cacheTime = 0;
+/** Dedupes concurrent SSR fetches (home page hits CMS from multiple Server Components). */
+let inflight: Promise<SiteContentMap | null> | null = null;
 
 export const CMS_CACHE_TTL_MS = 60 * 1000;
 
@@ -48,20 +50,31 @@ export async function getContent(locale: string = "en"): Promise<CmsPublicConten
     return formatContent(cache, normalizedLocale);
   }
 
-  try {
-    const prisma = getPrisma();
-    const items = await prisma.siteContent.findMany();
-    cache = Object.fromEntries(items.map((item) => [item.key, item]));
-    cacheTime = now;
-    return formatContent(cache, normalizedLocale);
-  } catch (error) {
-    if (isPrismaConnectionError(error)) {
-      console.warn("[cms] Database unreachable, using cached or default content");
-      if (cache) return formatContent(cache, normalizedLocale);
-      return getDefaultContent(normalizedLocale);
-    }
-    throw error;
+  if (!inflight) {
+    inflight = (async () => {
+      try {
+        const prisma = getPrisma();
+        const items = await prisma.siteContent.findMany();
+        cache = Object.fromEntries(items.map((item) => [item.key, item]));
+        cacheTime = Date.now();
+        return cache;
+      } catch (error) {
+        // Never crash marketing pages if CMS DB is down or pool is exhausted.
+        if (isPrismaConnectionError(error)) {
+          console.warn("[cms] Database unreachable, using cached or default content");
+        } else {
+          console.error("[cms] Failed to load site content, using cached or default content", error);
+        }
+        return null;
+      } finally {
+        inflight = null;
+      }
+    })();
   }
+
+  const map = (await inflight) ?? cache;
+  if (map) return formatContent(map, normalizedLocale);
+  return getDefaultContent(normalizedLocale);
 }
 
 export async function getAllContentItems(): Promise<CmsAdminItem[]> {

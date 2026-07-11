@@ -7,6 +7,8 @@ export type { PublicPlatformSettings, PlatformSettingsDto };
 
 let settingsCache: PlatformSettings | null = null;
 let settingsCacheTime = 0;
+/** Dedupes concurrent SSR fetches under connection_limit=1 on Vercel. */
+let settingsInflight: Promise<PlatformSettings> | null = null;
 
 export const SETTINGS_CACHE_TTL_MS = 5 * 60 * 1000;
 
@@ -82,20 +84,30 @@ export async function getSettings(): Promise<PlatformSettings> {
     return settingsCache;
   }
 
-  try {
-    const prisma = getPrisma();
-    const row = await prisma.platformSettings.findFirst();
-    settingsCache = withDefaults(row);
-    settingsCacheTime = now;
-    return settingsCache;
-  } catch (error) {
-    if (isPrismaConnectionError(error)) {
-      console.warn("[settings] Database unreachable, using cached or default settings");
-      if (settingsCache) return settingsCache;
-      return withDefaults(null);
-    }
-    throw error;
+  if (!settingsInflight) {
+    settingsInflight = (async () => {
+      try {
+        const prisma = getPrisma();
+        const row = await prisma.platformSettings.findFirst();
+        settingsCache = withDefaults(row);
+        settingsCacheTime = Date.now();
+        return settingsCache;
+      } catch (error) {
+        // Never crash marketing pages if settings DB is down or pool is exhausted.
+        if (isPrismaConnectionError(error)) {
+          console.warn("[settings] Database unreachable, using cached or default settings");
+        } else {
+          console.error("[settings] Failed to load platform settings, using cached or defaults", error);
+        }
+        if (settingsCache) return settingsCache;
+        return withDefaults(null);
+      } finally {
+        settingsInflight = null;
+      }
+    })();
   }
+
+  return settingsInflight;
 }
 
 export async function getPublicSettings(): Promise<PublicPlatformSettings> {
