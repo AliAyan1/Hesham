@@ -15,12 +15,19 @@ import {
   formatJobSalaryLine,
   parseHiringMeta,
 } from "@/lib/jobs/job-detail-display";
+import type { JdFitAnalysis } from "@/lib/jobs/jd-fit-analysis";
 
 type JobEnvelope = {
   success: boolean;
   data?: Record<string, unknown>;
   error?: string;
 };
+
+function severityClass(severity: string): string {
+  if (severity === "critical") return "border-red-200 bg-red-50 text-red-900";
+  if (severity === "major") return "border-amber-200 bg-amber-50 text-amber-950";
+  return "border-slate-200 bg-slate-50 text-slate-800";
+}
 
 function asStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
@@ -54,8 +61,10 @@ export function JobDetailClient({ jobId }: { jobId: string }) {
   const [applyOpen, setApplyOpen] = useState(false);
   const [cover, setCover] = useState("");
   const [applyState, setApplyState] = useState<
-    "idle" | "pending" | "success" | "dup" | "fail" | "needAssessment"
+    "idle" | "pending" | "success" | "dup" | "fail" | "needAssessment" | "needCv"
   >("idle");
+  const [fitState, setFitState] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [fitAnalysis, setFitAnalysis] = useState<JdFitAnalysis | null>(null);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
@@ -94,6 +103,44 @@ export function JobDetailClient({ jobId }: { jobId: string }) {
     };
   }, [jobId]);
 
+  function openApply() {
+    setApplyOpen(true);
+    setApplyState("idle");
+    setFitState("idle");
+    setFitAnalysis(null);
+  }
+
+  async function runFitCheck() {
+    setFitState("loading");
+    setApplyState("idle");
+    try {
+      const res = await fetch("/api/jobs/fit-preview", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobId }),
+      });
+      const json = (await res.json()) as {
+        success?: boolean;
+        data?: JdFitAnalysis;
+        error?: string;
+      };
+      if (res.status === 403 && json.error === "cv_required") {
+        setApplyState("needCv");
+        setFitState("error");
+        return;
+      }
+      if (!res.ok || !json.success || !json.data) {
+        setFitState("error");
+        return;
+      }
+      setFitAnalysis(json.data);
+      setFitState("ready");
+    } catch {
+      setFitState("error");
+    }
+  }
+
   async function submitApply() {
     setApplyState("pending");
     try {
@@ -101,7 +148,11 @@ export function JobDetailClient({ jobId }: { jobId: string }) {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jobId, coverLetter: cover.trim() || undefined }),
+        body: JSON.stringify({
+          jobId,
+          coverLetter: cover.trim() || undefined,
+          ...(fitAnalysis ? { fitAnalysis } : {}),
+        }),
       });
       const json = (await res.json()) as { success?: boolean; error?: string };
       if (res.status === 409 || json.error === "already_applied") {
@@ -258,7 +309,7 @@ export function JobDetailClient({ jobId }: { jobId: string }) {
               variant="secondary"
               type="button"
               className="min-h-11 font-semibold"
-              onClick={() => setApplyOpen(true)}
+              onClick={openApply}
             >
               {t("apply")}
             </Button>
@@ -357,7 +408,7 @@ export function JobDetailClient({ jobId }: { jobId: string }) {
           role="dialog"
           aria-modal
         >
-          <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
             <h3 className="text-lg font-bold text-[#0D2137]">{t("apply")}</h3>
             <p className="mt-2 text-sm text-[#6B7280]">{title}</p>
 
@@ -365,15 +416,65 @@ export function JobDetailClient({ jobId }: { jobId: string }) {
             <textarea
               value={cover}
               onChange={(e) => setCover(e.target.value)}
-              rows={6}
+              rows={4}
               className="mt-2 w-full rounded-lg border border-[#E5E7EB] p-3 text-sm outline-none ring-brand-teal/30 focus-visible:ring-2"
             />
+
+            {fitState === "loading" ? (
+              <p className="mt-4 text-sm text-[#6B7280]">{t("fitChecking")}</p>
+            ) : null}
+            {fitState === "error" && applyState !== "needCv" ? (
+              <p className="mt-4 text-sm text-amber-800">{t("fitCheckFailed")}</p>
+            ) : null}
+            {fitState === "ready" && fitAnalysis ? (
+              <div className="mt-4 space-y-3 rounded-lg border border-[#EEF2F7] bg-[#F8FAFC] p-4">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <h4 className="text-sm font-bold text-[#0D2137]">{t("fitReviewTitle")}</h4>
+                  <p className="text-sm font-semibold text-brand-teal">
+                    {t("fitScoreLabel", { score: fitAnalysis.fitScore })}
+                  </p>
+                </div>
+                <p className="text-sm text-[#374151]">
+                  {isRtl && fitAnalysis.summaryAr?.trim()
+                    ? fitAnalysis.summaryAr
+                    : fitAnalysis.summary}
+                </p>
+                {fitAnalysis.gaps.length > 0 ? (
+                  <ul className="space-y-2">
+                    {fitAnalysis.gaps.map((g) => (
+                      <li
+                        key={`${g.code}-${g.title}`}
+                        className={`rounded-md border px-3 py-2 text-sm ${severityClass(g.severity)}`}
+                      >
+                        <p className="font-semibold">
+                          {isRtl && g.titleAr?.trim() ? g.titleAr : g.title}
+                        </p>
+                        <p className="mt-0.5 opacity-90">
+                          {isRtl && g.detailAr?.trim() ? g.detailAr : g.detail}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm font-medium text-brand-teal">{t("fitNoGaps")}</p>
+                )}
+                <p className="text-xs text-[#6B7280]">{t("fitStillApplyHint")}</p>
+              </div>
+            ) : null}
 
             {applyState === "success" ? (
               <p className="mt-3 text-sm font-semibold text-brand-teal">{t("applySuccess")}</p>
             ) : null}
             {applyState === "dup" ? (
               <p className="mt-3 text-sm font-semibold text-amber-700">{t("alreadyApplied")}</p>
+            ) : null}
+            {applyState === "needCv" ? (
+              <p className="mt-3 text-sm font-semibold text-amber-800">
+                {t("fitNeedCv")}{" "}
+                <Link href="/dashboard/job-seeker/cv-builder" className="text-brand-teal underline">
+                  {t("fitGoToCv")}
+                </Link>
+              </p>
             ) : null}
             {applyState === "needAssessment" ? (
               <p className="mt-3 text-sm font-semibold text-amber-800">
@@ -383,21 +484,39 @@ export function JobDetailClient({ jobId }: { jobId: string }) {
                 </Link>
               </p>
             ) : null}
+            {applyState === "fail" ? (
+              <p className="mt-3 text-sm font-semibold text-red-700">{t("applyFailed")}</p>
+            ) : null}
 
-            <div className="mt-5 flex justify-end gap-3">
+            <div className="mt-5 flex flex-wrap justify-end gap-3">
               <Button variant="outline" type="button" className="min-h-11" onClick={() => setApplyOpen(false)}>
                 {tc("cancel")}
               </Button>
-              <Button
-                variant="secondary"
-                type="button"
-                className="min-h-11"
-                loading={applyState === "pending"}
-                disabled={applyState === "success"}
-                onClick={() => void submitApply()}
-              >
-                {t("submitApplication")}
-              </Button>
+              {fitState === "ready" || fitState === "error" ? (
+                <Button
+                  variant="secondary"
+                  type="button"
+                  className="min-h-11"
+                  loading={applyState === "pending"}
+                  disabled={applyState === "success" || applyState === "needCv"}
+                  onClick={() => void submitApply()}
+                >
+                  {fitAnalysis && fitAnalysis.gaps.length > 0
+                    ? t("submitAnyway")
+                    : t("submitApplication")}
+                </Button>
+              ) : (
+                <Button
+                  variant="secondary"
+                  type="button"
+                  className="min-h-11"
+                  loading={fitState === "loading"}
+                  disabled={applyState === "success" || applyState === "needCv"}
+                  onClick={() => void runFitCheck()}
+                >
+                  {t("fitCheckCta")}
+                </Button>
+              )}
             </div>
           </div>
         </div>

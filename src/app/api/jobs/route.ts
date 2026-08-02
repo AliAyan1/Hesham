@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { JobType, type Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/db";
 import { JOB_CATEGORIES } from "@/lib/jobs/constants";
+import { maskSalaryIfHidden } from "@/lib/jobs/mask-salary";
 
 function asInt(v: string | null, fallback: number) {
   const n = v ? Number.parseInt(v, 10) : NaN;
@@ -76,6 +77,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
           salaryMin: true,
           salaryMax: true,
           currency: true,
+          hideSalary: true,
           createdAt: true,
           expiresAt: true,
           employer: {
@@ -99,6 +101,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         j.employer.name?.trim() ||
         j.employer.email ||
         "—";
+      const publicJob = maskSalaryIfHidden(j);
       return {
         id: j.id,
         title: j.title,
@@ -108,9 +111,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         location: j.location,
         locationAr: j.locationAr,
         isRemote: j.isRemote,
-        salaryMin: j.salaryMin,
-        salaryMax: j.salaryMax,
+        salaryMin: publicJob.salaryMin,
+        salaryMax: publicJob.salaryMax,
         currency: j.currency,
+        hideSalary: j.hideSalary,
         createdAt: j.createdAt.toISOString(),
         expiresAt: j.expiresAt?.toISOString() ?? null,
         companyName: company,

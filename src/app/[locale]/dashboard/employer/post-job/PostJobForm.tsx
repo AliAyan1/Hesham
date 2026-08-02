@@ -4,7 +4,7 @@ import { JobType } from "@prisma/client";
 import axios, { isAxiosError } from "axios";
 import { useTranslations } from "next-intl";
 import { Link, useRouter } from "@/i18n/navigation";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { JOB_CATEGORIES } from "@/lib/jobs/constants";
 import { createJobSchema, createJobValidationMessage } from "@/lib/jobs/create-job-schema";
 import { CURRENCIES, formatCurrencyLabel } from "@/lib/currencies";
@@ -48,6 +48,9 @@ export function PostJobForm({
   const [salaryMin, setSalaryMin] = useState("");
   const [salaryMax, setSalaryMax] = useState("");
   const [currency, setCurrency] = useState("SAR");
+  const [hideSalary, setHideSalary] = useState(false);
+  const [salaryPrivacyOpen, setSalaryPrivacyOpen] = useState(false);
+  const [salaryPrivacyResolved, setSalaryPrivacyResolved] = useState(false);
   const [expiresAt, setExpiresAt] = useState("");
   const [description, setDescription] = useState("");
   const [descriptionAr, setDescriptionAr] = useState("");
@@ -59,8 +62,10 @@ export function PostJobForm({
   const [expLevel, setExpLevel] = useState<"ENTRY" | "MID" | "SENIOR" | "LEAD">("MID");
   const [years, setYears] = useState("1");
   const [aiPending, setAiPending] = useState(false);
+  const [parsePending, setParsePending] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const uploadRef = useRef<HTMLInputElement | null>(null);
 
   const categoryLabel = useCallback(
     (c: string) => t(`marketplaceCategories.${c}` as never),
@@ -102,6 +107,50 @@ export function PostJobForm({
     }
   }
 
+  async function parseJobDocument(file: File) {
+    setParsePending(true);
+    setErr(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await axios.post<{
+        success: boolean;
+        data?: {
+          description: string;
+          descriptionAr: string;
+          requirements: string[];
+          benefits: string[];
+        };
+        error?: string;
+      }>("/api/jobs/parse-description", fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      if (!res.data.success || !res.data.data) {
+        throw new Error(res.data.error ?? "parse_failed");
+      }
+      const data = res.data.data;
+      setDescription(data.description);
+      setDescriptionAr(data.descriptionAr || "");
+      if (data.requirements?.length) setReqText(data.requirements.join("\n"));
+      if (data.benefits?.length) setBenText(data.benefits.join("\n"));
+    } catch (e) {
+      const code = isAxiosError(e) ? String(e.response?.data?.error ?? "") : "";
+      const map: Record<string, string> = {
+        unsupported_type: pw("uploadUnsupported"),
+        doc_not_supported: pw("uploadDocLegacy"),
+        file_too_large: pw("uploadTooLarge"),
+        empty_document: pw("uploadEmpty"),
+        extract_failed: pw("uploadExtractFailed"),
+        pdf_corrupt: pw("uploadPdfCorrupt"),
+        file_required: pw("uploadFailed"),
+      };
+      setErr(map[code] ?? (isAxiosError(e) ? String(e.response?.data?.error ?? pw("uploadFailed")) : pw("uploadFailed")));
+    } finally {
+      setParsePending(false);
+      if (uploadRef.current) uploadRef.current.value = "";
+    }
+  }
+
   async function submit() {
     setSubmitting(true);
     setErr(null);
@@ -121,6 +170,7 @@ export function PostJobForm({
         salaryMin: smin === undefined || Number.isNaN(smin) ? undefined : smin,
         salaryMax: smax === undefined || Number.isNaN(smax) ? undefined : smax,
         currency: currency.trim() || undefined,
+        hideSalary: Boolean(smin !== undefined || smax !== undefined) ? hideSalary : false,
         requirements: bullets(reqText),
         benefits: bullets(benText),
         skills: bullets(skillsText),
@@ -176,6 +226,32 @@ export function PostJobForm({
     return true;
   }
 
+  function hasSalaryEntered(): boolean {
+    return Boolean(salaryMin.trim() || salaryMax.trim());
+  }
+
+  function goNextFromStep1() {
+    if (!validateStep(1)) return;
+    if (hasSalaryEntered() && !salaryPrivacyResolved) {
+      setSalaryPrivacyOpen(true);
+      return;
+    }
+    setStep(2);
+  }
+
+  function chooseSalaryVisibility(hide: boolean) {
+    setHideSalary(hide);
+    setSalaryPrivacyResolved(true);
+    setSalaryPrivacyOpen(false);
+    if (step === 1) setStep(2);
+  }
+
+  function onSalaryChange(kind: "min" | "max", value: string) {
+    if (kind === "min") setSalaryMin(value);
+    else setSalaryMax(value);
+    setSalaryPrivacyResolved(false);
+  }
+
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div className="flex gap-2 text-sm font-semibold text-[#6B7280]">
@@ -183,6 +259,30 @@ export function PostJobForm({
       </div>
 
       {err ? <p className="text-sm text-red-600">{err}</p> : null}
+
+      {salaryPrivacyOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal>
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <h3 className="text-lg font-bold text-[#0D2137]">{pw("salaryPrivacyTitle")}</h3>
+            <p className="mt-2 text-sm text-[#4B5563]">{pw("salaryPrivacyBody")}</p>
+            <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-end">
+              <Button type="button" variant="outline" className="min-h-11" onClick={() => chooseSalaryVisibility(false)}>
+                {pw("salaryShow")}
+              </Button>
+              <Button type="button" variant="primary" className="min-h-11" onClick={() => chooseSalaryVisibility(true)}>
+                {pw("salaryHide")}
+              </Button>
+            </div>
+            <button
+              type="button"
+              className="mt-3 text-sm text-[#6B7280] underline"
+              onClick={() => setSalaryPrivacyOpen(false)}
+            >
+              {tc("cancel")}
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {step === 1 ? (
         <section className="space-y-4 rounded-xl border bg-white p-6">
@@ -236,11 +336,21 @@ export function PostJobForm({
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="text-sm font-medium">
               {pw("salaryMin")}
-              <input value={salaryMin} onChange={(e) => setSalaryMin(e.target.value)} className="mt-1 w-full rounded border px-3 py-2" type="number" />
+              <input
+                value={salaryMin}
+                onChange={(e) => onSalaryChange("min", e.target.value)}
+                className="mt-1 w-full rounded border px-3 py-2"
+                type="number"
+              />
             </label>
             <label className="text-sm font-medium">
               {pw("salaryMax")}
-              <input value={salaryMax} onChange={(e) => setSalaryMax(e.target.value)} className="mt-1 w-full rounded border px-3 py-2" type="number" />
+              <input
+                value={salaryMax}
+                onChange={(e) => onSalaryChange("max", e.target.value)}
+                className="mt-1 w-full rounded border px-3 py-2"
+                type="number"
+              />
             </label>
             <label className="text-sm font-medium">
               {pw("currency")}
@@ -253,11 +363,23 @@ export function PostJobForm({
               </select>
             </label>
           </div>
+          {hasSalaryEntered() && salaryPrivacyResolved ? (
+            <p className="text-xs text-[#6B7280]">
+              {hideSalary ? pw("salaryHiddenHint") : pw("salaryVisibleHint")}{" "}
+              <button
+                type="button"
+                className="font-semibold text-[#0D9488] underline"
+                onClick={() => setSalaryPrivacyOpen(true)}
+              >
+                {pw("salaryChangeVisibility")}
+              </button>
+            </p>
+          ) : null}
           <label className="block text-sm font-medium">
             {pw("deadline")}
             <input value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} type="datetime-local" className="mt-1 w-full rounded border px-3 py-2" />
           </label>
-          <Button type="button" variant="primary" className="min-h-11" onClick={() => validateStep(1) && setStep(2)}>
+          <Button type="button" variant="primary" className="min-h-11" onClick={goNextFromStep1}>
             {tc("next")}
           </Button>
         </section>
@@ -265,12 +387,32 @@ export function PostJobForm({
 
       {step === 2 ? (
         <section className="space-y-4 rounded-xl border bg-white p-6">
-          <div className="flex flex-wrap items-start gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {canAiJobDescription ? (
-              <Button type="button" variant="outline" loading={aiPending} onClick={() => void runAi()}>
+              <Button type="button" variant="outline" loading={aiPending} disabled={parsePending} onClick={() => void runAi()}>
                 {pw("aiGenerateDesc")}
               </Button>
             ) : null}
+            <Button
+              type="button"
+              variant="outline"
+              loading={parsePending}
+              disabled={aiPending}
+              onClick={() => uploadRef.current?.click()}
+            >
+              {pw("uploadJd")}
+            </Button>
+            <input
+              ref={uploadRef}
+              type="file"
+              accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void parseJobDocument(f);
+              }}
+            />
+            <p className="w-full text-xs text-[#6B7280]">{pw("uploadJdHint")}</p>
           </div>
           <label className="block text-sm font-medium">
             {pw("descEnRequired")}
@@ -346,6 +488,15 @@ export function PostJobForm({
             {categoryLabel(category)} · {t(`jobTypes.${String(type).toLowerCase()}` as never)} ·{" "}
             {isRemote ? pw("remoteSummary") : pw("locationSummary", { location: location || "—" })}
           </p>
+          {hasSalaryEntered() ? (
+            <p className="text-sm text-[#374151]">
+              {hideSalary
+                ? pw("previewSalaryHidden")
+                : pw("previewSalaryShown", {
+                    range: `${salaryMin || "—"} – ${salaryMax || "—"} ${currency}`,
+                  })}
+            </p>
+          ) : null}
           <p className="whitespace-pre-wrap text-sm">{description.slice(0, 400)}…</p>
           <div className="flex gap-2">
             <Button type="button" variant="outline" onClick={() => setStep(3)}>

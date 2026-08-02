@@ -6,6 +6,8 @@ import type { ApiResponse } from "@/types";
 import { generateEmployerInterviewQuestions } from "@/lib/employer-interview/ai-questions";
 import type { InterviewQuestion } from "@/lib/employer-interview/template";
 
+export const maxDuration = 60;
+
 export async function POST(
   _request: NextRequest,
   ctx: { params: Promise<{ jobId: string }> },
@@ -25,15 +27,16 @@ export async function POST(
     return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
   }
 
-  const suggestions = await generateEmployerInterviewQuestions({
+  const result = await generateEmployerInterviewQuestions({
     jobTitle: job.title,
     jobDescription: job.description,
     count: 5,
+    experienceLevel: "auto",
   });
 
-  if (!suggestions?.length) {
+  if (!result.questions.length) {
     return NextResponse.json({ success: false, error: "ai_unavailable" }, { status: 503 });
   }
 
-  return NextResponse.json({ success: true, data: { suggestions } }, { status: 200 });
+  return NextResponse.json({ success: true, data: { suggestions: result.questions } }, { status: 200 });
 }

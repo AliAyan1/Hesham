@@ -4,7 +4,6 @@ import { getPrisma } from "@/lib/db";
 import type { ZodIssue } from "zod";
 import { registerWithPlanSchema } from "@/lib/validations";
 import type { ApiResponse, IUser } from "@/types";
-import { tierFromPlan } from "@/lib/subscription";
 import { UserRole } from "@prisma/client";
 import { onEmployerRegistered, onJobSeekerRegistered } from "@/lib/email-triggers";
 import { isRegistrationOpen as getRegistrationOpen } from "@/lib/settings";
@@ -52,18 +51,12 @@ export async function POST(
 
     const { name, email, password, role, plan } = parsed.data;
     console.error("[register] attempt:", email, "role:", role, "plan:", plan ?? "none");
-    let subscriptionTier =
-      role === UserRole.MENTOR ? ("FREE" as const) : tierFromPlan(plan);
 
-    if (
-      moyasarPaymentsEnabled() &&
-      isPaidPlanChoice(plan) &&
-      role !== UserRole.MENTOR
-    ) {
-      subscriptionTier = "FREE";
-    }
+    // REVERTED - payment required to upgrade. All new accounts start as FREE.
+    // Plan upgrades only AFTER payment success via /api/payments/verify.
+    const subscriptionTier = "FREE" as const;
 
-    if (paymentsAreLive() && subscriptionTier !== "FREE") {
+    if (paymentsAreLive() && isPaidPlanChoice(plan) && !moyasarPaymentsEnabled()) {
       return NextResponse.json(
         {
           success: false,

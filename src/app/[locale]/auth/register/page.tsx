@@ -489,9 +489,9 @@ export default function RegisterPage() {
           /* use cached flag */
         }
 
+        // Paid plans require Moyasar checkout before onboarding.
         const needsPayment =
-          paymentsConfigured &&
-          (plan === "professional" || plan === "premium");
+          paymentsConfigured && (plan === "professional" || plan === "premium");
 
         if (needsPayment) {
           savePaymentReturnContext({

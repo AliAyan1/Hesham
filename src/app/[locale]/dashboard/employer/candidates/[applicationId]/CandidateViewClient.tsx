@@ -1,7 +1,7 @@
 "use client";
 
 import axios from "axios";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useMemo, useState } from "react";
 import type { EmployerCandidatePayload } from "@/types";
 import { ApplicationStatus } from "@/types";
@@ -91,6 +91,8 @@ export function CandidateViewClient({ applicationId }: { applicationId: string }
   const dash = useTranslations("dashboard");
   const tc = useTranslations("common");
   const tj = useTranslations("jobs");
+  const locale = useLocale();
+  const isRtl = locale === "ar" || locale === "ur";
 
   const [data, setData] = useState<EmployerCandidatePayload | null>(null);
   const [err, setErr] = useState(false);
@@ -236,6 +238,62 @@ export function CandidateViewClient({ applicationId }: { applicationId: string }
           ) : null}
         </div>
       </header>
+
+      {data.jdFit ? (
+        <section className="rounded-xl border border-[#EEF2F7] bg-white p-6 shadow-sm">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="font-bold text-[#0D2137]">{tec("jdFitSection")}</h2>
+            <p className="text-sm font-semibold text-brand-teal">
+              {tec("jdFitScore", { score: data.jdFit.fitScore })}
+            </p>
+          </div>
+          <p className="mt-1 text-xs text-[#6B7280]">{tec("jdFitHint")}</p>
+          <p className="mt-3 text-sm text-[#374151]">
+            {isRtl && data.jdFit.summaryAr?.trim() ? data.jdFit.summaryAr : data.jdFit.summary}
+          </p>
+          {data.jdFit.gaps.length > 0 ? (
+            <ul className="mt-4 space-y-2">
+              {data.jdFit.gaps.map((g) => (
+                <li
+                  key={`${g.code}-${g.title}`}
+                  className={`rounded-lg border px-3 py-2 text-sm ${
+                    g.severity === "critical"
+                      ? "border-red-200 bg-red-50 text-red-900"
+                      : g.severity === "major"
+                        ? "border-amber-200 bg-amber-50 text-amber-950"
+                        : "border-slate-200 bg-slate-50 text-slate-800"
+                  }`}
+                >
+                  <p className="font-semibold">
+                    {tec(`jdFitSeverity.${g.severity}` as never)} ·{" "}
+                    {isRtl && g.titleAr?.trim() ? g.titleAr : g.title}
+                  </p>
+                  <p className="mt-0.5 opacity-90">
+                    {isRtl && g.detailAr?.trim() ? g.detailAr : g.detail}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-3 text-sm font-medium text-brand-teal">{tec("jdFitNoGaps")}</p>
+          )}
+          {data.jdFit.strengths.length > 0 ? (
+            <div className="mt-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#6B7280]">
+                {tec("jdFitStrengths")}
+              </p>
+              <ul className="mt-2 list-disc space-y-1 ps-5 text-sm text-[#374151]">
+                {(isRtl && data.jdFit.strengthsAr?.length
+                  ? data.jdFit.strengthsAr
+                  : data.jdFit.strengths
+                ).map((s) => (
+                  <li key={s}>{s}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
 
       <div className="flex flex-wrap gap-3">
         <a

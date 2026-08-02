@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import { useRouter } from "@/i18n/navigation";
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
+import { PaymentModal } from "@/components/payments/PaymentModal";
 
 type ObligationDto = {
   id: string;
@@ -36,6 +37,10 @@ export default function ObligationClient() {
   const [row, setRow] = useState<ObligationDto | null>(null);
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [signedFee, setSignedFee] = useState<number | null>(null);
+  const [signedJobTitle, setSignedJobTitle] = useState("");
+  const [signedCandidate, setSignedCandidate] = useState("");
 
   useEffect(() => {
     void fetch(`/api/employer/obligation/${encodeURIComponent(id)}`, { credentials: "include" })
@@ -56,8 +61,11 @@ export default function ObligationClient() {
     });
     setLoading(false);
     const json = (await res.json()) as SignResponse;
-    if (res.ok && json.success) {
-      router.push("/dashboard/employer/candidates");
+    if (res.ok && json.success && json.data) {
+      setSignedFee(json.data.recruitmentFee);
+      setSignedJobTitle(json.data.jobTitle);
+      setSignedCandidate(json.data.candidateName ?? t("candidate"));
+      setShowPaymentModal(true);
     }
   }
 
@@ -67,6 +75,7 @@ export default function ObligationClient() {
   const total = row.totalAmount ?? row.recruitmentFee + vat;
   const candidateName = row.candidate.name ?? t("candidate");
   const jobTitle = row.job.title;
+  const feeAmount = signedFee ?? row.recruitmentFee;
 
   return (
     <>
@@ -95,13 +104,31 @@ export default function ObligationClient() {
         />
         <button
           type="button"
-          disabled={loading || !name.trim()}
+          disabled={loading || !name.trim() || showPaymentModal}
           onClick={() => void sign()}
           className="w-full rounded-lg bg-[#0F4C75] py-3 text-sm font-semibold text-white disabled:opacity-50"
         >
           {loading ? t("signing") : t("agreeAndSign")}
         </button>
       </div>
+
+      <PaymentModal
+        isOpen={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        title={t("recruitmentFeeTitle")}
+        baseAmount={feeAmount}
+        description={t("recruitmentFeeDescription", {
+          candidate: signedCandidate || candidateName,
+          job: signedJobTitle || jobTitle,
+        })}
+        metadata={{
+          type: "RECRUITMENT_FEE",
+          obligationId: id,
+        }}
+        onSuccess={() => {
+          router.push("/dashboard/employer/candidates");
+        }}
+      />
     </>
   );
 }

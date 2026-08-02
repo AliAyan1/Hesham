@@ -113,9 +113,9 @@ export default function RegisterCompletePage() {
           /* use cached flag */
         }
 
+        // Paid plans require Moyasar checkout after Google signup.
         const needsPayment =
-          paymentsConfigured &&
-          (plan === "professional" || plan === "premium");
+          paymentsConfigured && (plan === "professional" || plan === "premium");
 
         if (needsPayment) {
           savePaymentReturnContext({

@@ -7,6 +7,7 @@ import type { ApiResponse } from "@/types";
 import { jobCategorySchema, jobTypeSchema, hiringMetaSchema } from "@/lib/jobs/constants";
 import { notifyJobSeekersOnNewJob } from "@/lib/jobs/notify-job-matches";
 import { runAutoShortlistForJob } from "@/lib/jobs/run-auto-shortlist";
+import { maskSalaryIfHidden } from "@/lib/jobs/mask-salary";
 
 const updateBodySchema = z.object({
   title: z.string().min(3).max(200).optional(),
@@ -21,6 +22,7 @@ const updateBodySchema = z.object({
   salaryMin: z.number().int().min(0).nullable().optional(),
   salaryMax: z.number().int().min(0).nullable().optional(),
   currency: z.string().max(8).optional(),
+  hideSalary: z.boolean().optional(),
   requirements: z.array(z.string().max(800)).max(80).optional(),
   benefits: z.array(z.string().max(800)).max(80).optional(),
   skills: z.array(z.string().max(120)).max(60).optional(),
@@ -83,14 +85,21 @@ export async function GET(
     job.employer.name?.trim() ||
     job.employer.email;
 
+  const session = await getServerSession();
+  const isOwnerEmployer =
+    session?.user?.role === UserRole.EMPLOYER && session.user.id === job.employerId;
+
+  const payload = isOwnerEmployer ? job : maskSalaryIfHidden(job);
+
   return NextResponse.json({
     success: true,
     data: {
-      ...job,
+      ...payload,
       createdAt: job.createdAt.toISOString(),
       updatedAt: job.updatedAt.toISOString(),
       expiresAt: job.expiresAt?.toISOString() ?? null,
       companyName,
+      hideSalary: job.hideSalary,
     },
   });
 }
@@ -137,6 +146,7 @@ export async function PUT(
       ...(b.salaryMin !== undefined ? { salaryMin: b.salaryMin } : {}),
       ...(b.salaryMax !== undefined ? { salaryMax: b.salaryMax } : {}),
       ...(b.currency !== undefined ? { currency: b.currency } : {}),
+      ...(b.hideSalary !== undefined ? { hideSalary: b.hideSalary } : {}),
       ...(b.requirements !== undefined ? { requirements: toInputJson(b.requirements) } : {}),
       ...(b.benefits !== undefined ? { benefits: toInputJson(b.benefits) } : {}),
       ...(b.skills !== undefined ? { skills: toInputJson(b.skills) } : {}),

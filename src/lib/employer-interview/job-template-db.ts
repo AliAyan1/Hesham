@@ -8,7 +8,14 @@ export async function getInterviewTemplateForJob(jobId: string): Promise<JobInte
     where: { jobId },
     select: { template: true },
   });
-  return parseInterviewTemplate(row?.template) ?? defaultInterviewTemplate();
+  const parsed = parseInterviewTemplate(row?.template);
+  if (!parsed) return defaultInterviewTemplate();
+  return {
+    ...defaultInterviewTemplate(),
+    ...parsed,
+    experienceLevel: parsed.experienceLevel ?? "auto",
+    settings: { ...defaultInterviewTemplate().settings, ...parsed.settings },
+  };
 }
 
 export async function upsertInterviewTemplateForJob(jobId: string, template: JobInterviewTemplate): Promise<void> {

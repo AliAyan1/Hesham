@@ -10,10 +10,18 @@ import { getInterviewTemplateForJob } from "@/lib/employer-interview/job-templat
 import { employerInterviewQuestionsToVideoJson } from "@/lib/employer-interview/to-video-interview-questions";
 import { shareCompletedAssessmentsForUser } from "@/lib/assessment/auto-share";
 import { getSettings } from "@/lib/settings";
+import {
+  analyzeJdFit,
+  jdFitAnalysisSchema,
+  type JdFitAnalysis,
+} from "@/lib/jobs/jd-fit-analysis";
+
+export const maxDuration = 60;
 
 const bodySchema = z.object({
   jobId: z.string().min(1),
   coverLetter: z.string().max(8000).optional(),
+  fitAnalysis: jdFitAnalysisSchema.optional(),
 });
 
 export async function POST(
@@ -69,7 +77,37 @@ export async function POST(
     );
   }
 
-  const cv = await prisma.cV.findUnique({ where: { userId: seekerId }, select: { id: true } });
+  const cv = await prisma.cV.findUnique({
+    where: { userId: seekerId },
+    select: {
+      id: true,
+      professionalTitle: true,
+      summary: true,
+      experience: true,
+      education: true,
+      skills: true,
+    },
+  });
+
+  let fitAnalysis: JdFitAnalysis | null = parsed.data.fitAnalysis ?? null;
+  if (!fitAnalysis && cv) {
+    fitAnalysis = await analyzeJdFit({
+      job: {
+        title: job.title,
+        description: job.description,
+        requirements: job.requirements,
+        skills: job.skills,
+        hiringMeta: job.hiringMeta,
+      },
+      cv: {
+        professionalTitle: cv.professionalTitle,
+        summary: cv.summary,
+        experience: cv.experience,
+        education: cv.education,
+        skills: cv.skills,
+      },
+    });
+  }
 
   try {
     const result = await prisma.$transaction(async (tx) => {
@@ -78,7 +116,17 @@ export async function POST(
           jobId: job.id,
           jobSeekerId: seekerId,
           coverLetter: parsed.data.coverLetter,
-          ...(cv ? { cvSnapshot: { cvId: cv.id } } : {}),
+          matchScore: fitAnalysis?.fitScore ?? null,
+          ...(cv
+            ? {
+                cvSnapshot: {
+                  cvId: cv.id,
+                  ...(fitAnalysis ? { fitAnalysis } : {}),
+                } as object,
+              }
+            : fitAnalysis
+              ? { cvSnapshot: { fitAnalysis } as object }
+              : {}),
         },
         select: { id: true },
       });

@@ -78,6 +78,24 @@ export interface ApiResponse<T = unknown> {
   error?: string;
 }
 
+/** JD↔CV fit briefing stored on application (seeker warning + employer gaps). */
+export type EmployerJdFitBriefing = {
+  fitScore: number;
+  summary: string;
+  summaryAr: string;
+  strengths: string[];
+  strengthsAr: string[];
+  gaps: Array<{
+    code: string;
+    severity: "critical" | "major" | "minor";
+    title: string;
+    titleAr: string;
+    detail: string;
+    detailAr: string;
+  }>;
+  analyzedAt?: string;
+};
+
 /** Employer-only view of a candidate tied to one application (see GET …/applications/[id]/candidate). */
 export type EmployerCandidatePayload = {
   applicationId: string;
@@ -85,6 +103,9 @@ export type EmployerCandidatePayload = {
   appliedForJobTitle: string;
   /** Email/phone/external links visible only after hire or candidate accepted offer. */
   contactUnlocked: boolean;
+  /** AI JD fit vs CV — major gaps before shortlisting. */
+  jdFit: EmployerJdFitBriefing | null;
+  matchScore: number | null;
   candidate: {
     id: string;
     name: string | null;

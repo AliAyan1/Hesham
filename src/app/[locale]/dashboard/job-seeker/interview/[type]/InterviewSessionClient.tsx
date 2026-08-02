@@ -27,6 +27,9 @@ type QuestionItem = {
   category: string;
   timeLimit: number;
   tips: string;
+  followUp?: string;
+  followUpAr?: string;
+  stage?: string;
 };
 
 type AnalysisPack = {
@@ -39,7 +42,7 @@ type AnalysisPack = {
   overallFeedbackAr: string;
 };
 
-type FlowError = "begin" | "finalize" | null;
+type FlowError = "begin" | "generate" | "finalize" | null;
 
 function pickRecorderMime(): string {
   if (typeof MediaRecorder === "undefined") return "";
@@ -414,6 +417,38 @@ export default function InterviewSessionClient({
     const finalText = (finalTextOverride ?? (liveTranscript.trim() || transcripts[q.id] || "")).trim();
     setTranscripts((prev) => ({ ...prev, [q.id]: finalText }));
 
+    // Adaptive probe: after a substantive answer, insert the employer-authored follow-up once.
+    const substantive =
+      finalText.length >= 40 &&
+      finalText !== t("emptyAnswerPlaceholder") &&
+      !q.id.includes("-followup");
+    const followEn = q.followUp?.trim() ?? "";
+    const followAr = (q.followUpAr?.trim() || followEn).trim();
+    if (substantive && followEn) {
+      const followId = `${q.id}-followup`;
+      if (!questions.some((item) => item.id === followId)) {
+        const followItem: QuestionItem = {
+          id: followId,
+          question: followEn,
+          questionAr: followAr || followEn,
+          category: "follow_up",
+          timeLimit: Math.min(90, q.timeLimit || 90),
+          tips: "Follow-up based on your previous answer.",
+          stage: "follow_up",
+        };
+        setQuestions((prev) =>
+          prev.some((item) => item.id === followId)
+            ? prev
+            : [...prev.slice(0, idx + 1), followItem, ...prev.slice(idx + 1)],
+        );
+        setIdx(idx + 1);
+        setLiveTranscript("");
+        setTimeLeft(followItem.timeLimit);
+        setAnswerRecorded(false);
+        return;
+      }
+    }
+
     const nextIdx = idx + 1;
     if (nextIdx >= questions.length) {
       await finalizeInterview();
@@ -705,7 +740,7 @@ export default function InterviewSessionClient({
       }
       if (!gen.ok || !gj.success || !gj.data) {
         if (gen.status === 403 && gj.error === "consent_required") throw new Error("consent_required");
-        throw new Error(gj.error ?? "generate");
+        throw new Error(`generate:${gj.error ?? "failed"}`);
       }
       const loadedQuestions = gj.data.questions;
       setInterviewId(gj.data.interviewId);
@@ -724,8 +759,9 @@ export default function InterviewSessionClient({
       } else {
         void playIntroAndFirstQuestion(loadedQuestions);
       }
-    } catch {
-      setFlowError("begin");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "";
+      setFlowError(msg.startsWith("generate:") ? "generate" : "begin");
       try {
         fullRecorderRef.current?.stop();
       } catch {
@@ -898,9 +934,14 @@ export default function InterviewSessionClient({
   }
 
   if (flowError) {
-    const title = flowError === "begin" ? t("beginFailed") : t("analyzeFailed");
-    const onRetry =
+    const title =
       flowError === "begin"
+        ? t("beginFailed")
+        : flowError === "generate"
+          ? t("generateFailed")
+          : t("analyzeFailed");
+    const onRetry =
+      flowError === "begin" || flowError === "generate"
         ? () => {
             setFlowError(null);
             void begin();

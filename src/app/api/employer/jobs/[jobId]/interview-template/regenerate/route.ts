@@ -1,22 +1,46 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { UserRole } from "@prisma/client";
+import { z } from "zod";
 import { getServerSession } from "@/lib/get-server-session";
 import { getPrisma } from "@/lib/db";
 import type { ApiResponse } from "@/types";
-import { generateEmployerInterviewQuestions } from "@/lib/employer-interview/ai-questions";
+import {
+  generateEmployerInterviewQuestions,
+  TARGET_INTERVIEW_QUESTION_COUNT,
+} from "@/lib/employer-interview/ai-questions";
+import { experienceLevelSchema, type InterviewQuestion } from "@/lib/employer-interview/template";
 
-import type { InterviewQuestion } from "@/lib/employer-interview/template";
+export const maxDuration = 90;
+
+const bodySchema = z.object({
+  experienceLevel: experienceLevelSchema.optional(),
+  count: z.number().int().min(5).max(TARGET_INTERVIEW_QUESTION_COUNT).optional(),
+});
 
 export async function POST(
-  _request: NextRequest,
+  request: NextRequest,
   ctx: { params: Promise<{ jobId: string }> },
-): Promise<NextResponse<ApiResponse<{ questions: InterviewQuestion[] }>>> {
+): Promise<
+  NextResponse<
+    ApiResponse<{
+      questions: InterviewQuestion[];
+      resolvedLevel: "fresher" | "experienced";
+      analysisSummary: string;
+    }>
+  >
+> {
   const session = await getServerSession();
   if (!session?.user?.id || session.user.role !== UserRole.EMPLOYER) {
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
   }
 
   const { jobId } = await ctx.params;
+  const raw: unknown = await request.json().catch(() => ({}));
+  const parsed = bodySchema.safeParse(raw ?? {});
+  if (!parsed.success) {
+    return NextResponse.json({ success: false, error: "Validation failed" }, { status: 400 });
+  }
+
   const prisma = getPrisma();
   const job = await prisma.job.findFirst({
     where: { id: jobId, employerId: session.user.id },
@@ -26,15 +50,26 @@ export async function POST(
     return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
   }
 
-  const questions = await generateEmployerInterviewQuestions({
+  const result = await generateEmployerInterviewQuestions({
     jobTitle: job.title,
     jobDescription: job.description,
-    count: 7,
+    count: parsed.data.count ?? TARGET_INTERVIEW_QUESTION_COUNT,
+    experienceLevel: parsed.data.experienceLevel ?? "auto",
   });
 
-  if (!questions?.length) {
+  if (!result.questions.length) {
     return NextResponse.json({ success: false, error: "ai_unavailable" }, { status: 503 });
   }
 
-  return NextResponse.json({ success: true, data: { questions } }, { status: 200 });
+  return NextResponse.json(
+    {
+      success: true,
+      data: {
+        questions: result.questions,
+        resolvedLevel: result.resolvedLevel,
+        analysisSummary: result.analysisSummary,
+      },
+    },
+    { status: 200 },
+  );
 }

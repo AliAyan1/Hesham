@@ -66,6 +66,7 @@ export async function POST(
       salaryMin: b.salaryMin,
       salaryMax: b.salaryMax,
       currency: b.currency ?? "SAR",
+      hideSalary: b.hideSalary ?? false,
       requirements: b.requirements ? toInputJson(b.requirements) : undefined,
       benefits: b.benefits ? toInputJson(b.benefits) : undefined,
       skills: b.skills ? toInputJson(b.skills) : undefined,

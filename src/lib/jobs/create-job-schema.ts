@@ -14,6 +14,8 @@ export const createJobSchema = z.object({
   salaryMin: z.number().int().min(0).optional(),
   salaryMax: z.number().int().min(0).optional(),
   currency: z.string().max(8).optional(),
+  /** Hide salary range from job seekers (employer still keeps the values). */
+  hideSalary: z.boolean().optional(),
   requirements: z.array(z.string().max(800)).max(80).optional(),
   benefits: z.array(z.string().max(800)).max(80).optional(),
   skills: z.array(z.string().max(120)).max(60).optional(),

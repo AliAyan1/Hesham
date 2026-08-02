@@ -10,6 +10,12 @@ import { getProctoringSuspensionPayload } from "@/lib/assessment/check-proctorin
 import type { ApiResponse, SubscriptionTier } from "@/types";
 import { getQuestionGenerationLanguageInstruction } from "@/lib/interview/locale-language";
 import { PRACTICE_INTERVIEW_QUESTIONS } from "@/lib/interview/practice-questions";
+import {
+  fallbackCompetencyInterviewQuestions,
+  fallbackJobInterviewQuestions,
+  normalizeVideoInterviewQuestions,
+  type VideoInterviewQuestion,
+} from "@/lib/interview/fallback-ai-questions";
 
 const bodySchema = z.object({
   kind: z.enum(["practice", "competency", "job"]),
@@ -25,10 +31,9 @@ const qSchema = z.object({
   category: z.string(),
   timeLimit: z.number().int().min(30).max(600),
   tips: z.string(),
-});
-
-const packSchema = z.object({
-  questions: z.array(qSchema).min(4).max(10),
+  followUp: z.string().optional(),
+  followUpAr: z.string().optional(),
+  stage: z.string().optional(),
 });
 
 /** Employer templates may have fewer questions than AI-generated packs. */
@@ -88,13 +93,20 @@ export async function POST(
     }
     const questionsUnknown = existing.questions as unknown;
     const v = storedPackSchema.safeParse({ questions: questionsUnknown });
-    if (!v.success) {
-      return NextResponse.json({ success: false, error: "Stored questions invalid" }, { status: 500 });
+    if (v.success) {
+      return NextResponse.json(
+        { success: true, data: { interviewId: existing.id, questions: v.data.questions } },
+        { status: 200 },
+      );
     }
-    return NextResponse.json(
-      { success: true, data: { interviewId: existing.id, questions: v.data.questions } },
-      { status: 200 },
-    );
+    const repaired = normalizeVideoInterviewQuestions({ questions: questionsUnknown });
+    if (repaired.length > 0) {
+      return NextResponse.json(
+        { success: true, data: { interviewId: existing.id, questions: repaired } },
+        { status: 200 },
+      );
+    }
+    return NextResponse.json({ success: false, error: "Stored questions invalid" }, { status: 500 });
   }
 
   /** Employer flow: applications create `PENDING` interviews with questions — start them here. */
@@ -112,7 +124,10 @@ export async function POST(
     if (jobIv?.questions) {
       const questionsUnknown = jobIv.questions as unknown;
       const v = storedPackSchema.safeParse({ questions: questionsUnknown });
-      if (v.success) {
+      const questions = v.success
+        ? v.data.questions
+        : normalizeVideoInterviewQuestions({ questions: questionsUnknown });
+      if (questions.length > 0) {
         if (jobIv.status === InterviewStatus.PENDING) {
           await prisma.videoInterview.update({
             where: { id: jobIv.id },
@@ -120,7 +135,7 @@ export async function POST(
           });
         }
         return NextResponse.json(
-          { success: true, data: { interviewId: jobIv.id, questions: v.data.questions } },
+          { success: true, data: { interviewId: jobIv.id, questions } },
           { status: 200 },
         );
       }
@@ -194,6 +209,8 @@ export async function POST(
       : "") +
     `Return ONLY JSON: {"questions":[{"id":"string","question":"","questionAr":"","category":"","timeLimit":120,"tips":""}]}`;
 
+  let questions: VideoInterviewQuestion[] = [];
+
   const claude = await fetchClaudeJsonText({
     system:
       "You output a single JSON object only. No markdown. Questions must be fair and professional.",
@@ -201,20 +218,22 @@ export async function POST(
     maxTokens: 6000,
   });
 
-  if (!claude.ok) {
-    return NextResponse.json({ success: false, error: "AI unavailable" }, { status: 503 });
+  if (claude.ok) {
+    try {
+      const json = parseJsonFromModel(claude.text);
+      questions = normalizeVideoInterviewQuestions(json);
+    } catch (err) {
+      console.error("[interview/generate-questions] parse failed:", err);
+    }
+  } else {
+    console.error("[interview/generate-questions] Claude unavailable:", claude.error);
   }
 
-  let pack: z.infer<typeof packSchema>;
-  try {
-    const json = parseJsonFromModel(claude.text);
-    const v = packSchema.safeParse(json);
-    if (!v.success) {
-      return NextResponse.json({ success: false, error: "Invalid AI shape" }, { status: 502 });
-    }
-    pack = v.data;
-  } catch {
-    return NextResponse.json({ success: false, error: "Parse error" }, { status: 502 });
+  if (questions.length < 4) {
+    questions =
+      parsed.data.kind === "job"
+        ? fallbackJobInterviewQuestions(role, job?.title ?? role)
+        : fallbackCompetencyInterviewQuestions(role);
   }
 
   const created = await prisma.videoInterview.create({
@@ -223,14 +242,14 @@ export async function POST(
       interviewKind: parsed.data.kind,
       jobId: parsed.data.jobId ?? null,
       status: InterviewStatus.IN_PROGRESS,
-      questions: pack.questions as object[],
+      questions: questions as object[],
       startedAt: new Date(),
     },
     select: { id: true },
   });
 
   return NextResponse.json(
-    { success: true, data: { interviewId: created.id, questions: pack.questions } },
+    { success: true, data: { interviewId: created.id, questions } },
     { status: 201 },
   );
   } catch (err) {

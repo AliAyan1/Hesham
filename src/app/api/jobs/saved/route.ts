@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "@/lib/get-server-session";
 import { getPrisma } from "@/lib/db";
 import { apiFailure, apiSuccess, runApiRoute } from "@/lib/api/route-handler";
+import { maskSalaryIfHidden } from "@/lib/jobs/mask-salary";
 
 export async function GET(): Promise<NextResponse> {
   return runApiRoute("jobs/saved", async () => {
@@ -28,6 +29,7 @@ export async function GET(): Promise<NextResponse> {
             salaryMin: true,
             salaryMax: true,
             currency: true,
+            hideSalary: true,
             createdAt: true,
             employer: {
               select: {
@@ -42,24 +44,28 @@ export async function GET(): Promise<NextResponse> {
     });
 
     return apiSuccess({
-      items: rows.map((row) => ({
-        savedAt: row.createdAt.toISOString(),
-        id: row.job.id,
-        title: row.job.title,
-        category: row.job.category,
-        type: row.job.type,
-        location: row.job.location,
-        isRemote: row.job.isRemote,
-        salaryMin: row.job.salaryMin,
-        salaryMax: row.job.salaryMax,
-        currency: row.job.currency,
-        createdAt: row.job.createdAt.toISOString(),
-        companyName:
-          row.job.employer.employerProfile?.companyName?.trim() ||
-          row.job.employer.name ||
-          "Company",
-        employerImage: row.job.employer.image,
-      })),
+      items: rows.map((row) => {
+        const publicJob = maskSalaryIfHidden(row.job);
+        return {
+          savedAt: row.createdAt.toISOString(),
+          id: row.job.id,
+          title: row.job.title,
+          category: row.job.category,
+          type: row.job.type,
+          location: row.job.location,
+          isRemote: row.job.isRemote,
+          salaryMin: publicJob.salaryMin,
+          salaryMax: publicJob.salaryMax,
+          currency: row.job.currency,
+          hideSalary: row.job.hideSalary,
+          createdAt: row.job.createdAt.toISOString(),
+          companyName:
+            row.job.employer.employerProfile?.companyName?.trim() ||
+            row.job.employer.name ||
+            "Company",
+          employerImage: row.job.employer.image,
+        };
+      }),
     });
   });
 }

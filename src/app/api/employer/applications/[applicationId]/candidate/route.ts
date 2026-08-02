@@ -2,10 +2,36 @@ import { ApplicationStatus, AssessmentStatus, InterviewStatus, UserRole } from "
 import { NextResponse, type NextRequest } from "next/server";
 import { getServerSession } from "@/lib/get-server-session";
 import { getPrisma } from "@/lib/db";
-import type { ApiResponse, EmployerCandidatePayload } from "@/types";
+import type { ApiResponse, EmployerCandidatePayload, EmployerJdFitBriefing } from "@/types";
 import { sanitizeUserForEmployer } from "@/lib/sanitize-user";
 import { createUserNotification } from "@/lib/notifications/create-user-notification";
 import { NotificationType } from "@prisma/client";
+import { analyzeJdFit, parseStoredFitAnalysis } from "@/lib/jobs/jd-fit-analysis";
+
+export const maxDuration = 60;
+
+function fitFromSnapshot(cvSnapshot: unknown): EmployerJdFitBriefing | null {
+  if (!cvSnapshot || typeof cvSnapshot !== "object") return null;
+  const raw = (cvSnapshot as { fitAnalysis?: unknown }).fitAnalysis;
+  const parsed = parseStoredFitAnalysis(raw);
+  if (!parsed) return null;
+  return {
+    fitScore: parsed.fitScore,
+    summary: parsed.summary,
+    summaryAr: parsed.summaryAr ?? "",
+    strengths: parsed.strengths,
+    strengthsAr: parsed.strengthsAr ?? [],
+    gaps: parsed.gaps.map((g) => ({
+      code: g.code,
+      severity: g.severity,
+      title: g.title,
+      titleAr: g.titleAr || g.title,
+      detail: g.detail,
+      detailAr: g.detailAr || g.detail,
+    })),
+    analyzedAt: parsed.analyzedAt,
+  };
+}
 
 export async function GET(
   _request: NextRequest,
@@ -28,7 +54,18 @@ export async function GET(
       id: true,
       status: true,
       offerAcceptedAt: true,
-      job: { select: { id: true, title: true } },
+      matchScore: true,
+      cvSnapshot: true,
+      job: {
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          requirements: true,
+          skills: true,
+          hiringMeta: true,
+        },
+      },
       jobSeeker: {
         select: {
           id: true,
@@ -216,6 +253,56 @@ export async function GET(
   const contactUnlocked =
     applicationStatus === ApplicationStatus.HIRED || row.offerAcceptedAt != null;
 
+  let jdFit = fitFromSnapshot(row.cvSnapshot);
+  let matchScore = row.matchScore;
+
+  if (!jdFit && row.jobSeeker.cv) {
+    const analysis = await analyzeJdFit({
+      job: {
+        title: row.job.title,
+        description: row.job.description,
+        requirements: row.job.requirements,
+        skills: row.job.skills,
+        hiringMeta: row.job.hiringMeta,
+      },
+      cv: {
+        professionalTitle: row.jobSeeker.cv.professionalTitle,
+        summary: row.jobSeeker.cv.summary,
+        experience: row.jobSeeker.cv.experience,
+        education: row.jobSeeker.cv.education,
+        skills: row.jobSeeker.cv.skills,
+      },
+    });
+    jdFit = {
+      fitScore: analysis.fitScore,
+      summary: analysis.summary,
+      summaryAr: analysis.summaryAr ?? "",
+      strengths: analysis.strengths,
+      strengthsAr: analysis.strengthsAr ?? [],
+      gaps: analysis.gaps.map((g) => ({
+        code: g.code,
+        severity: g.severity,
+        title: g.title,
+        titleAr: g.titleAr || g.title,
+        detail: g.detail,
+        detailAr: g.detailAr || g.detail,
+      })),
+      analyzedAt: analysis.analyzedAt,
+    };
+    matchScore = analysis.fitScore;
+    const prevSnap =
+      row.cvSnapshot && typeof row.cvSnapshot === "object"
+        ? (row.cvSnapshot as Record<string, unknown>)
+        : {};
+    await prisma.application.update({
+      where: { id: applicationId },
+      data: {
+        matchScore: analysis.fitScore,
+        cvSnapshot: { ...prevSnap, fitAnalysis: analysis } as object,
+      },
+    });
+  }
+
   const publicCandidate = sanitizeUserForEmployer(row.jobSeeker, contactUnlocked);
   const maskedSeeker = {
     ...row.jobSeeker,
@@ -247,6 +334,8 @@ export async function GET(
     applicationStatus,
     appliedForJobTitle: row.job.title,
     contactUnlocked,
+    jdFit,
+    matchScore,
     candidate: maskedSeeker,
     sharedAssessment: sharedAssessment
       ? {
