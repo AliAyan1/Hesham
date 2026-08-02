@@ -86,7 +86,7 @@ async function extractPdfText(buf: Buffer): Promise<string> {
       stopAtErrors: false,
     } as Parameters<typeof getDocumentProxy>[1]);
     const { text } = await unpdfExtractText(pdf, { mergePages: true });
-    const merged = (typeof text === "string" ? text : text.join("\n")).trim();
+    const merged = String(text ?? "").trim();
     if (merged.length >= 20) return merged;
   } catch (err) {
     errors.push(err);

@@ -194,6 +194,8 @@ model Job {
   salaryMin         Int?
   salaryMax         Int?
   currency          String       @default("SAR")
+  /// When true, salary is stored but hidden from job seekers.
+  hideSalary        Boolean      @default(false)
 
   requirements   Json?
   benefits       Json?
