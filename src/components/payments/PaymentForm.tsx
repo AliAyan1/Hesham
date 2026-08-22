@@ -153,42 +153,81 @@ export function PaymentForm({
         const halalas = Math.round(amount * 100);
         const origin = window.location.origin;
 
+        // Card-only by default. Apple Pay is opt-in — enabling it without
+        // domain verification often prevents the whole form from rendering.
         const methods = applePayEnabled ? ["creditcard", "applepay"] : ["creditcard"];
 
-        window.Moyasar.init({
-          element: `.${elementClass}`,
-          amount: halalas,
-          currency: "SAR",
-          country: "SA",
-          description,
-          publishable_api_key: publishableKey,
-          callback_url: `${origin}/api/payments/callback`,
-          supported_networks: ["mada", "visa", "mastercard"],
-          methods,
-          metadata: parsedMetadata,
-          ...(applePayEnabled
-            ? {
-                apple_pay: {
-                  country: "SA",
-                  label: "QudrahTech",
-                  validate_merchant_url: "https://api.moyasar.com/v1/applepay/initiate",
+        try {
+          window.Moyasar.init({
+            element: `.${elementClass}`,
+            amount: halalas,
+            currency: "SAR",
+            country: "SA",
+            description,
+            publishable_api_key: publishableKey,
+            callback_url: `${origin}/api/payments/callback`,
+            supported_networks: ["mada", "visa", "mastercard"],
+            methods,
+            metadata: parsedMetadata,
+            ...(applePayEnabled
+              ? {
+                  apple_pay: {
+                    country: "SA",
+                    label: "QudrahTech",
+                    validate_merchant_url: "https://api.moyasar.com/v1/applepay/initiate",
+                  },
+                }
+              : {}),
+            on_completed: async (payment: MoyasarPaymentResult) => {
+              onSuccessRef.current(payment.id);
+              return true;
+            },
+            on_failure: (error: MoyasarPaymentResult | string) => {
+              const msg =
+                typeof error === "string"
+                  ? error
+                  : (error.source?.message ?? t("paymentFailed"));
+              onErrorRef.current(msg);
+            },
+          });
+        } catch (err) {
+          console.error("[PaymentForm] Moyasar.init failed:", err);
+          // Retry once without Apple Pay if that was the likely cause
+          if (applePayEnabled) {
+            try {
+              window.Moyasar.init({
+                element: `.${elementClass}`,
+                amount: halalas,
+                currency: "SAR",
+                country: "SA",
+                description,
+                publishable_api_key: publishableKey,
+                callback_url: `${origin}/api/payments/callback`,
+                supported_networks: ["mada", "visa", "mastercard"],
+                methods: ["creditcard"],
+                metadata: parsedMetadata,
+                on_completed: async (payment: MoyasarPaymentResult) => {
+                  onSuccessRef.current(payment.id);
+                  return true;
                 },
-              }
-            : {}),
-          on_completed: async (payment: MoyasarPaymentResult) => {
-            onSuccessRef.current(payment.id);
-            return true;
-          },
-          on_failure: (error: MoyasarPaymentResult | string) => {
-            const msg =
-              typeof error === "string"
-                ? error
-                : (error.source?.message ?? t("paymentFailed"));
-            onErrorRef.current(msg);
-          },
-        });
+                on_failure: (error: MoyasarPaymentResult | string) => {
+                  const msg =
+                    typeof error === "string"
+                      ? error
+                      : (error.source?.message ?? t("paymentFailed"));
+                  onErrorRef.current(msg);
+                },
+              });
+              return;
+            } catch (retryErr) {
+              console.error("[PaymentForm] Moyasar.init retry failed:", retryErr);
+            }
+          }
+          if (!cancelled) onErrorRef.current(t("formLoadFailed"));
+        }
       })
-      .catch(() => {
+      .catch((err) => {
+        console.error("[PaymentForm] Moyasar assets failed:", err);
         if (!cancelled) onErrorRef.current(t("formLoadFailed"));
       });
 

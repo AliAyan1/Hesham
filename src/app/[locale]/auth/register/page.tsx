@@ -172,12 +172,6 @@ export default function RegisterPage() {
     }
   }, [loggedInReady, session?.user, pickRoleAfterGoogle, locale]);
 
-  useEffect(() => {
-    // No payment integration yet: never redirect to upgrade pages.
-    // Logged-in users are handled by the signed-in gate below.
-    void session;
-  }, [session]);
-
   const showSignedInGate =
     loggedInReady &&
     !postSignupRedirect &&
@@ -299,7 +293,6 @@ export default function RegisterPage() {
 
   const signupPlanBanner = resolvedPlan();
 
-  // No payment integration yet: allow Google signup for all roles and all plans.
   const canUseGoogleSignup = true;
 
   async function handleGoogleRegister() {
@@ -350,7 +343,9 @@ export default function RegisterPage() {
     })();
   }, [loggedInReady, pendingGoogleRole, pendingGooglePlan, session?.user, locale, t, update]);
 
-  if (sessionStatus === "loading" && !sessionFetchTimedOut) {
+  // After paid signup we keep the form mounted for PaymentModal; don't replace it
+  // with a Loading shell while NextAuth refreshes the session.
+  if (sessionStatus === "loading" && !sessionFetchTimedOut && !showSignupPayment) {
     return (
       <AuthShell isRtl={isRTL} slogan={t("common.slogan")}>
         <p className="py-12 text-center text-sm text-gray-400">{t("common.loading")}</p>
@@ -478,7 +473,6 @@ export default function RegisterPage() {
 
         await update();
         clearRegisterPlan();
-        setPostSignupRedirect(true);
 
         let paymentsConfigured = moyasarConfigured;
         try {
@@ -501,10 +495,13 @@ export default function RegisterPage() {
           });
           setSignupPaymentPlan(plan);
           setSignupRole(parsed.data.role);
+          // Keep the register UI mounted so PaymentModal can render.
+          // Setting postSignupRedirect here hid the page behind "Loading…" forever.
           setShowSignupPayment(true);
           return;
         }
 
+        setPostSignupRedirect(true);
         const nextPath =
           parsed.data.role === UserRole.JOBSEEKER
             ? "/onboarding"
