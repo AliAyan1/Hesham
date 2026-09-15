@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getServerSession } from "@/lib/get-server-session";
 import { resolveDbUserIdForSession } from "@/lib/resolve-session-user";
 import { verifyAndFulfillPayment } from "@/lib/payments/fulfill";
+import { clientIp, rateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
 const bodySchema = z.object({
   paymentId: z.string().min(1),
@@ -24,6 +25,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const resolved = await resolveDbUserIdForSession(session, request);
     if (!resolved) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const limited = rateLimit(
+      `payments-verify:${resolved.id}:${clientIp(request)}`,
+      10,
+      60 * 60 * 1000,
+    );
+    if (!limited.ok) {
+      return rateLimitResponse(limited.retryAfterSec);
     }
 
     const body: unknown = await request.json().catch(() => null);

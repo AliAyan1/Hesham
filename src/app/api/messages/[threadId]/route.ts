@@ -147,7 +147,7 @@ export async function POST(
       type: NotificationType.MESSAGE_RECEIVED,
       title: "New message",
       titleAr: "رسالة جديدة",
-      message: `${selfName} sent you a message on QudrahTech.`,
+      message: `${selfName} sent you a message on Qudrahtech.`,
       messageAr: `${selfName} أرسل لك رسالة.`,
       link: msgLink,
     });

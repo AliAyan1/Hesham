@@ -173,7 +173,7 @@ export function PaymentForm({
               ? {
                   apple_pay: {
                     country: "SA",
-                    label: "QudrahTech",
+                    label: "Qudrahtech",
                     validate_merchant_url: "https://api.moyasar.com/v1/applepay/initiate",
                   },
                 }

@@ -29,7 +29,7 @@ export function Logo({
   priority = false,
 }: LogoProps) {
   const locale = useLocale();
-  const alt = locale === "ar" ? "قدرتك" : "QudrahTech";
+  const alt = locale === "ar" ? "قدرتك" : "Qudrahtech";
 
   // Single asset until `public/logo-white.png` exists; `variant` reserved for future src swap on dark UIs.
   const src = "/logo.png";

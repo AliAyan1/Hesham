@@ -62,11 +62,11 @@ export function AssessmentReportPdf({
     <Document>
       <Page size="A4" style={styles.page}>
         <Text style={styles.watermark}>CONFIDENTIAL</Text>
-        <Text style={styles.coverTitle}>QudrahTech Psychometric Assessment</Text>
+        <Text style={styles.coverTitle}>Qudrahtech Psychometric Assessment</Text>
         <Text style={styles.coverSub}>تقرير التقييم النفسي - قدرتك</Text>
         <Text style={styles.coverTitle}>{candidateName}</Text>
         <Text style={styles.coverDate}>{completedAt}</Text>
-        <Text style={styles.footer}>QudrahTech | قدرتك</Text>
+        <Text style={styles.footer}>Qudrahtech | قدرتك</Text>
       </Page>
 
       <Page size="A4" style={styles.page}>
@@ -89,7 +89,7 @@ export function AssessmentReportPdf({
             </View>
           );
         })}
-        <Text style={styles.footer}>QudrahTech | قدرتك</Text>
+        <Text style={styles.footer}>Qudrahtech | قدرتك</Text>
       </Page>
 
       <Page size="A4" style={styles.page}>
@@ -111,7 +111,7 @@ export function AssessmentReportPdf({
             </View>
           ) : null,
         )}
-        <Text style={styles.footer}>QudrahTech | قدرتك</Text>
+        <Text style={styles.footer}>Qudrahtech | قدرتك</Text>
       </Page>
 
       <Page size="A4" style={styles.page}>
@@ -132,7 +132,7 @@ export function AssessmentReportPdf({
             </View>
           ) : null,
         )}
-        <Text style={styles.footer}>QudrahTech | قدرتك</Text>
+        <Text style={styles.footer}>Qudrahtech | قدرتك</Text>
       </Page>
 
       <Page size="A4" style={styles.page}>
@@ -157,7 +157,7 @@ export function AssessmentReportPdf({
             {r.role} — {r.fitPercentage}%
           </Text>
         ))}
-        <Text style={styles.footer}>QudrahTech | قدرتك</Text>
+        <Text style={styles.footer}>Qudrahtech | قدرتك</Text>
       </Page>
     </Document>
   );

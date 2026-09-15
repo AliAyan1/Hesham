@@ -4,6 +4,10 @@
 :root {
   --background: #f9fafb;
   --foreground: #111827;
+  --basalim-dark: #0d1f2d;
+  --basalim-teal: #1a6b5a;
+  --basalim-gold: #c9a84c;
+  --basalim-light: #f5f3ee;
 }
 
 @theme inline {

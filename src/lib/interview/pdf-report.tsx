@@ -48,8 +48,8 @@ export function InterviewReportPdf({ candidateName, jobTitle, completedAt, repor
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        <Text style={styles.watermark}>Confidential — QudrahTech</Text>
-        <Text style={styles.h1}>QudrahTech AI Interview Report</Text>
+        <Text style={styles.watermark}>Confidential — Qudrahtech</Text>
+        <Text style={styles.h1}>Qudrahtech AI Interview Report</Text>
         <Text style={styles.body}>{candidateName}</Text>
         <Text style={styles.body}>{jobTitle}</Text>
         <Text style={styles.body}>{completedAt}</Text>
@@ -58,11 +58,11 @@ export function InterviewReportPdf({ candidateName, jobTitle, completedAt, repor
           {report.executiveSummary.overallRating}/10
         </Text>
         <Text style={styles.body}>{summary}</Text>
-        <Text style={styles.footer}>QudrahTech | {candidateName}</Text>
+        <Text style={styles.footer}>Qudrahtech | {candidateName}</Text>
       </Page>
 
       <Page size="A4" style={styles.page}>
-        <Text style={styles.watermark}>Confidential — QudrahTech</Text>
+        <Text style={styles.watermark}>Confidential — Qudrahtech</Text>
         <Text style={styles.h2}>Scores</Text>
         <Text style={styles.body}>Communication: {report.communicationAnalysis.score}/10</Text>
         <Text style={styles.body}>Content: {report.contentAnalysis.score}/10</Text>
@@ -77,7 +77,7 @@ export function InterviewReportPdf({ candidateName, jobTitle, completedAt, repor
       </Page>
 
       <Page size="A4" style={styles.page}>
-        <Text style={styles.watermark}>Confidential — QudrahTech</Text>
+        <Text style={styles.watermark}>Confidential — Qudrahtech</Text>
         <Text style={styles.h2}>Facial / Non-verbal Analysis</Text>
         <Text style={styles.body}>{facial}</Text>
         <Text style={styles.body}>{report.facialExpressionAnalysis.eyeContactAssessment}</Text>
@@ -86,7 +86,7 @@ export function InterviewReportPdf({ candidateName, jobTitle, completedAt, repor
       </Page>
 
       <Page size="A4" style={styles.page}>
-        <Text style={styles.watermark}>Confidential — QudrahTech</Text>
+        <Text style={styles.watermark}>Confidential — Qudrahtech</Text>
         <Text style={styles.h2}>Hiring Manager Notes</Text>
         <Text style={styles.body}>{finalRec}</Text>
         {report.hiringManagerNotes.suggestedFollowUpQuestions.map((q, i) => (

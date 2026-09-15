@@ -10,7 +10,7 @@ export function dailyDomain(): string {
   return (
     process.env.NEXT_PUBLIC_DAILY_DOMAIN?.trim() ||
     process.env.DAILY_DOMAIN?.trim() ||
-    "qudrahtech.daily.co"
+    "Qudrahtech.daily.co"
   );
 }
 

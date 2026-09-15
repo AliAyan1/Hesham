@@ -7,62 +7,65 @@ datasource db {
 }
 
 model User {
-  id                  String           @id @default(cuid())
-  name                String?
-  email               String           @unique
-  password            String?
-  role                UserRole         @default(JOBSEEKER)
-  subscriptionTier    SubscriptionTier @default(FREE)
-  subscriptionStart   DateTime?
-  subscriptionEnd     DateTime?
-  onboardingComplete  Boolean          @default(true)
-  emailVerified       DateTime?
-  image               String?
+  id                       String           @id @default(cuid())
+  name                     String?
+  email                    String           @unique
+  password                 String?
+  role                     UserRole         @default(JOBSEEKER)
+  subscriptionTier         SubscriptionTier @default(FREE)
+  subscriptionStart        DateTime?
+  subscriptionEnd          DateTime?
+  onboardingComplete       Boolean          @default(true)
+  emailVerified            DateTime?
+  image                    String?
   /// Platform consent before AI assessment (recording / sharing with employers).
-  dataConsentAssessmentAt DateTime?
+  dataConsentAssessmentAt  DateTime?
   /// Platform consent before AI interview.
-  dataConsentInterviewAt  DateTime?
+  dataConsentInterviewAt   DateTime?
   /// After 3 proctoring strikes — block assessments/interviews until this time (24h cooldown).
   proctoringSuspendedUntil DateTime?
   /// Cached talent pool membership (synced from TalentPoolEntry + exit rules).
-  inTalentPool        Boolean          @default(false)
-  talentPoolReason    String?
-  talentPoolDate      DateTime?
-  createdAt           DateTime         @default(now())
-  updatedAt           DateTime         @updatedAt
+  inTalentPool             Boolean          @default(false)
+  talentPoolReason         String?
+  talentPoolDate           DateTime?
+  createdAt                DateTime         @default(now())
+  updatedAt                DateTime         @updatedAt
 
-  profile         Profile?
-  cv              CV?
-  employerProfile EmployerProfile?
-  accounts        Account[]
-  sessions        Session[]
-  jobs            Job[]
-  applications    Application[]
-  savedJobs       SavedJob[]
-  notifications   Notification[]
-  assessments     Assessment[]
-  videoInterviews VideoInterview[]
-  proctoringSessions ProctoringSession[]
-  talentPoolEntries TalentPoolEntry[]
-  candidateTalentPoolInvites TalentPoolInvite[] @relation("CandidateInvites")
-  employerTalentPoolInvites  TalentPoolInvite[] @relation("EmployerInvites")
-  messageThreadsAsEmployer MessageThread[] @relation("EmployerThreads")
-  messageThreadsAsSeeker   MessageThread[] @relation("SeekerThreads")
-  messagesSent             Message[]       @relation("MessageSender")
-  mentorMessagesSent       MentorMessage[] @relation("MentorMessageSender")
-  obligationsAsEmployer    ObligationLetter[] @relation("EmployerObligation")
-  obligationsAsCandidate   ObligationLetter[] @relation("CandidateObligation")
-  offersAsEmployer         OfferLetter[]      @relation("EmployerOffer")
-  offersAsCandidate        OfferLetter[]      @relation("CandidateOffer")
-  recruitmentPayments      RecruitmentPayment[]
-  auditLogs                AuditLog[]
-  payments                 Payment[]
-  paymentIntents           PaymentIntent[]
-  mentorProfile            Mentor?
-  mentorSessionsAsMentee   MentorSession[]    @relation("MenteeSessions")
-  profileReminderSentAt    DateTime?
+  profile                    Profile?
+  cv                         CV?
+  employerProfile            EmployerProfile?
+  accounts                   Account[]
+  sessions                   Session[]
+  jobs                       Job[]
+  applications               Application[]
+  savedJobs                  SavedJob[]
+  notifications              Notification[]
+  assessments                Assessment[]
+  videoInterviews            VideoInterview[]
+  proctoringSessions         ProctoringSession[]
+  talentPoolEntries          TalentPoolEntry[]
+  candidateTalentPoolInvites TalentPoolInvite[]   @relation("CandidateInvites")
+  employerTalentPoolInvites  TalentPoolInvite[]   @relation("EmployerInvites")
+  messageThreadsAsEmployer   MessageThread[]      @relation("EmployerThreads")
+  messageThreadsAsSeeker     MessageThread[]      @relation("SeekerThreads")
+  messagesSent               Message[]            @relation("MessageSender")
+  mentorMessagesSent         MentorMessage[]      @relation("MentorMessageSender")
+  obligationsAsEmployer      ObligationLetter[]   @relation("EmployerObligation")
+  obligationsAsCandidate     ObligationLetter[]   @relation("CandidateObligation")
+  offersAsEmployer           OfferLetter[]        @relation("EmployerOffer")
+  offersAsCandidate          OfferLetter[]        @relation("CandidateOffer")
+  recruitmentPayments        RecruitmentPayment[]
+  auditLogs                  AuditLog[]
+  payments                   Payment[]
+  paymentIntents             PaymentIntent[]
+  mentorProfile              Mentor?
+  mentorSessionsAsMentee     MentorSession[]      @relation("MenteeSessions")
+  profileReminderSentAt      DateTime?
   welcomeEmailSentAt         DateTime?
-  passwordResetTokens      PasswordResetToken[]
+  passwordResetTokens        PasswordResetToken[]
+
+  @@index([createdAt])
+  @@index([role])
 }
 
 model PasswordResetToken {
@@ -90,19 +93,19 @@ enum UserRole {
 }
 
 model Profile {
-  id        String    @id @default(cuid())
-  userId    String    @unique
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  bio       String?
-  phone     String?
-  location  String?
-  language  String    @default("ar")
-  cvUrl     String?
-  atsScore  Int?
+  id       String  @id @default(cuid())
+  userId   String  @unique
+  user     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bio      String?
+  phone    String?
+  location String?
+  language String  @default("ar")
+  cvUrl    String?
+  atsScore Int?
 
-  dateOfBirth   DateTime?
-  gender        String?
-  nationality   String?
+  dateOfBirth    DateTime?
+  gender         String?
+  nationality    String?
   jobPreferences Json?
 
   createdAt DateTime @default(now())
@@ -110,39 +113,39 @@ model Profile {
 }
 
 model EmployerProfile {
-  id          String @id @default(cuid())
-  userId      String @unique
-  user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  companyName                   String?
-  companyNameAr                 String?
-  logoUrl                       String?
-  industry                      String?
-  companySize                   String?
-  foundedYear                   Int?
-  websiteUrl                    String?
-  linkedinUrl                   String?
-  description                   String?
-  descriptionAr                 String?
-  contactName                   String?
-  contactEmail                  String?
-  contactPhone                  String?
-  officeLocation                String?
-  crNumber                      String?
-  twitterUrl                    String?
-  instagramUrl                  String?
-  hiringCategories              Json?
-  preferredCandidateLocations   Json?
-  activeHiring                  Boolean @default(true)
+  companyName                 String?
+  companyNameAr               String?
+  logoUrl                     String?
+  industry                    String?
+  companySize                 String?
+  foundedYear                 Int?
+  websiteUrl                  String?
+  linkedinUrl                 String?
+  description                 String?
+  descriptionAr               String?
+  contactName                 String?
+  contactEmail                String?
+  contactPhone                String?
+  officeLocation              String?
+  crNumber                    String?
+  twitterUrl                  String?
+  instagramUrl                String?
+  hiringCategories            Json?
+  preferredCandidateLocations Json?
+  activeHiring                Boolean @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
 model CV {
-  id                  String    @id @default(cuid())
-  userId              String    @unique
-  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                  String  @id @default(cuid())
+  userId              String  @unique
+  user                User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   fullName            String?
   fullNameAr          String?
   professionalTitle   String?
@@ -168,60 +171,66 @@ model CV {
 
   uploadedCvUrl  String?
   generatedCvUrl String?
-  template       String   @default("modern")
+  template       String  @default("modern")
 
-  isComplete    Boolean  @default(false)
-  completionPct Int      @default(0)
+  isComplete    Boolean   @default(false)
+  completionPct Int       @default(0)
   lastParsed    DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 }
 
 model Job {
-  id                String       @id @default(cuid())
-  employerId        String
-  employer          User         @relation(fields: [employerId], references: [id])
+  id         String @id @default(cuid())
+  employerId String
+  employer   User   @relation(fields: [employerId], references: [id])
 
-  title             String
-  titleAr           String?
-  description       String
-  descriptionAr     String?
-  category          String
-  type              JobType      @default(FULLTIME)
-  location          String?
-  locationAr        String?
-  isRemote          Boolean      @default(false)
-  salaryMin         Int?
-  salaryMax         Int?
-  currency          String       @default("SAR")
+  title         String
+  titleAr       String?
+  description   String
+  descriptionAr String?
+  category      String
+  type          JobType @default(FULLTIME)
+  location      String?
+  locationAr    String?
+  isRemote      Boolean @default(false)
+  salaryMin     Int?
+  salaryMax     Int?
+  currency      String  @default("SAR")
   /// When true, salary is stored but hidden from job seekers.
-  hideSalary        Boolean      @default(false)
+  hideSalary    Boolean @default(false)
 
-  requirements   Json?
-  benefits       Json?
-  skills         Json?
+  requirements Json?
+  benefits     Json?
+  skills       Json?
 
-  /** Extra structured fields from post-job wizard (education, experience level, years, etc.) */
+  /**
+   * Extra structured fields from post-job wizard (education, experience level, years, etc.)
+   */
   hiringMeta Json?
 
   /// Employer-defined AI interview template (mode, questions, settings).
   interviewTemplate InterviewTemplate?
 
-  isActive           Boolean @default(true)
-  isFeatured         Boolean @default(false)
-  viewCount          Int     @default(0)
-  applicationCount   Int     @default(0)
-  expiresAt          DateTime?
+  isActive         Boolean   @default(true)
+  isFeatured       Boolean   @default(false)
+  viewCount        Int       @default(0)
+  applicationCount Int       @default(0)
+  expiresAt        DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  applications Application[]
-  savedBy      SavedJob[]
-  autoShortlist JobAutoShortlist?
+  applications      Application[]
+  savedBy           SavedJob[]
+  autoShortlist     JobAutoShortlist?
   talentPoolInvites TalentPoolInvite[]
   obligationLetters ObligationLetter[]
   offerLetters      OfferLetter[]
+
+  @@index([employerId])
+  @@index([isActive, createdAt])
+  @@index([createdAt])
 }
 
 model InterviewTemplate {
@@ -243,19 +252,19 @@ enum JobType {
 }
 
 model Application {
-  id            String             @id @default(cuid())
-  jobId         String
-  job           Job                @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  jobSeekerId   String
-  jobSeeker     User               @relation(fields: [jobSeekerId], references: [id], onDelete: Cascade)
+  id          String @id @default(cuid())
+  jobId       String
+  job         Job    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  jobSeekerId String
+  jobSeeker   User   @relation(fields: [jobSeekerId], references: [id], onDelete: Cascade)
 
-  status        ApplicationStatus  @default(PENDING)
-  coverLetter   String?
-  cvSnapshot    Json?
-  matchScore    Int?
+  status      ApplicationStatus @default(PENDING)
+  coverLetter String?
+  cvSnapshot  Json?
+  matchScore  Int?
 
   /// Required when status becomes REJECTED (employer must submit).
-  declineReason      String?
+  declineReason     String?
   declineReasonCode String?
   declinedAt        DateTime?
   /// Candidate accepted offer — unlocks contact info for employer before HIRED if needed.
@@ -265,6 +274,10 @@ model Application {
   updatedAt DateTime @updatedAt
 
   @@unique([jobId, jobSeekerId])
+  @@index([jobId])
+  @@index([jobSeekerId])
+  @@index([status])
+  @@index([createdAt])
 }
 
 model SavedJob {
@@ -394,15 +407,15 @@ model TalentPoolInvite {
 }
 
 model TalentPoolEntry {
-  id                   String           @id @default(cuid())
-  userId               String
-  user                 User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  reason               TalentPoolReason
-  sourceInterviewId    String?
-  sourceApplicationId  String?
+  id                  String           @id @default(cuid())
+  userId              String
+  user                User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reason              TalentPoolReason
+  sourceInterviewId   String?
+  sourceApplicationId String?
   /// Tags for admin training routing, e.g. ["interview_soft_skills","declined_role_fit"].
-  trainingTags         Json?
-  createdAt            DateTime         @default(now())
+  trainingTags        Json?
+  createdAt           DateTime         @default(now())
 
   @@index([userId, reason])
   @@index([createdAt])
@@ -419,14 +432,14 @@ model JobAutoShortlist {
 }
 
 model MessageThread {
-  id           String    @id @default(cuid())
-  employerId   String
-  employer     User      @relation("EmployerThreads", fields: [employerId], references: [id], onDelete: Cascade)
-  jobSeekerId  String
-  jobSeeker    User      @relation("SeekerThreads", fields: [jobSeekerId], references: [id], onDelete: Cascade)
-  messages     Message[]
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id          String    @id @default(cuid())
+  employerId  String
+  employer    User      @relation("EmployerThreads", fields: [employerId], references: [id], onDelete: Cascade)
+  jobSeekerId String
+  jobSeeker   User      @relation("SeekerThreads", fields: [jobSeekerId], references: [id], onDelete: Cascade)
+  messages    Message[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   @@unique([employerId, jobSeekerId])
   @@index([employerId])
@@ -471,140 +484,140 @@ enum InterviewStatus {
 }
 
 model Assessment {
-  id                   String            @id @default(cuid())
-  userId               String
-  user                 User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type                 AssessmentType    @default(GENERAL)
-  status               AssessmentStatus  @default(NOT_STARTED)
+  id     String           @id @default(cuid())
+  userId String
+  user   User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type   AssessmentType   @default(GENERAL)
+  status AssessmentStatus @default(NOT_STARTED)
 
   /// ProfileXT psychometric scores
-  thinkingStyleScore   Float?
-  behavioralScore      Float?
-  interestsScore       Float?
-  overallScore         Float?
-  traitScores          Json?
-  interestScores       Json?
-  writtenReport        Json?
-  jobFitScores         Json?
-  topJobMatches        Json?
-  questionsData        Json?
-  answersData          Json?
+  thinkingStyleScore Float?
+  behavioralScore    Float?
+  interestsScore     Float?
+  overallScore       Float?
+  traitScores        Json?
+  interestScores     Json?
+  writtenReport      Json?
+  jobFitScores       Json?
+  topJobMatches      Json?
+  questionsData      Json?
+  answersData        Json?
 
   /// Legacy denormalized (synced for employer filters / backward compat)
-  totalScore           Int?
-  skillsScore          Int?
-  communicationScore   Int?
-  industryFitScore     Int?
-  strengths            Json?
-  weaknesses           Json?
-  recommendations      Json?
-  detailedReport       Json?
+  totalScore         Int?
+  skillsScore        Int?
+  communicationScore Int?
+  industryFitScore   Int?
+  strengths          Json?
+  weaknesses         Json?
+  recommendations    Json?
+  detailedReport     Json?
 
-  startedAt            DateTime?
-  completedAt          DateTime?
-  duration             Int?
-  proctoringFlags      Json?
-  isFlagged            Boolean           @default(false)
-  flagReason           String?
-  shareWithEmployers   Boolean           @default(true)
-  stepScores           Json?
-  currentStep          Int?
-  stepsCompleted       Int               @default(0)
-  retakeCount          Int               @default(0)
-  lastRetakeAt         DateTime?
-  createdAt            DateTime          @default(now())
-  updatedAt            DateTime          @updatedAt
-  videoInterview       VideoInterview?
-  proctoringSessions   ProctoringSession[]
+  startedAt          DateTime?
+  completedAt        DateTime?
+  duration           Int?
+  proctoringFlags    Json?
+  isFlagged          Boolean             @default(false)
+  flagReason         String?
+  shareWithEmployers Boolean             @default(true)
+  stepScores         Json?
+  currentStep        Int?
+  stepsCompleted     Int                 @default(0)
+  retakeCount        Int                 @default(0)
+  lastRetakeAt       DateTime?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  videoInterview     VideoInterview?
+  proctoringSessions ProctoringSession[]
 
   @@index([userId, type, status])
   @@index([userId, createdAt])
 }
 
 model VideoInterview {
-  id                   String          @id @default(cuid())
-  userId               String
-  user                 User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  assessmentId         String?         @unique
-  assessment           Assessment?     @relation(fields: [assessmentId], references: [id], onDelete: SetNull)
+  id                    String                    @id @default(cuid())
+  userId                String
+  user                  User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assessmentId          String?                   @unique
+  assessment            Assessment?               @relation(fields: [assessmentId], references: [id], onDelete: SetNull)
   /// practice | competency | job — used to resume sessions and show prior results per flow.
-  interviewKind      String?
-  jobId                String?
-  status               InterviewStatus @default(PENDING)
-  questions            Json?
-  answers              Json?
-  transcripts          Json?
-  overallScore         Int?
-  communicationScore   Int?
-  confidenceScore      Int?
-  clarityScore         Int?
-  relevanceScore       Int?
-  aiAnalysis           Json?
-  strengths            Json?
-  improvements         Json?
-  recordingUrl         String?
+  interviewKind         String?
+  jobId                 String?
+  status                InterviewStatus           @default(PENDING)
+  questions             Json?
+  answers               Json?
+  transcripts           Json?
+  overallScore          Int?
+  communicationScore    Int?
+  confidenceScore       Int?
+  clarityScore          Int?
+  relevanceScore        Int?
+  aiAnalysis            Json?
+  strengths             Json?
+  improvements          Json?
+  recordingUrl          String?
   /// Full-session audio (e.g. WebM Opus) for employer download when shared.
-  recordingData        Bytes?
-  recordingMimeType    String?
-  duration             Int?
-  proctoringFlags      Json?
-  isFlagged            Boolean         @default(false)
-  shareWithEmployers   Boolean         @default(false)
-  startedAt            DateTime?
-  completedAt          DateTime?
-  createdAt            DateTime        @default(now())
-  updatedAt            DateTime        @updatedAt
-  proctoringSessions   ProctoringSession[]
-  facialSnapshots      InterviewFacialSnapshot[]
+  recordingData         Bytes?
+  recordingMimeType     String?
+  duration              Int?
+  proctoringFlags       Json?
+  isFlagged             Boolean                   @default(false)
+  shareWithEmployers    Boolean                   @default(false)
+  startedAt             DateTime?
+  completedAt           DateTime?
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+  proctoringSessions    ProctoringSession[]
+  facialSnapshots       InterviewFacialSnapshot[]
   /// Aggregated facial expression metrics from live snapshots.
   facialAnalysisSummary Json?
   /// Comprehensive AI interview report (employer-facing sections).
-  enhancedReport       Json?
+  enhancedReport        Json?
 
   @@index([userId, status])
   @@index([userId, interviewKind, status])
 }
 
 model InterviewFacialSnapshot {
-  id               String         @id @default(cuid())
-  videoInterviewId String
-  videoInterview   VideoInterview @relation(fields: [videoInterviewId], references: [id], onDelete: Cascade)
-  timestamp        DateTime
-  questionNumber   Int
-  confidence       Float
-  stress           Float
-  engagement       Float
-  authenticity     Float
-  primaryEmotion   String
-  eyeContact       String
-  posture          String
-  microExpressions Json
+  id                String         @id @default(cuid())
+  videoInterviewId  String
+  videoInterview    VideoInterview @relation(fields: [videoInterviewId], references: [id], onDelete: Cascade)
+  timestamp         DateTime
+  questionNumber    Int
+  confidence        Float
+  stress            Float
+  engagement        Float
+  authenticity      Float
+  primaryEmotion    String
+  eyeContact        String
+  posture           String
+  microExpressions  Json
   overallImpression String
-  createdAt        DateTime       @default(now())
+  createdAt         DateTime       @default(now())
 
   @@index([videoInterviewId, timestamp])
 }
 
 model ProctoringSession {
-  id                 String   @id @default(cuid())
-  userId             String
-  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  assessmentId       String?
-  assessment         Assessment?   @relation(fields: [assessmentId], references: [id], onDelete: SetNull)
-  interviewId        String?
-  videoInterview     VideoInterview? @relation(fields: [interviewId], references: [id], onDelete: SetNull)
-  tabSwitches        Int      @default(0)
-  faceNotVisible     Int      @default(0)
-  multipleFaces      Int      @default(0)
-  copyPasteAttempts  Int      @default(0)
-  aiToolDetected     Int      @default(0)
-  flags              Json?
-  screenshots        Json?
-  startedAt          DateTime @default(now())
-  endedAt            DateTime?
-  isFlagged          Boolean  @default(false)
-  severity           String?
-  warningCount       Int      @default(0)
+  id                String          @id @default(cuid())
+  userId            String
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assessmentId      String?
+  assessment        Assessment?     @relation(fields: [assessmentId], references: [id], onDelete: SetNull)
+  interviewId       String?
+  videoInterview    VideoInterview? @relation(fields: [interviewId], references: [id], onDelete: SetNull)
+  tabSwitches       Int             @default(0)
+  faceNotVisible    Int             @default(0)
+  multipleFaces     Int             @default(0)
+  copyPasteAttempts Int             @default(0)
+  aiToolDetected    Int             @default(0)
+  flags             Json?
+  screenshots       Json?
+  startedAt         DateTime        @default(now())
+  endedAt           DateTime?
+  isFlagged         Boolean         @default(false)
+  severity          String?
+  warningCount      Int             @default(0)
 
   @@index([userId])
   @@index([assessmentId])
@@ -633,41 +646,41 @@ model SiteContent {
 }
 
 model PlatformSettings {
-  id                    String   @id @default(cuid())
-  platformName          String   @default("QudrahTech")
-  platformNameAr        String   @default("قدرتك")
-  platformUrl           String   @default("https://basalim-consulting.com")
-  supportEmail          String   @default("support@basalim-consulting.com")
-  proPlanPrice          Float    @default(99)
-  premiumPlanPrice      Float    @default(299)
-  vatPercentage         Float    @default(15)
-  mentorCommission      Float    @default(25)
-  mentorPayout          Float    @default(75)
-  assessmentPassScore   Int      @default(50)
-  assessmentRetakeLimit Int      @default(3)
-  interviewQuestionCount Int     @default(5)
-  talentPoolMinScore    Int      @default(50)
-  talentPoolMinProfile  Int      @default(80)
-  isRegistrationOpen    Boolean  @default(true)
-  isMentorMarketOpen    Boolean  @default(true)
-  isAssessmentRequired Boolean @default(true)
-  isProctorEnabled      Boolean  @default(true)
-  isMaintenanceMode     Boolean  @default(false)
-  sendWelcomeEmail      Boolean  @default(true)
-  sendAssessmentInvite  Boolean  @default(true)
-  sendJobMatchEmail     Boolean  @default(true)
-  sendAssessmentResults Boolean  @default(true)
-  sendApplicationStatus Boolean  @default(true)
-  sendInterviewInvite   Boolean  @default(true)
-  sendOfferLetter       Boolean  @default(true)
-  sendSessionReminder   Boolean  @default(true)
-  maxJobsPerEmployer    Int      @default(10)
-  maxApplicationsPerJob Int      @default(500)
-  freeUserJobAlerts     Int      @default(3)
-  maintenanceMessage    String   @default("We are updating QudrahTech. We will be back shortly!") @db.Text
-  maintenanceMessageAr  String   @default("قدرتك تتحدث") @db.Text
-  updatedAt             DateTime @updatedAt
-  updatedBy             String?
+  id                     String   @id @default(cuid())
+  platformName           String   @default("Qudrahtech")
+  platformNameAr         String   @default("قدرتك")
+  platformUrl            String   @default("https://basalim-consulting.com")
+  supportEmail           String   @default("support@basalim-consulting.com")
+  proPlanPrice           Float    @default(99)
+  premiumPlanPrice       Float    @default(299)
+  vatPercentage          Float    @default(15)
+  mentorCommission       Float    @default(25)
+  mentorPayout           Float    @default(75)
+  assessmentPassScore    Int      @default(50)
+  assessmentRetakeLimit  Int      @default(3)
+  interviewQuestionCount Int      @default(5)
+  talentPoolMinScore     Int      @default(50)
+  talentPoolMinProfile   Int      @default(80)
+  isRegistrationOpen     Boolean  @default(true)
+  isMentorMarketOpen     Boolean  @default(true)
+  isAssessmentRequired   Boolean  @default(true)
+  isProctorEnabled       Boolean  @default(true)
+  isMaintenanceMode      Boolean  @default(false)
+  sendWelcomeEmail       Boolean  @default(true)
+  sendAssessmentInvite   Boolean  @default(true)
+  sendJobMatchEmail      Boolean  @default(true)
+  sendAssessmentResults  Boolean  @default(true)
+  sendApplicationStatus  Boolean  @default(true)
+  sendInterviewInvite    Boolean  @default(true)
+  sendOfferLetter        Boolean  @default(true)
+  sendSessionReminder    Boolean  @default(true)
+  maxJobsPerEmployer     Int      @default(10)
+  maxApplicationsPerJob  Int      @default(500)
+  freeUserJobAlerts      Int      @default(3)
+  maintenanceMessage     String   @default("We are updating Qudrahtech. We will be back shortly!") @db.Text
+  maintenanceMessageAr   String   @default("قدرتك تتحدث") @db.Text
+  updatedAt              DateTime @updatedAt
+  updatedBy              String?
 }
 
 enum ObligationStatus {
@@ -698,36 +711,37 @@ enum PaymentType {
 }
 
 model Payment {
-  id               String          @id @default(cuid())
-  userId           String
-  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  type             PaymentType
-  provider         PaymentProvider @default(MOYASAR)
+  type     PaymentType
+  provider PaymentProvider @default(MOYASAR)
 
   subscriptionPlan String?
   obligationId     String?
   sessionId        String?
 
-  amount           Float
-  vatAmount        Float
-  totalAmount      Float
-  currency         String          @default("SAR")
+  amount      Float
+  vatAmount   Float
+  totalAmount Float
+  currency    String @default("SAR")
 
-  status           PaymentStatus   @default(PENDING)
+  status PaymentStatus @default(PENDING)
 
-  moyasarPaymentId String?         @unique
-  externalPaymentId String?        @unique
-  moyasarInvoiceId String?
+  moyasarPaymentId  String? @unique
+  externalPaymentId String? @unique
+  moyasarInvoiceId  String?
 
-  paidAt           DateTime?
-  failureReason    String?
+  paidAt        DateTime?
+  failureReason String?
 
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([userId, createdAt])
   @@index([type])
+  @@index([status])
   @@index([obligationId])
   @@index([sessionId])
   @@index([provider])
@@ -768,20 +782,20 @@ enum SessionStatus {
 }
 
 model ObligationLetter {
-  id             String           @id @default(cuid())
+  id             String              @id @default(cuid())
   employerId     String
   candidateId    String
   jobId          String
-  employer       User             @relation("EmployerObligation", fields: [employerId], references: [id], onDelete: Cascade)
-  candidate      User             @relation("CandidateObligation", fields: [candidateId], references: [id], onDelete: Cascade)
-  job            Job              @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  employer       User                @relation("EmployerObligation", fields: [employerId], references: [id], onDelete: Cascade)
+  candidate      User                @relation("CandidateObligation", fields: [candidateId], references: [id], onDelete: Cascade)
+  job            Job                 @relation(fields: [jobId], references: [id], onDelete: Cascade)
   recruitmentFee Float
-  currency       String           @default("SAR")
-  status         ObligationStatus @default(PENDING)
+  currency       String              @default("SAR")
+  status         ObligationStatus    @default(PENDING)
   signedAt       DateTime?
   signedByName   String?
   terms          String
-  generatedAt    DateTime         @default(now())
+  generatedAt    DateTime            @default(now())
   expiresAt      DateTime
   payment        RecruitmentPayment?
   offerLetter    OfferLetter?
@@ -791,21 +805,21 @@ model ObligationLetter {
 }
 
 model OfferLetter {
-  id                String      @id @default(cuid())
+  id                String            @id @default(cuid())
   employerId        String
   candidateId       String
   jobId             String
-  obligationId      String?     @unique
-  employer          User        @relation("EmployerOffer", fields: [employerId], references: [id], onDelete: Cascade)
-  candidate         User        @relation("CandidateOffer", fields: [candidateId], references: [id], onDelete: Cascade)
-  job               Job         @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  obligationId      String?           @unique
+  employer          User              @relation("EmployerOffer", fields: [employerId], references: [id], onDelete: Cascade)
+  candidate         User              @relation("CandidateOffer", fields: [candidateId], references: [id], onDelete: Cascade)
+  job               Job               @relation(fields: [jobId], references: [id], onDelete: Cascade)
   obligation        ObligationLetter? @relation(fields: [obligationId], references: [id], onDelete: SetNull)
   fileUrl           String
   fileName          String
-  status            OfferStatus @default(PENDING)
+  status            OfferStatus       @default(PENDING)
   candidateResponse String?
   declineReason     String?
-  sentAt            DateTime    @default(now())
+  sentAt            DateTime          @default(now())
   respondedAt       DateTime?
   expiresAt         DateTime
 
@@ -814,19 +828,19 @@ model OfferLetter {
 }
 
 model RecruitmentPayment {
-  id            String        @id @default(cuid())
-  obligationId  String        @unique
+  id            String           @id @default(cuid())
+  obligationId  String           @unique
   obligation    ObligationLetter @relation(fields: [obligationId], references: [id], onDelete: Cascade)
   employerId    String
-  employer      User          @relation(fields: [employerId], references: [id], onDelete: Cascade)
+  employer      User             @relation(fields: [employerId], references: [id], onDelete: Cascade)
   amount        Float
-  currency      String        @default("SAR")
+  currency      String           @default("SAR")
   vatAmount     Float
   totalAmount   Float
-  status        PaymentStatus @default(PENDING)
+  status        PaymentStatus    @default(PENDING)
   paidAt        DateTime?
   receiptNumber String?
-  createdAt     DateTime      @default(now())
+  createdAt     DateTime         @default(now())
 
   @@index([employerId])
 }
@@ -850,9 +864,9 @@ model AuditLog {
 }
 
 model Mentor {
-  id              String    @id @default(cuid())
-  userId          String    @unique
-  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id              String                @id @default(cuid())
+  userId          String                @unique
+  user            User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   title           String?
   titleAr         String?
   bio             String?
@@ -861,24 +875,24 @@ model Mentor {
   industries      Json?
   languages       Json?
   hourlyRate      Float?
-  currency        String    @default("SAR")
-  isApproved      Boolean   @default(false)
-  isActive        Boolean   @default(true)
+  currency        String                @default("SAR")
+  isApproved      Boolean               @default(false)
+  isActive        Boolean               @default(true)
   approvedAt      DateTime?
   approvedBy      String?
   rejectedReason  String?
-  totalSessions   Int       @default(0)
-  averageRating   Float     @default(0)
-  totalEarnings   Float     @default(0)
-  pendingPayout   Float     @default(0)
+  totalSessions   Int                   @default(0)
+  averageRating   Float                 @default(0)
+  totalEarnings   Float                 @default(0)
+  pendingPayout   Float                 @default(0)
   linkedinUrl     String?
   yearsExperience Int?
   sessions        MentorSession[]
   availability    MentorAvailability[]
   certifications  MentorCertification[]
   payoutRequests  MentorPayoutRequest[]
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
 }
 
 model MentorCertification {
@@ -897,36 +911,36 @@ model MentorCertification {
 }
 
 model MentorSession {
-  id              String        @id @default(cuid())
-  mentorId        String
-  menteeId        String
-  mentor          Mentor        @relation(fields: [mentorId], references: [id], onDelete: Cascade)
-  mentee          User          @relation("MenteeSessions", fields: [menteeId], references: [id], onDelete: Cascade)
-  status          SessionStatus @default(PENDING)
-  duration        Int           @default(60)
-  topic           String?
-  notes           String?
-  scheduledAt     DateTime?
-  startedAt       DateTime?
-  endedAt         DateTime?
-  price           Float         @default(0)
-  platformFee     Float         @default(0)
-  mentorEarning   Float         @default(0)
-  dailyRoomName   String?
-  dailyRoomUrl    String?
-  recordingId     String?
-  recordingUrl    String?
-  rating          Int?
-  review          String?
-  reviewedAt      DateTime?
-  payoutStatus    String        @default("PENDING")
-  payoutDate      DateTime?
-  payoutReference String?
+  id                       String               @id @default(cuid())
+  mentorId                 String
+  menteeId                 String
+  mentor                   Mentor               @relation(fields: [mentorId], references: [id], onDelete: Cascade)
+  mentee                   User                 @relation("MenteeSessions", fields: [menteeId], references: [id], onDelete: Cascade)
+  status                   SessionStatus        @default(PENDING)
+  duration                 Int                  @default(60)
+  topic                    String?
+  notes                    String?
+  scheduledAt              DateTime?
+  startedAt                DateTime?
+  endedAt                  DateTime?
+  price                    Float                @default(0)
+  platformFee              Float                @default(0)
+  mentorEarning            Float                @default(0)
+  dailyRoomName            String?
+  dailyRoomUrl             String?
+  recordingId              String?
+  recordingUrl             String?
+  rating                   Int?
+  review                   String?
+  reviewedAt               DateTime?
+  payoutStatus             String               @default("PENDING")
+  payoutDate               DateTime?
+  payoutReference          String?
   reminderOneHourSentAt    DateTime?
   reminderFifteenMinSentAt DateTime?
-  messageThread   MentorMessageThread?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  messageThread            MentorMessageThread?
+  createdAt                DateTime             @default(now())
+  updatedAt                DateTime             @updatedAt
 
   @@index([mentorId])
   @@index([menteeId])
@@ -957,17 +971,17 @@ model MentorMessage {
 }
 
 model MentorPayoutRequest {
-  id              String   @id @default(cuid())
-  mentorId        String
-  mentor          Mentor   @relation(fields: [mentorId], references: [id], onDelete: Cascade)
-  amount          Float
-  bankName        String
-  accountHolder   String
-  iban            String
-  status          String   @default("REQUESTED")
-  reference       String?
-  createdAt       DateTime @default(now())
-  processedAt     DateTime?
+  id            String    @id @default(cuid())
+  mentorId      String
+  mentor        Mentor    @relation(fields: [mentorId], references: [id], onDelete: Cascade)
+  amount        Float
+  bankName      String
+  accountHolder String
+  iban          String
+  status        String    @default("REQUESTED")
+  reference     String?
+  createdAt     DateTime  @default(now())
+  processedAt   DateTime?
 
   @@index([mentorId])
   @@index([status])

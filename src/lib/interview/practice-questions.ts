@@ -3,7 +3,7 @@ export const PRACTICE_INTERVIEW_QUESTIONS = [
   {
     id: "practice-1",
     question:
-      "Hello! I'm Lara from QudrahTech. Let's start with a simple introduction — what is your full name?",
+      "Hello! I'm Lara from Qudrahtech. Let's start with a simple introduction — what is your full name?",
     questionAr: "مرحباً! أنا لارا من قدرتك. لنبدأ بتعريف بسيط — ما اسمك الكامل؟",
     category: "introduction",
     timeLimit: 120,

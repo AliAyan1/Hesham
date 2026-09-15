@@ -45,7 +45,7 @@ export async function onJobSeekerRegistered(params: {
   if (settings.sendWelcomeEmail) {
     await safeSend(
       params.email,
-      "Welcome to QudrahTech! | مرحباً بك في قدرتك",
+      "Welcome to Qudrahtech! | مرحباً بك في قدرتك",
       WelcomeJobSeeker({ name: params.name || "there" }),
     );
   }
@@ -78,7 +78,7 @@ export async function onEmployerRegistered(params: {
   if (settings.sendWelcomeEmail) {
     await safeSend(
       params.email,
-      "Welcome to QudrahTech! Start Hiring Smarter",
+      "Welcome to Qudrahtech! Start Hiring Smarter",
       WelcomeEmployer({ name: params.name || "there" }),
     );
   }
@@ -457,7 +457,7 @@ export async function onNewMessage(params: {
   const role = params.recipientRole === UserRole.EMPLOYER ? "EMPLOYER" : "JOBSEEKER";
   await safeSend(
     params.recipientEmail,
-    "New Message on QudrahTech | رسالة جديدة",
+    "New Message on Qudrahtech | رسالة جديدة",
     NewMessage({
       senderName: params.senderName,
       preview: params.preview,

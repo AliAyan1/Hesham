@@ -6,7 +6,7 @@ export type PlatformSettingsInput = Omit<
 >;
 
 export const DEFAULT_PLATFORM_SETTINGS: PlatformSettingsInput = {
-  platformName: "QudrahTech",
+  platformName: "Qudrahtech",
   platformNameAr: "قدرتك",
   platformUrl: "https://basalim-consulting.com",
   supportEmail: "support@basalim-consulting.com",
@@ -36,6 +36,6 @@ export const DEFAULT_PLATFORM_SETTINGS: PlatformSettingsInput = {
   maxJobsPerEmployer: 10,
   maxApplicationsPerJob: 500,
   freeUserJobAlerts: 3,
-  maintenanceMessage: "We are updating QudrahTech. We will be back shortly!",
+  maintenanceMessage: "We are updating Qudrahtech. We will be back shortly!",
   maintenanceMessageAr: "قدرتك تتحدث",
 };

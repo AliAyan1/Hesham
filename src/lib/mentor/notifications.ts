@@ -41,14 +41,14 @@ export async function onMentorApproved(params: {
   void sendTransactionalEmail({
     to: params.email,
     subject: "Mentor profile approved | تمت الموافقة على ملف المرشد",
-    html: `<p>Congratulations ${params.name}! Your mentor profile has been approved on QudrahTech. You can now receive session bookings.</p>`,
+    html: `<p>Congratulations ${params.name}! Your mentor profile has been approved on Qudrahtech. You can now receive session bookings.</p>`,
   }).catch(() => undefined);
   await createNotification({
     userId: params.userId,
     type: NotificationType.MENTOR_APPROVED,
     title: "Your profile is approved!",
     titleAr: "تمت الموافقة على ملفك!",
-    message: "Congratulations! Your mentor profile has been approved on QudrahTech.",
+    message: "Congratulations! Your mentor profile has been approved on Qudrahtech.",
     messageAr: "تهانينا! تمت الموافقة على ملفك كمرشد على قدرتك.",
     link: "/dashboard/mentor",
   });

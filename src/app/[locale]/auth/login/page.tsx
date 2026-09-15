@@ -149,7 +149,7 @@ export default function LoginPage() {
         <div className="hidden items-center justify-center bg-gradient-to-br from-[#0F4C75] to-[#0D2137] p-10 text-white lg:flex">
           <div className="w-full max-w-md">
             <div className="flex justify-center">
-              <Image src="/logo.png" alt="QudrahTech" width={220} height={70} priority className="h-auto w-auto" />
+              <Image src="/logo.png" alt="Qudrahtech" width={220} height={70} priority className="h-auto w-auto" />
             </div>
             <p className="mt-8 text-center text-xl font-semibold">{tAuth("tagline")}</p>
             <p className="mt-2 text-center text-sm text-white/70">{tAuth("taglineAr")}</p>
@@ -166,7 +166,7 @@ export default function LoginPage() {
         <div className="flex items-center justify-center bg-white p-6">
           <div className="w-full max-w-md">
             <div className="mb-8 lg:hidden">
-              <Image src="/logo.png" alt="QudrahTech" width={180} height={58} priority className="h-auto w-auto" />
+              <Image src="/logo.png" alt="Qudrahtech" width={180} height={58} priority className="h-auto w-auto" />
             </div>
 
             <h1 className="text-2xl font-black text-[#0D2137]">{tAuth("title")}</h1>

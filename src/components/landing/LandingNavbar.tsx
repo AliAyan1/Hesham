@@ -6,6 +6,7 @@ import { Link, usePathname } from "@/i18n/navigation";
 import { Logo } from "@/components/ui/Logo";
 import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
 import { cn } from "@/lib/cn";
+import { QUDRAHTECH_MARKETING_PATH } from "@/lib/qudrahtech-marketing";
 
 type NavItem = { href: string; label: string };
 
@@ -25,14 +26,20 @@ export function LandingNavbar() {
   const pathname = usePathname();
   const shadow = useScrollShadow(10);
 
+  const onPlatformMarketing =
+    pathname.startsWith(QUDRAHTECH_MARKETING_PATH) || pathname.startsWith("/qudratak");
+
   const items: NavItem[] = useMemo(
     () => [
-      { href: "/", label: t("home") },
-      { href: "/about", label: t("about") },
+      {
+        href: onPlatformMarketing ? QUDRAHTECH_MARKETING_PATH : "/",
+        label: t("home"),
+      },
+      { href: "/jobs", label: t("jobs") },
       { href: "/pricing", label: t("pricing") },
       { href: "/contact", label: t("contact") },
     ],
-    [t],
+    [t, onPlatformMarketing],
   );
 
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -45,7 +52,14 @@ export function LandingNavbar() {
   }
 
   const isActive = (href: string) => {
-    if (href === "/") return pathname === "/" || pathname === "";
+    if (href === "/" || href === QUDRAHTECH_MARKETING_PATH) {
+      return (
+        pathname === "/" ||
+        pathname === "" ||
+        pathname === QUDRAHTECH_MARKETING_PATH ||
+        pathname === "/qudratak"
+      );
+    }
     return pathname === href || pathname.startsWith(`${href}/`);
   };
 
@@ -59,7 +73,12 @@ export function LandingNavbar() {
     >
       <div className="mx-auto flex h-[68px] max-w-6xl items-center px-6">
         <div className="flex w-[200px] shrink-0 items-center">
-          <Logo size="md" priority className="shrink-0 [&_img]:h-12 [&_img]:w-auto" />
+          <Logo
+            size="md"
+            priority
+            href={onPlatformMarketing ? QUDRAHTECH_MARKETING_PATH : "/"}
+            className="shrink-0 [&_img]:h-12 [&_img]:w-auto"
+          />
         </div>
 
         <nav

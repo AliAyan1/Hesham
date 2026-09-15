@@ -1,8 +1,9 @@
 "use client";
 
-import Image from "next/image";
 import { useEffect } from "react";
 import { useTranslations } from "next-intl";
+import { Link } from "@/i18n/navigation";
+import { BasalimLogo } from "@/components/layout/BasalimLogo";
 
 export default function LocaleError({
   error,
@@ -18,17 +19,24 @@ export default function LocaleError({
 
   return (
     <div className="flex min-h-[100dvh] flex-col items-center justify-center gap-5 bg-white px-6 text-center">
-      <Image src="/logo.png" alt="QudrahTech" width={180} height={58} priority className="h-auto w-auto" />
-      <h1 className="text-xl font-black text-[#0D2137]">{t("error")}</h1>
+      <BasalimLogo compact priority />
+      <h1 className="text-xl font-black text-[#0D1F2D]">{t("error")}</h1>
       <p className="max-w-md text-sm text-[#6B7280]">{t("friendlyError")}</p>
-      <button
-        type="button"
-        onClick={() => reset()}
-        className="min-h-11 rounded-xl bg-[#0F4C75] px-6 py-3 text-sm font-semibold text-white hover:bg-[#0D2137]"
-      >
-        {t("retry")}
-      </button>
+      <div className="flex flex-wrap items-center justify-center gap-3">
+        <button
+          type="button"
+          onClick={() => reset()}
+          className="min-h-11 rounded-xl bg-[#1A6B5A] px-6 py-3 text-sm font-semibold text-white hover:bg-[#155A4A]"
+        >
+          {t("retry")}
+        </button>
+        <Link
+          href="/"
+          className="min-h-11 rounded-xl border border-[#0D1F2D]/20 px-6 py-3 text-sm font-semibold text-[#0D1F2D] hover:bg-[#F5F3EE]"
+        >
+          Home
+        </Link>
+      </div>
     </div>
   );
 }
-

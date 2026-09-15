@@ -1,5 +1,5 @@
-import { PageLoadingSpinner } from "@/components/marketing/PageLoadingSpinner";
+import { PageSkeleton } from "@/components/basalim/PageSkeleton";
 
 export default function AboutLoading() {
-  return <PageLoadingSpinner />;
+  return <PageSkeleton />;
 }

@@ -10,7 +10,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     return NextResponse.json(content, {
       headers: {
-        "Cache-Control": "public, max-age=60, s-maxage=60, stale-while-revalidate=60",
+        "Cache-Control": "public, max-age=300, s-maxage=300, stale-while-revalidate=300",
       },
     });
   } catch (error) {

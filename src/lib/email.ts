@@ -9,9 +9,9 @@ function getResend(): Resend | null {
 
 function fromAddress(): string | null {
   const configured = process.env.FROM_EMAIL ?? process.env.RESEND_FROM_EMAIL ?? null;
-  /** Resend sandbox — works in dev until qudrahtech.sa domain is verified */
+  /** Resend sandbox — works in dev until Qudrahtech.sa domain is verified */
   if (process.env.NODE_ENV !== "production" && process.env.RESEND_USE_VERIFIED_DOMAIN !== "true") {
-    return "QudrahTech <onboarding@resend.dev>";
+    return "Qudrahtech <onboarding@resend.dev>";
   }
   return configured;
 }

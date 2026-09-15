@@ -70,22 +70,22 @@ export function getLaraIntro(locale: string, questionCount: number): string {
   const n = String(questionCount);
   const intros: Record<InterviewLocale, string> = {
     en:
-      `Hello! I'm Lara, your AI interviewer from QudrahTech. I'm excited to learn more about you today. ` +
+      `Hello! I'm Lara, your AI interviewer from Qudrahtech. I'm excited to learn more about you today. ` +
       `We'll go through ${n} questions together. Please answer each question clearly and take your time. Let's begin!`,
     ar:
       `مرحباً! أنا لارا، محاورتك الذكية من قدرتك. يسعدني التعرّف عليك اليوم. ` +
       `سنمرّ على ${n} أسئلة معاً. يُرجى الإجابة بوضوح وأخذ وقتك. لنبدأ!`,
     fr:
-      `Bonjour ! Je suis Lara, votre intervieweuse IA de QudrahTech. Je suis ravie d'en apprendre plus sur vous aujourd'hui. ` +
+      `Bonjour ! Je suis Lara, votre intervieweuse IA de Qudrahtech. Je suis ravie d'en apprendre plus sur vous aujourd'hui. ` +
       `Nous passerons en revue ${n} questions ensemble. Répondez clairement et prenez votre temps. Commençons !`,
     es:
-      `¡Hola! Soy Lara, tu entrevistadora de IA de QudrahTech. Me alegra conocerte hoy. ` +
+      `¡Hola! Soy Lara, tu entrevistadora de IA de Qudrahtech. Me alegra conocerte hoy. ` +
       `Repasaremos ${n} preguntas juntos. Responde con claridad y tómate tu tiempo. ¡Empecemos!`,
     ur:
-      `ہیلو! میں لارا ہوں، QudrahTech کی AI انٹرویوئر۔ آج آپ کے بارے میں جان کر خوشی ہوئی۔ ` +
+      `ہیلو! میں لارا ہوں، Qudrahtech کی AI انٹرویوئر۔ آج آپ کے بارے میں جان کر خوشی ہوئی۔ ` +
       `ہم مل کر ${n} سوالات پر گفتگو کریں گے۔ واضح جواب دیں اور اپنا وقت لیں۔ شروع کرتے ہیں!`,
     tr:
-      `Merhaba! Ben Lara, QudrahTech'in yapay zeka görüşmecisiyim. Bugün sizi tanımak için heyecanlıyım. ` +
+      `Merhaba! Ben Lara, Qudrahtech'in yapay zeka görüşmecisiyim. Bugün sizi tanımak için heyecanlıyım. ` +
       `Birlikte ${n} sorudan geçeceğiz. Her soruyu açıkça yanıtlayın ve acele etmeyin. Başlayalım!`,
   };
   return intros[normalizeInterviewLocale(locale)];

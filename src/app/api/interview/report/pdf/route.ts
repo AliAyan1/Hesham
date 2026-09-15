@@ -73,7 +73,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   );
 
   const suffix = locale === "ar" ? "ar" : "en";
-  const filename = `qudrahtech-interview-${interviewId.slice(0, 8)}-${suffix}.pdf`;
+  const filename = `Qudrahtech-interview-${interviewId.slice(0, 8)}-${suffix}.pdf`;
   return new NextResponse(new Uint8Array(buffer), {
     status: 200,
     headers: {

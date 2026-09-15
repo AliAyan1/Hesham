@@ -26,7 +26,7 @@ export async function POST(request: Request): Promise<
   NextResponse<{ ok: true } | { error: string }>
 > {
   try {
-    const limited = rateLimit(`contact:${clientIp(request)}`, 5, 15 * 60 * 1000);
+    const limited = rateLimit(`contact:${clientIp(request)}`, 3, 60 * 60 * 1000);
     if (!limited.ok) {
       return rateLimitResponse(limited.retryAfterSec);
     }

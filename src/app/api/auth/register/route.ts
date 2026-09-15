@@ -20,7 +20,7 @@ export async function POST(
 ): Promise<NextResponse> {
   try {
     const ip = clientIp(request);
-    const limited = rateLimit(`register:${ip}`, 10, 60 * 60 * 1000);
+    const limited = rateLimit(`register:${ip}`, 5, 60 * 60 * 1000);
     if (!limited.ok) {
       return rateLimitResponse(limited.retryAfterSec);
     }

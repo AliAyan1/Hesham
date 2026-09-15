@@ -1,6 +1,5 @@
 import { getTranslations } from "next-intl/server";
-import { PublicNavbar } from "@/components/layout/PublicNavbar";
-import { Footer } from "@/components/layout/Footer";
+import { PublicLayout } from "@/components/layout/PublicLayout";
 import { PricingCardsSection } from "@/components/landing/PricingCardsSection";
 import { PricingComparisonTable } from "@/components/pricing/PricingComparisonTable";
 import { PricingFaqAccordion } from "@/components/pricing/PricingFaqAccordion";
@@ -12,12 +11,8 @@ export default async function PricingPage({
 }) {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "pages.pricing" });
-  const isRTL = locale === "ar" || locale === "ur";
-
   return (
-    <div className="min-h-screen bg-white text-gray-900" dir={isRTL ? "rtl" : "ltr"}>
-      <PublicNavbar locale={locale} guestOnly />
-
+    <PublicLayout locale={locale}>
       <section className="bg-[#F8FAFC] px-6 py-20">
         <div className="mx-auto max-w-6xl text-center">
           <h1 className="text-balance text-4xl font-black tracking-tight text-[#0D2137] sm:text-5xl">
@@ -46,8 +41,6 @@ export default async function PricingPage({
           </div>
         </section>
       </main>
-
-      <Footer locale={locale} />
-    </div>
+    </PublicLayout>
   );
 }

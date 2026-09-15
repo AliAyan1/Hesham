@@ -109,6 +109,19 @@ export async function POST(
     });
   }
 
+  const existingApplication = await prisma.application.findUnique({
+    where: {
+      jobId_jobSeekerId: { jobId: job.id, jobSeekerId: seekerId },
+    },
+    select: { id: true },
+  });
+  if (existingApplication) {
+    return NextResponse.json(
+      { success: false, error: "Already applied to this job" },
+      { status: 409 },
+    );
+  }
+
   try {
     const result = await prisma.$transaction(async (tx) => {
       const created = await tx.application.create({

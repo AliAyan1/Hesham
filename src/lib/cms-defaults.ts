@@ -206,7 +206,7 @@ export const SITE_CONTENT_SEED: SiteContentSeed[] = [
   },
   {
     key: "welcome_message",
-    valueEn: "Welcome to QudrahTech! Your journey to the perfect career starts here.",
+    valueEn: "Welcome to Qudrahtech! Your journey to the perfect career starts here.",
     valueAr: "مرحباً بك في قدرتك! رحلتك نحو المسيرة المهنية المثالية تبدأ هنا.",
     section: "platform",
     label: "Welcome Message",

@@ -9,27 +9,10 @@ import {
 import { getToken } from "next-auth/jwt";
 import { isLocale, LOCALE_STORAGE_KEY } from "@/lib/locale-preference";
 import { getAuthSecret } from "@/lib/auth-secret";
+import { isPublicPath } from "@/lib/middleware-public-paths";
 
 /** next-intl reads this on the server; custom middleware must set it (see getRequestLocale). */
 const NEXT_INTL_LOCALE_HEADER = "X-NEXT-INTL-LOCALE";
-
-/** Pages and API prefixes that never require a dashboard session. */
-const PUBLIC_PATHS = [
-  "/",
-  "/about",
-  "/pricing",
-  "/contact",
-  "/privacy",
-  "/terms",
-  "/auth/login",
-  "/auth/register",
-  "/auth/forgot-password",
-  "/maintenance",
-  "/api/auth",
-  "/api/health",
-  "/api/settings/public",
-  "/api/jobs",
-];
 
 /** Extract locale segment from pathname (e.g. /ar/dashboard → "ar") */
 function getLocaleFromPath(pathname: string): Locale | null {
@@ -179,7 +162,7 @@ export default async function middleware(request: NextRequest) {
     );
     if (maintenanceRedirect) return maintenanceRedirect;
 
-    if (PUBLIC_PATHS.some((p) => pathWithoutLocale.startsWith(p))) {
+    if (isPublicPath(pathWithoutLocale)) {
       if (pathWithoutLocale.startsWith("/auth/login")) {
         const loginToken = await getToken({
           req: request,

@@ -332,7 +332,7 @@ export async function acceptTalentPoolInvite(params: {
           questions: videoQs as object[],
         },
       });
-      const base = process.env.NEXTAUTH_URL ?? "https://qudrahtech.com";
+      const base = process.env.NEXTAUTH_URL ?? "https://Qudrahtech.com";
       await createUserNotification({
         userId: params.candidateId,
         type: NotificationType.INTERVIEW_READY,

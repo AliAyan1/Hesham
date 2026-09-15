@@ -42,8 +42,8 @@ async function main() {
   });
 
   if (user.password) {
-    const ok = await bcrypt.compare("Admin@QudrahTech2026!", user.password);
-    console.log("password matches Admin@QudrahTech2026!:", ok);
+    const ok = await bcrypt.compare("Admin@Qudrahtech2026!", user.password);
+    console.log("password matches Admin@Qudrahtech2026!:", ok);
   }
 }
 

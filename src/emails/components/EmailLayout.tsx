@@ -54,7 +54,7 @@ export function EmailLayout({
                 letterSpacing: "-0.5px",
               }}
             >
-              QudrahTech
+              Qudrahtech
             </Heading>
             <Text style={{ color: "#A7F3D0", fontSize: 12, margin: "8px 0 0" }}>
               Know Your Potential. Shape Your Future.
@@ -86,7 +86,7 @@ export function EmailLayout({
             }}
           >
             <Text style={{ color: MUTED, fontSize: 12, margin: 0, lineHeight: 1.6 }}>
-              © {new Date().getFullYear()} QudrahTech. All rights reserved.
+              © {new Date().getFullYear()} Qudrahtech. All rights reserved.
             </Text>
             <Link href={unsubscribe} style={{ color: TEAL, fontSize: 12 }}>
               Contact / unsubscribe preferences

@@ -4,7 +4,7 @@ import { UserRole } from "@/types";
 export type { Locale } from "./locale-settings";
 export { DEFAULT_LOCALE, LOCALES, RTL_LOCALES };
 
-export const APP_NAME = "QudrahTech";
+export const APP_NAME = "Qudrahtech";
 export const APP_NAME_AR = "قدرتك";
 export const SLOGAN = "Know Your Potential. Shape Your Future.";
 export const SLOGAN_AR = "اعرف إمكاناتك. شكّل مستقبلك.";

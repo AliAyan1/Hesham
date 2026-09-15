@@ -53,7 +53,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }),
   );
 
-  const filename = `qudrahtech-assessment-${id.slice(0, 8)}.pdf`;
+  const filename = `Qudrahtech-assessment-${id.slice(0, 8)}.pdf`;
   return new NextResponse(new Uint8Array(buffer), {
     status: 200,
     headers: {

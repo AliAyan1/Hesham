@@ -240,7 +240,7 @@ function FlaggedTable({
           <tr key={r.id} className="border-t border-red-100 bg-red-50/40">
             <td className="py-2">
               <div className="flex items-center gap-2">
-                <InitialsAvatar name={r.name} email="candidate@qudrahtech.com" size="sm" />
+                <InitialsAvatar name={r.name} email="candidate@Qudrahtech.com" size="sm" />
                 {r.name}
               </div>
             </td>

@@ -14,7 +14,7 @@ const adapter = new PrismaPg({ connectionString: databaseUrl });
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
-  const hashedPassword = await bcrypt.hash("Admin@QudrahTech2026!", 12);
+  const hashedPassword = await bcrypt.hash("Admin@Qudrahtech2026!", 12);
 
   await prisma.user.upsert({
     where: { email: "admin@basalim-consulting.com" },
@@ -24,7 +24,7 @@ async function main() {
       onboardingComplete: true,
     },
     create: {
-      name: "QudrahTech Admin",
+      name: "Qudrahtech Admin",
       email: "admin@basalim-consulting.com",
       password: hashedPassword,
       role: "ADMIN",
@@ -35,7 +35,7 @@ async function main() {
   });
   console.log("✅ Admin account created");
   console.log("Email: admin@basalim-consulting.com");
-  console.log("Password: Admin@QudrahTech2026!");
+  console.log("Password: Admin@Qudrahtech2026!");
 }
 
 main()

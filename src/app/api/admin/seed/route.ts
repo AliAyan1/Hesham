@@ -5,7 +5,7 @@ import { getPrisma } from "@/lib/db";
 export const dynamic = "force-dynamic";
 
 const ADMIN_EMAIL = "admin@basalim-consulting.com";
-const ADMIN_PASSWORD = "Admin@QudrahTech2026!";
+const ADMIN_PASSWORD = "Admin@Qudrahtech2026!";
 
 function seedSecret(): string | undefined {
   const s = process.env.ADMIN_SEED_SECRET ?? process.env.CRON_SECRET;
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
         onboardingComplete: true,
       },
       create: {
-        name: "QudrahTech Admin",
+        name: "Qudrahtech Admin",
         email: ADMIN_EMAIL,
         password: hashedPassword,
         role: "ADMIN",

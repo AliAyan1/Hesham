@@ -1,7 +1,7 @@
 import { LOCALES, type Locale } from "@/lib/locale-settings";
 
-export const LOCALE_STORAGE_KEY = "qudrahtech-locale";
-export const LEGACY_LOCALE_STORAGE_KEY = "qudrahtech-preferred-locale";
+export const LOCALE_STORAGE_KEY = "Qudrahtech-locale";
+export const LEGACY_LOCALE_STORAGE_KEY = "Qudrahtech-preferred-locale";
 
 export function isLocale(segment: string | undefined | null): segment is Locale {
   return !!segment && (LOCALES as readonly string[]).includes(segment);

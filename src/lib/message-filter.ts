@@ -17,4 +17,4 @@ export function containsContactInfo(text: string): boolean {
 }
 
 export const MESSAGE_FILTER_ERROR =
-  "Sharing personal contact information is not allowed on QudrahTech. All communication must stay on platform.";
+  "Sharing personal contact information is not allowed on Qudrahtech. All communication must stay on platform.";

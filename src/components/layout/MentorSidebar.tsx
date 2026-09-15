@@ -101,7 +101,7 @@ export function MentorSidebar({ locale }: { locale: string }) {
             <Avatar
               src={session.data?.user?.image ?? null}
               name={session.data?.user?.name ?? null}
-              email={session.data?.user?.email ?? "mentor@qudrahtech.com"}
+              email={session.data?.user?.email ?? "mentor@Qudrahtech.com"}
               size="sm"
             />
             <div className="min-w-0 flex-1">

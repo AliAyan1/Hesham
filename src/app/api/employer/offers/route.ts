@@ -46,7 +46,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       candidateId: app.jobSeekerId,
       jobId: app.job.id,
       recruitmentFee: fee,
-      terms: "Standard QudrahTech recruitment obligation terms apply.",
+      terms: "Standard Qudrahtech recruitment obligation terms apply.",
       expiresAt,
     },
   });

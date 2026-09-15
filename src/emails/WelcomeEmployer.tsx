@@ -4,7 +4,7 @@ import { appUrl } from "@/lib/email/app-url";
 export function WelcomeEmployer({ name }: { name: string }) {
   return (
     <EmailLayout
-      preview="Welcome to QudrahTech — hire smarter"
+      preview="Welcome to Qudrahtech — hire smarter"
       titleEn={`Welcome, ${name}!`}
       titleAr={`مرحباً بك، ${name}!`}
     >

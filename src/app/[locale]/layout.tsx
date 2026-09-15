@@ -26,11 +26,11 @@ const plusJakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "QudrahTech | قدرتك - AI Career Platform",
+  title: "Qudrahtech | قدرتك - AI Career Platform",
   description:
     "AI-powered career assessments, ATS-optimized CVs, and smart job matching for job seekers and employers.",
   keywords: [
-    "QudrahTech",
+    "Qudrahtech",
     "قدرتك",
     "AI career platform",
     "ATS CV builder",
@@ -41,14 +41,14 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
   openGraph: {
     type: "website",
-    siteName: "QudrahTech",
-    title: "QudrahTech | قدرتك - AI Career Platform",
+    siteName: "Qudrahtech",
+    title: "Qudrahtech | قدرتك - AI Career Platform",
     description:
       "AI-powered career assessments, ATS-optimized CVs, and smart job matching for job seekers and employers.",
   },
   twitter: {
     card: "summary_large_image",
-    title: "QudrahTech | قدرتك",
+    title: "Qudrahtech | قدرتك",
     description: "Know Your Potential. Shape Your Future.",
   },
 };
@@ -56,7 +56,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#0F4C75",
+  themeColor: "#0D1F2D",
 };
 
 export default async function LocaleLayout({
