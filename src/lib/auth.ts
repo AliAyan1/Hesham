@@ -5,6 +5,7 @@ import type { SubscriptionTier as PrismaSubscriptionTier } from "@prisma/client"
 import { getPrisma } from "@/lib/db";
 import bcrypt from "bcryptjs";
 import { loginSchema } from "@/lib/validations";
+import { DEFAULT_LOCALE } from "@/lib/constants";
 import { UserRole } from "@/types";
 import type { NextAuthConfig } from "next-auth";
 import { getAuthSecret } from "@/lib/auth-secret";
@@ -193,8 +194,9 @@ export const authConfig: NextAuthConfig = {
       if (account?.provider === "google" && token.email) {
         try {
           const prisma = getPrisma();
-          const dbUser = await prisma.user.findUnique({
-            where: { email: token.email },
+          const email = token.email.trim().toLowerCase();
+          const dbUser = await prisma.user.findFirst({
+            where: { email: { equals: email, mode: "insensitive" } },
           });
           if (dbUser) {
             token.id = dbUser.id;
@@ -306,13 +308,14 @@ export const authConfig: NextAuthConfig = {
       if (account?.provider === "google" && user.email) {
         try {
           const prisma = getPrisma();
-          const existing = await prisma.user.findUnique({
-            where: { email: user.email },
+          const email = user.email.trim().toLowerCase();
+          const existing = await prisma.user.findFirst({
+            where: { email: { equals: email, mode: "insensitive" } },
           });
           if (!existing) {
             await prisma.user.create({
               data: {
-                email: user.email,
+                email,
                 name: user.name,
                 image: user.image,
                 role: UserRole.JOBSEEKER,
@@ -338,14 +341,24 @@ export const authConfig: NextAuthConfig = {
       } catch {
         /* ignore */
       }
-      return `${baseUrl}/auth/login`;
+      try {
+        const base = new URL(baseUrl);
+        const dest = new URL(url, baseUrl);
+        const seg = dest.pathname.split("/")[1];
+        if (seg && seg.length === 2) {
+          return `${base.origin}/${seg}/auth/login`;
+        }
+        return `${base.origin}/${DEFAULT_LOCALE}/auth/login`;
+      } catch {
+        return `${baseUrl}/${DEFAULT_LOCALE}/auth/login`;
+      }
     },
   },
 
   pages: {
-    signIn: "/auth/login",
-    error: "/auth/login",
-    newUser: "/onboarding",
+    signIn: `/${DEFAULT_LOCALE}/auth/login`,
+    error: `/${DEFAULT_LOCALE}/auth/login`,
+    newUser: `/${DEFAULT_LOCALE}/onboarding`,
   },
 
   session: {

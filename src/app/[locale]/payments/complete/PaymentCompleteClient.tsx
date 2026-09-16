@@ -10,6 +10,7 @@ import type { PaymentMetadataInput } from "@/lib/payments/fulfill";
 import {
   clearPaymentReturnContext,
   loadPaymentReturnContext,
+  PAYMENT_LOCALE_STORAGE_KEY,
 } from "@/lib/payments/return-context";
 import { dashboardPathForRole } from "@/lib/subscription";
 import { hardNavigate } from "@/lib/auth-redirect";
@@ -64,7 +65,13 @@ async function finishAndRedirect(input: {
 
   const role =
     returnCtx?.dashboardRole ?? String(input.sessionRole ?? "JOBSEEKER").toUpperCase();
-  const navLocale = returnCtx?.locale ?? input.locale;
+  let storedLocale: string | null = null;
+  try {
+    storedLocale = sessionStorage.getItem(PAYMENT_LOCALE_STORAGE_KEY);
+  } catch {
+    storedLocale = null;
+  }
+  const navLocale = returnCtx?.locale ?? storedLocale ?? input.locale;
 
   if (input.metadata.type === "SUBSCRIPTION") {
     hardNavigate(dashboardPathForRole(role), navLocale);

@@ -1,4 +1,5 @@
 export const PAYMENT_RETURN_STORAGE_KEY = "qt-payment-return-context";
+export const PAYMENT_LOCALE_STORAGE_KEY = "qt-payment-locale";
 
 export type PaymentReturnContext = {
   dashboardRole: string;
@@ -11,6 +12,7 @@ export function savePaymentReturnContext(ctx: PaymentReturnContext): void {
   if (typeof window === "undefined") return;
   try {
     sessionStorage.setItem(PAYMENT_RETURN_STORAGE_KEY, JSON.stringify(ctx));
+    sessionStorage.setItem(PAYMENT_LOCALE_STORAGE_KEY, ctx.locale);
   } catch {
     /* ignore */
   }

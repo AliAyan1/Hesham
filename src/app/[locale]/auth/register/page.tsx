@@ -26,6 +26,7 @@ import {
   finishGoogleSignup,
   hardNavigate,
   signOutThenNavigate,
+  waitForAuthenticatedSession,
   type SignupPlanChoice,
 } from "@/lib/auth-redirect";
 import { signInWithGoogle } from "@/lib/google-oauth";
@@ -935,6 +936,7 @@ export default function RegisterPage() {
             setShowSignupPayment(false);
             setPostSignupRedirect(true);
             await update();
+            await waitForAuthenticatedSession(30);
             const nextPath =
               signupRole === UserRole.JOBSEEKER
                 ? "/onboarding"

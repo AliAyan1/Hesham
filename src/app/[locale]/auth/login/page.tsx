@@ -135,7 +135,18 @@ export default function LoginPage() {
   async function handleGoogleSignIn() {
     startTransition(async () => {
       try {
-        await signInWithGoogle({ callbackUrl: `/${locale}/auth/login?from=oauth` });
+        const params = new URLSearchParams(window.location.search);
+        const rawCallback = params.get("callbackUrl")?.trim();
+        let callbackUrl = `/${locale}/auth/login?from=oauth`;
+        if (rawCallback?.startsWith("/")) {
+          callbackUrl = rawCallback;
+        } else if (rawCallback) {
+          const path = intlPathFromCallback(rawCallback, locale);
+          if (path) {
+            callbackUrl = path.startsWith("/") ? `/${locale}${path}` : `/${locale}/${path}`;
+          }
+        }
+        await signInWithGoogle({ callbackUrl });
       } catch {
         setServerError(t("common.error"));
       }

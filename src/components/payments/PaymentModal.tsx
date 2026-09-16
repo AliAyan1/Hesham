@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { calculateVAT } from "@/lib/moyasar";
 import { PaymentForm } from "./PaymentForm";
 import { BnplPaymentButtons } from "./BnplPaymentButtons";
@@ -35,6 +35,7 @@ export function PaymentModal({
   onSuccess,
 }: PaymentModalProps) {
   const t = useTranslations("payments");
+  const locale = useLocale();
   const [status, setStatus] = useState<ModalStatus>("idle");
   const [errorMsg, setErrorMsg] = useState("");
   const [isTestMode, setIsTestMode] = useState(false);
@@ -201,6 +202,7 @@ export function PaymentModal({
                     amount={total}
                     description={description}
                     metadata={metadata}
+                    locale={locale}
                     isTestMode={isTestMode}
                     applePayEnabled={methods.applePay}
                     onSuccess={handleSuccess}

@@ -66,6 +66,7 @@ interface PaymentFormProps {
   amount: number;
   description: string;
   metadata: Record<string, string>;
+  locale?: string;
   isTestMode?: boolean;
   applePayEnabled?: boolean;
   onSuccess: (paymentId: string) => void;
@@ -76,6 +77,7 @@ export function PaymentForm({
   amount,
   description,
   metadata,
+  locale = "ar",
   isTestMode = false,
   applePayEnabled = false,
   onSuccess,
@@ -165,7 +167,7 @@ export function PaymentForm({
             country: "SA",
             description,
             publishable_api_key: publishableKey,
-            callback_url: `${origin}/api/payments/callback`,
+            callback_url: `${origin}/api/payments/callback?locale=${encodeURIComponent(locale)}`,
             supported_networks: ["mada", "visa", "mastercard"],
             methods,
             metadata: parsedMetadata,
@@ -202,7 +204,7 @@ export function PaymentForm({
                 country: "SA",
                 description,
                 publishable_api_key: publishableKey,
-                callback_url: `${origin}/api/payments/callback`,
+                callback_url: `${origin}/api/payments/callback?locale=${encodeURIComponent(locale)}`,
                 supported_networks: ["mada", "visa", "mastercard"],
                 methods: ["creditcard"],
                 metadata: parsedMetadata,
@@ -244,6 +246,7 @@ export function PaymentForm({
     publishableKey,
     loadingKey,
     applePayEnabled,
+    locale,
   ]);
 
   if (loadingKey) {

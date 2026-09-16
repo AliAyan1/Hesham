@@ -6,6 +6,8 @@ import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "@/i18n/navigation";
 import { cn } from "@/lib/cn";
+import { hardNavigate } from "@/lib/auth-redirect";
+import { useLocale } from "next-intl";
 import { PaymentModal } from "@/components/payments/PaymentModal";
 import {
   SUBSCRIPTION_PLAN_PRICES_SAR,
@@ -24,6 +26,7 @@ export function UpgradeConfirm({
   const tp = useTranslations("payments");
   const tc = useTranslations("common");
   const router = useRouter();
+  const locale = useLocale();
   const { update } = useSession();
   const [err, setErr] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -51,6 +54,14 @@ export function UpgradeConfirm({
       : selectedPlan === "premium"
         ? "PREMIUM"
         : null;
+
+  const autoOpenedPayment = useRef(false);
+  useEffect(() => {
+    if (autoOpenedPayment.current || !selectedPlan || !planKey) return;
+    autoOpenedPayment.current = true;
+    upgradedPlanSlug.current = selectedPlan;
+    setShowPaymentModal(true);
+  }, [selectedPlan, planKey]);
 
   const finalizeToDashboard = useCallback(
     async (pick: AccountPick) => {
@@ -84,15 +95,13 @@ export function UpgradeConfirm({
     const sess = await getSession();
     const r = sess?.user?.role;
     if (r === "ADMIN") {
-      router.push(slug ? `/dashboard/admin?upgraded=${slug}` : "/dashboard/admin");
-      router.refresh();
+      hardNavigate(slug ? `/dashboard/admin?upgraded=${slug}` : "/dashboard/admin", locale);
       return;
     }
     if (r === "EMPLOYER" || r === "JOBSEEKER") {
       const dest =
         r === "EMPLOYER" ? "/dashboard/employer" : "/dashboard/job-seeker";
-      router.push(slug ? `${dest}?upgraded=${slug}` : dest);
-      router.refresh();
+      hardNavigate(slug ? `${dest}?upgraded=${slug}` : dest, locale);
       return;
     }
     setPickOpen(true);

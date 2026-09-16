@@ -8,7 +8,6 @@ import { UserRole } from "@prisma/client";
 import { onEmployerRegistered, onJobSeekerRegistered } from "@/lib/email-triggers";
 import { isRegistrationOpen as getRegistrationOpen } from "@/lib/settings";
 import { defaultMentorProfileCreate } from "@/lib/mentor/default-mentor-create";
-import { paymentsAreLive, moyasarPaymentsEnabled, isPaidPlanChoice } from "@/lib/payments-config";
 import { clientIp, rateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
 /**
@@ -56,17 +55,11 @@ export async function POST(
     // Plan upgrades only AFTER payment success via /api/payments/verify.
     const subscriptionTier = "FREE" as const;
 
-    if (paymentsAreLive() && isPaidPlanChoice(plan) && !moyasarPaymentsEnabled()) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Paid plans require checkout before account creation",
-        },
-        { status: 402 },
-      );
-    }
+    const normalizedEmail = email.trim().toLowerCase();
 
-    const existing = await prisma.user.findUnique({ where: { email } });
+    const existing = await prisma.user.findFirst({
+      where: { email: { equals: normalizedEmail, mode: "insensitive" } },
+    });
     if (existing) {
       return NextResponse.json(
         { success: false, error: "Email already registered" },
@@ -79,7 +72,7 @@ export async function POST(
     const user = await prisma.user.create({
       data: {
         name,
-        email,
+        email: normalizedEmail,
         password: hashedPassword,
         role,
         subscriptionTier,

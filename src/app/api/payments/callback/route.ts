@@ -5,7 +5,10 @@ function appOrigin(): string {
   return raw.replace(/\/$/, "");
 }
 
-function localeFromReferer(request: NextRequest): string {
+function resolveLocale(request: NextRequest): string {
+  const fromQuery = request.nextUrl.searchParams.get("locale")?.trim();
+  if (fromQuery && fromQuery.length === 2) return fromQuery;
+
   const ref = request.headers.get("referer");
   if (ref) {
     try {
@@ -16,7 +19,7 @@ function localeFromReferer(request: NextRequest): string {
       /* ignore */
     }
   }
-  return "en";
+  return "ar";
 }
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
@@ -24,7 +27,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const paymentId = url.searchParams.get("id");
   const status = url.searchParams.get("status");
   const message = url.searchParams.get("message");
-  const locale = url.searchParams.get("locale") ?? localeFromReferer(request);
+  const locale = resolveLocale(request);
 
   const params = new URLSearchParams();
   if (paymentId) params.set("id", paymentId);
