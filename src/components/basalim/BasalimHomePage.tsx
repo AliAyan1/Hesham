@@ -14,6 +14,8 @@ import {
 import { HeshamFounderPhoto } from "@/components/basalim/HeshamFounderPhoto";
 import { QudrahtechHomeSplitSection } from "@/components/basalim/QudrahtechHomeSplitSection";
 import {
+  BASALIM_CALENDLY_URL,
+  HESHAM_LINKEDIN_URL,
   qudratakMarketingHref,
   QUDRAH_PLATFORM_NAME,
   QUDRAH_PLATFORM_NAME_AR,
@@ -188,12 +190,14 @@ export function BasalimHomePage({ locale }: BasalimHomePageProps) {
               : "Empowering businesses, teams and future leaders to achieve ambitious outcomes for sustainable growth."}
           </p>
           <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-            <Link
-              href="/contact"
+            <a
+              href={BASALIM_CALENDLY_URL}
+              target="_blank"
+              rel="noopener noreferrer"
               className="inline-flex items-center justify-center rounded-md bg-[#1A6B5A] px-7 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-[#155A4A]"
             >
-              {isAr ? "تواصل معنا" : "Book a Consultation"}
-            </Link>
+              {isAr ? "احجز استشارة" : "Book a Consultation"}
+            </a>
             <Link
               href="/services"
               className="inline-flex items-center justify-center rounded-md border-2 border-white px-7 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-white/10"
@@ -301,12 +305,14 @@ export function BasalimHomePage({ locale }: BasalimHomePageProps) {
                 ? "عندما يكسب الإنسان، تكسب المنظمات والمجتمعات. كل مشروع نأخذه يُبنى على هذا الاعتقاد."
                 : "When people grow, organizations and communities move forward. Every engagement we take on is built on that belief."}
             </blockquote>
-            <Link
-              href="/about"
+            <a
+              href={HESHAM_LINKEDIN_URL}
+              target="_blank"
+              rel="noopener noreferrer"
               className="mt-6 inline-flex items-center gap-1 font-semibold text-[#1A6B5A] hover:underline"
             >
-              {isAr ? "اقرأ قصته ←" : "Read his story →"}
-            </Link>
+              {isAr ? "اقرأ قصته على لينكدإن ←" : "Read his story on LinkedIn →"}
+            </a>
           </div>
         </div>
       </section>
@@ -408,12 +414,14 @@ export function BasalimHomePage({ locale }: BasalimHomePageProps) {
               : "Let's talk about your people, talent and organization challenges."}
           </p>
           <div className="mt-10 flex flex-col justify-center gap-3 sm:flex-row">
-            <Link
-              href="/contact"
+            <a
+              href={BASALIM_CALENDLY_URL}
+              target="_blank"
+              rel="noopener noreferrer"
               className="inline-flex justify-center rounded-md bg-[#1A6B5A] px-8 py-3.5 text-sm font-semibold text-white hover:bg-[#155A4A]"
             >
               {isAr ? "احجز استشارة" : "Book a Consultation"}
-            </Link>
+            </a>
             <Link
               href="/services"
               className="inline-flex justify-center rounded-md border-2 border-[#0D1F2D] px-8 py-3.5 text-sm font-semibold text-[#0D1F2D] hover:bg-white/50"

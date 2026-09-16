@@ -7,6 +7,7 @@ import { Menu, X, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { BasalimEnArToggle } from "@/components/layout/BasalimEnArToggle";
 import {
+  BASALIM_CALENDLY_URL,
   qudratakMarketingHref,
   QUDRAH_PLATFORM_NAME,
   QUDRAH_PLATFORM_NAME_AR,
@@ -223,12 +224,14 @@ export function BasalimNavbar({ locale }: BasalimNavbarProps) {
 
         <div className="hidden items-center justify-end gap-4 lg:flex">
           <BasalimEnArToggle />
-          <Link
-            href="/contact"
+          <a
+            href={BASALIM_CALENDLY_URL}
+            target="_blank"
+            rel="noopener noreferrer"
             className="rounded-md bg-[#1A6B5A] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#155A4A]"
           >
             {bookLabel}
-          </Link>
+          </a>
         </div>
 
         <button
@@ -298,13 +301,15 @@ export function BasalimNavbar({ locale }: BasalimNavbarProps) {
             ))}
             <div className="mt-6 flex flex-col gap-4 border-t pt-6">
               <BasalimEnArToggle className="self-start" />
-              <Link
-                href="/contact"
+              <a
+                href={BASALIM_CALENDLY_URL}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="rounded-md bg-[#1A6B5A] px-5 py-3 text-center text-sm font-semibold text-white"
                 onClick={() => setMobileOpen(false)}
               >
                 {bookLabel}
-              </Link>
+              </a>
             </div>
           </nav>
         </div>

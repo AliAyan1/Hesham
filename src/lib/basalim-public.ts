@@ -14,6 +14,9 @@ export const QUDRATAK_NAME_AR = "قدرتك";
 export const HESHAM_LINKEDIN_URL =
   "https://www.linkedin.com/in/hesham-basalim-mba?utm_source=share_via&utm_content=profile&utm_medium=member_ios";
 
+/** Basalim consultation booking (Calendly). */
+export const BASALIM_CALENDLY_URL = "https://calendly.com/basalimhesham/30min";
+
 export const BASALIM_COLORS = {
   dark: "#0D1F2D",
   teal: "#1A6B5A",
