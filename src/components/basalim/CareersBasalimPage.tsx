@@ -122,6 +122,7 @@ export function CareersBasalimPage({ locale, careersEmail }: Props) {
         titleAr="طوّر مسيرتك. اصنع غداً أكثر إشراقاً"
         buttonEn="Get in Touch"
         buttonAr="تواصل معنا"
+        href="/contact"
       />
     </>
   );

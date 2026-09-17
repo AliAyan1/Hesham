@@ -2,6 +2,7 @@ import { Link } from "@/i18n/navigation";
 import { BasalimPageHero } from "@/components/basalim/BasalimPageHero";
 import { BasalimContactForm } from "@/components/basalim/BasalimContactForm";
 import { BasalimLinkedInLink } from "@/components/layout/BasalimLinkedInLink";
+import { BASALIM_CALENDLY_URL } from "@/lib/basalim-public";
 
 type Props = {
   locale: string;
@@ -66,6 +67,14 @@ export function BasalimContactPage({
             <div className="mt-8">
               <BasalimLinkedInLink className="text-white/70 hover:text-white" />
             </div>
+            <a
+              href={BASALIM_CALENDLY_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-8 inline-flex w-full items-center justify-center rounded-md bg-[#1A6B5A] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#155A4A]"
+            >
+              {isAr ? "احجز استشارة" : "Book a Consultation"}
+            </a>
           </aside>
 
           <BasalimContactForm locale={locale} />

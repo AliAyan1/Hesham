@@ -4,6 +4,7 @@ import { BasalimLinkedInLink } from "@/components/layout/BasalimLinkedInLink";
 import { Link } from "@/i18n/navigation";
 import { getContent } from "@/lib/cms";
 import {
+  BASALIM_CALENDLY_URL,
   QudrahtechJoinUrl,
   QUDRAH_PLATFORM_NAME,
   QUDRAH_PLATFORM_NAME_AR,
@@ -119,9 +120,14 @@ export async function BasalimFooter({ locale }: BasalimFooterProps) {
                 </Link>
               </li>
               <li>
-                <Link href="/contact" className="transition-colors hover:text-white">
+                <a
+                  href={BASALIM_CALENDLY_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="transition-colors hover:text-white"
+                >
                   {isAr ? "احجز استشارة" : "Book Consultation"}
-                </Link>
+                </a>
               </li>
               <li>
                 <Link href="/legal" className="transition-colors hover:text-white">
