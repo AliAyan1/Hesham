@@ -98,7 +98,11 @@ async function maintenanceGuard(
   if (
     pathWithoutLocale.startsWith("/maintenance") ||
     pathWithoutLocale.startsWith("/api/settings/public") ||
-    pathWithoutLocale.startsWith("/api/auth")
+    pathWithoutLocale.startsWith("/api/auth") ||
+    pathWithoutLocale.startsWith("/auth/login") ||
+    pathWithoutLocale.startsWith("/auth/forgot-password") ||
+    pathWithoutLocale.startsWith("/auth/reset-password") ||
+    pathWithoutLocale === "/login"
   ) {
     return null;
   }
