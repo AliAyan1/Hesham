@@ -11,6 +11,7 @@ import { loginSchema } from "@/lib/validations";
 import { BRAND_COLORS } from "@/lib/constants";
 import { ClientHydrationGate } from "@/components/ui/ClientHydrationGate";
 import { GoogleIcon } from "@/components/auth/GoogleIcon";
+import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
 import {
   fetchPostAuthPath,
   hardNavigate,
@@ -154,7 +155,10 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-[100dvh]" dir={isRTL ? "rtl" : "ltr"}>
+    <div className="relative min-h-[100dvh]" dir={isRTL ? "rtl" : "ltr"}>
+      <div className="absolute end-4 top-4 z-20">
+        <LanguageSwitcher tone="light" minimal />
+      </div>
       <div className="grid min-h-[100dvh] lg:grid-cols-2">
         {/* Left panel (desktop) */}
         <div className="hidden items-center justify-center bg-gradient-to-br from-[#0F4C75] to-[#0D2137] p-10 text-white lg:flex">

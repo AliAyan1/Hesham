@@ -234,14 +234,17 @@ export function BasalimNavbar({ locale }: BasalimNavbarProps) {
           </a>
         </div>
 
-        <button
-          type="button"
-          className="ms-auto inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 text-[#0D1F2D] lg:hidden"
-          aria-label={mobileOpen ? "Close menu" : "Open menu"}
-          onClick={() => setMobileOpen((v) => !v)}
-        >
-          {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-        </button>
+        <div className="ms-auto flex items-center gap-2 lg:hidden">
+          <BasalimEnArToggle />
+          <button
+            type="button"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 text-[#0D1F2D]"
+            aria-label={mobileOpen ? "Close menu" : "Open menu"}
+            onClick={() => setMobileOpen((v) => !v)}
+          >
+            {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
+        </div>
       </div>
 
       {mobileOpen ? (

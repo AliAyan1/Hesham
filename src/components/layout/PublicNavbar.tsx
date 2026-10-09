@@ -108,7 +108,7 @@ export function PublicNavbar({ locale, guestOnly = false }: PublicNavbarProps): 
         </nav>
 
         <div className="flex w-[200px] shrink-0 items-center justify-end gap-2 sm:gap-3">
-          <div className="hidden sm:block">
+          <div className="shrink-0">
             <LanguageSwitcher tone="light" minimal />
           </div>
           <div className="hidden items-center gap-2 sm:flex">

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import type { Locale } from "@/lib/locale-settings";
-import { DEFAULT_LOCALE, LOCALES, RTL_LOCALES } from "@/lib/locale-settings";
+import { DEFAULT_LOCALE, RTL_LOCALES } from "@/lib/locale-settings";
 import {
   type MiddlewareUserRole,
   MIDDLEWARE_DASHBOARD_ROUTES,
@@ -20,23 +20,11 @@ function getLocaleFromPath(pathname: string): Locale | null {
   return isLocale(segment) ? segment : null;
 }
 
-/** Match Accept-Language to one of six locales; default Arabic */
-function localeFromAcceptLanguage(request: NextRequest): Locale {
-  const acceptLang = request.headers.get("accept-language") ?? "";
-  for (const part of acceptLang.split(",")) {
-    const raw = part.split(";")[0]?.trim()?.split("-")[0]?.toLowerCase();
-    if (raw && LOCALES.includes(raw as Locale)) {
-      return raw as Locale;
-    }
-  }
-  return DEFAULT_LOCALE;
-}
-
-/** Cookie wins on first visits; Accept-Language if no cookie */
+/** Saved preference (cookie) wins; otherwise Arabic for all first-time visitors. */
 function resolveTargetLocale(request: NextRequest): Locale {
   const fromCookie = request.cookies.get(LOCALE_STORAGE_KEY)?.value;
   if (fromCookie && isLocale(fromCookie)) return fromCookie;
-  return localeFromAcceptLanguage(request);
+  return DEFAULT_LOCALE;
 }
 
 function redirectPreservingSearch(

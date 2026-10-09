@@ -99,14 +99,17 @@ export function QudratakNavbar({ locale }: QudratakNavbarProps) {
           </PlatformCta>
         </div>
 
-        <button
-          type="button"
-          className="ms-auto inline-flex h-10 w-10 items-center justify-center rounded-lg border border-white/20 lg:hidden"
-          aria-label={mobileOpen ? "Close menu" : "Open menu"}
-          onClick={() => setMobileOpen((v) => !v)}
-        >
-          {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-        </button>
+        <div className="ms-auto flex items-center gap-2 lg:hidden">
+          <BasalimEnArToggle tone="dark" />
+          <button
+            type="button"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-white/20"
+            aria-label={mobileOpen ? "Close menu" : "Open menu"}
+            onClick={() => setMobileOpen((v) => !v)}
+          >
+            {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
+        </div>
       </div>
       </div>
 
