@@ -16,7 +16,7 @@ export function PublicLayout({ children, locale, variant = "basalim" }: PublicLa
 
   return (
     <div
-      className="min-h-screen bg-white text-[#0D1F2D] antialiased"
+      className="min-h-[100dvh] max-w-[100vw] overflow-x-clip bg-white text-[#0D1F2D] antialiased"
       dir={isRTL ? "rtl" : "ltr"}
     >
       {isQudratak ? <QudratakNavbar locale={locale} /> : <BasalimNavbar locale={locale} />}

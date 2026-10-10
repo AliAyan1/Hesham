@@ -164,12 +164,12 @@ export function BasalimHomePage({ locale }: BasalimHomePageProps) {
   return (
     <>
       {/* Hero */}
-      <section className="relative flex min-h-[100dvh] flex-col justify-center bg-gradient-to-br from-[#0D1F2D] to-[#1A3A2A] px-4 pb-28 pt-24 md:px-6">
+      <section className="relative flex min-h-[100dvh] flex-col justify-center bg-gradient-to-br from-[#0D1F2D] to-[#1A3A2A] px-4 pb-36 pt-[max(6rem,env(safe-area-inset-top,0px)+4.5rem)] sm:pb-32 md:px-6 md:pb-28 md:pt-24">
         <div className="mx-auto w-full max-w-7xl">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#C9A84C]">
             {isAr ? "الإنسان. المواهب. النمو." : "People. Talent. Growth."}
           </p>
-          <h1 className="mt-4 max-w-3xl text-[2.75rem] font-extrabold leading-[1.05] text-white md:text-[4.5rem]">
+          <h1 className="mt-4 max-w-3xl text-[2rem] font-extrabold leading-[1.08] text-white sm:text-[2.75rem] md:text-[4.5rem] md:leading-[1.05]">
             {isAr ? (
               <>
                 نبني الإنسان
@@ -184,7 +184,7 @@ export function BasalimHomePage({ locale }: BasalimHomePageProps) {
               </>
             )}
           </h1>
-          <p className="mt-6 max-w-[540px] text-lg text-white/80">
+          <p className="mt-6 max-w-[540px] text-base text-white/80 sm:text-lg">
             {isAr
               ? "استشارات في تطوير رأس المال البشري والتطوير التنظيمي لأعمال أكثر استدامة"
               : "Empowering businesses, teams and future leaders to achieve ambitious outcomes for sustainable growth."}
@@ -216,11 +216,11 @@ export function BasalimHomePage({ locale }: BasalimHomePageProps) {
         </div>
 
         <div className="absolute inset-x-0 bottom-0 border-t border-white/10 bg-[rgba(13,31,45,0.9)]">
-          <div className="mx-auto grid max-w-7xl grid-cols-2 gap-6 px-4 py-6 md:grid-cols-4 md:px-6">
+          <div className="mx-auto grid max-w-7xl grid-cols-2 gap-4 px-4 py-4 safe-bottom sm:gap-6 sm:py-6 md:grid-cols-4 md:px-6">
             {stats.map((s) => (
-              <div key={s.l} className="text-center md:text-start">
-                <p className="text-[1.75rem] font-bold text-[#C9A84C]">{s.n}</p>
-                <p className="mt-1 text-xs text-white/70">{s.l}</p>
+              <div key={s.l} className="min-w-0 text-center md:text-start">
+                <p className="text-xl font-bold text-[#C9A84C] sm:text-[1.75rem]">{s.n}</p>
+                <p className="mt-1 text-[0.65rem] leading-snug text-white/70 sm:text-xs">{s.l}</p>
               </div>
             ))}
           </div>
@@ -233,7 +233,7 @@ export function BasalimHomePage({ locale }: BasalimHomePageProps) {
           <p className="text-xs font-semibold uppercase tracking-wide text-[#1A6B5A]">
             {isAr ? "خدماتنا" : "Our Services"}
           </p>
-          <h2 className="mt-2 text-3xl font-bold text-[#0D1F2D] md:text-[2.625rem]">
+          <h2 className="mt-2 text-2xl font-bold text-[#0D1F2D] sm:text-3xl md:text-[2.625rem]">
             {isAr ? "من الاستراتيجية إلى الأثر الحقيقي" : "From Strategy to Real Impact."}
           </h2>
           <p className="mt-4 max-w-2xl text-lg text-[#6B7280]">

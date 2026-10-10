@@ -45,7 +45,7 @@ export function BasalimEnArToggle({ className, tone = "light" }: BasalimEnArTogg
             type="button"
             onClick={() => setLocale(code)}
             className={cn(
-              "min-w-[2.25rem] rounded px-2 py-1.5 uppercase transition-colors",
+              "min-h-10 min-w-[2.5rem] rounded px-2.5 py-2 uppercase transition-colors",
               active
                 ? isDark
                   ? "bg-white text-[#0D1F2D]"

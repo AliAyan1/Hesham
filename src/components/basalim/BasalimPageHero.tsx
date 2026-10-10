@@ -19,10 +19,10 @@ export function BasalimPageHero({
 
   return (
     <section
-      className={`flex items-center bg-[#0D1F2D] px-4 py-20 text-white md:px-6 ${heightClass}`}
+      className={`flex items-center bg-[#0D1F2D] px-4 py-16 text-white sm:py-20 md:px-6 ${heightClass}`}
     >
       <div className="mx-auto w-full max-w-4xl motion-safe:animate-[landing-in_600ms_ease-out]">
-        <h1 className="whitespace-pre-line text-3xl font-bold leading-tight md:text-[3.25rem] md:leading-[1.1]">
+        <h1 className="whitespace-pre-line text-[1.75rem] font-bold leading-tight sm:text-3xl md:text-[3.25rem] md:leading-[1.1]">
           {isAr ? titleAr : titleEn}
         </h1>
         {subtitleEn || subtitleAr ? (

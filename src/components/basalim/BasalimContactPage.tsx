@@ -43,7 +43,7 @@ export function BasalimContactPage({
 
       <section className="bg-[#F5F3EE] px-4 py-16 md:px-6">
         <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-2">
-          <aside className="rounded-2xl bg-[#0D1F2D] p-10 text-white">
+          <aside className="rounded-2xl bg-[#0D1F2D] p-6 text-white sm:p-8 md:p-10">
             <h2 className="text-xl font-bold">{isAr ? "تواصل معنا" : "Get in touch"}</h2>
             <ul className="mt-8 space-y-6 text-sm">
               <li>

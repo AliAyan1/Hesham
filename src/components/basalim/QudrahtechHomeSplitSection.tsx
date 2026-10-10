@@ -79,7 +79,7 @@ export function QudrahtechHomeSplitSection({ locale }: QudrahtechHomeSplitSectio
         {/* Left — dark teal (60% on desktop) */}
         <div
           className={cn(
-            "bg-[#0D3D2E] px-10 py-12 text-white min-[769px]:w-[60%]",
+            "bg-[#0D3D2E] px-5 py-8 text-white sm:px-8 sm:py-10 md:px-10 md:py-12 min-[769px]:w-[60%]",
             isAr ? "text-right" : "text-left",
           )}
         >
@@ -87,7 +87,7 @@ export function QudrahtechHomeSplitSection({ locale }: QudrahtechHomeSplitSectio
             {isAr ? "مبادرة من باسالم كونسلتينج" : "An Initiative by Basalim Consulting"}
           </span>
 
-          <h2 className="mt-4 text-[36px] font-bold leading-[1.2] text-white">
+          <h2 className="mt-4 text-2xl font-bold leading-[1.2] text-white sm:text-3xl md:text-[36px]">
             {isAr ? (
               "اكتشف قدرتك"
             ) : (
@@ -166,7 +166,7 @@ export function QudrahtechHomeSplitSection({ locale }: QudrahtechHomeSplitSectio
         <div
           id="qudrahtech-features"
           className={cn(
-            "bg-[#F5F3EE] px-9 py-12 min-[769px]:w-[40%]",
+            "bg-[#F5F3EE] px-5 py-8 sm:px-8 sm:py-10 md:px-9 md:py-12 min-[769px]:w-[40%]",
             isAr ? "text-right" : "text-left",
           )}
         >

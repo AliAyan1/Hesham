@@ -146,10 +146,10 @@ export function BasalimNavbar({ locale }: BasalimNavbarProps) {
         shadow ? "shadow-md" : "shadow-sm",
       )}
     >
-      <div className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-4 md:h-[72px] md:px-6 lg:grid lg:grid-cols-[auto_1fr_auto] lg:gap-8">
-        <div className="flex items-center lg:min-w-0">
-          <Link href="/" className="inline-flex shrink-0 items-center" onClick={() => setMobileOpen(false)}>
-            <BasalimLogo compact priority />
+      <div className="mx-auto flex h-16 max-w-7xl items-center gap-2 px-3 safe-top sm:gap-4 sm:px-4 md:h-[72px] md:px-6 lg:grid lg:grid-cols-[auto_1fr_auto] lg:gap-8">
+        <div className="flex min-w-0 flex-1 items-center lg:flex-none lg:min-w-0">
+          <Link href="/" className="inline-flex min-w-0 items-center" onClick={() => setMobileOpen(false)}>
+            <BasalimLogo compact priority className="max-w-[128px] sm:max-w-[168px]" />
           </Link>
         </div>
 
@@ -248,8 +248,8 @@ export function BasalimNavbar({ locale }: BasalimNavbarProps) {
       </div>
 
       {mobileOpen ? (
-        <div className="fixed inset-0 z-[60] flex flex-col bg-white lg:hidden">
-          <div className="flex h-16 items-center justify-between border-b px-4">
+        <div className="fixed inset-0 z-[60] flex flex-col bg-white safe-top lg:hidden">
+          <div className="flex h-16 shrink-0 items-center justify-between border-b px-4">
             <Link href="/" onClick={() => setMobileOpen(false)}>
               <BasalimLogo compact />
             </Link>

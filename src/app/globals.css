@@ -105,10 +105,27 @@
   animation: lara-mic-pulse 1s ease-in-out infinite;
 }
 
-@media (max-width: 374px) {
+@media (max-width: 768px) {
+  html,
   body {
     overflow-x: clip;
+    max-width: 100%;
   }
+
+  /* Prevent iOS Safari zoom on focus (needs ≥16px) */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+.safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 /* Mentor marketplace dual price range sliders */

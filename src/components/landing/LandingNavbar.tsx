@@ -71,13 +71,13 @@ export function LandingNavbar() {
         shadow ? "shadow-[0_6px_30px_rgba(15,23,42,0.10)]" : "shadow-[0_1px_3px_rgba(0,0,0,0.05)]",
       )}
     >
-      <div className="mx-auto flex h-[68px] max-w-6xl items-center px-6">
-        <div className="flex w-[200px] shrink-0 items-center">
+      <div className="mx-auto flex h-[68px] max-w-6xl items-center gap-2 px-4 safe-top sm:px-6">
+        <div className="flex min-w-0 flex-1 items-center">
           <Logo
             size="md"
             priority
             href={onPlatformMarketing ? QUDRAHTECH_MARKETING_PATH : "/"}
-            className="shrink-0 [&_img]:h-12 [&_img]:w-auto"
+            className="shrink-0 [&_img]:h-9 [&_img]:w-auto sm:[&_img]:h-12"
           />
         </div>
 
@@ -100,10 +100,7 @@ export function LandingNavbar() {
           ))}
         </nav>
 
-        <div
-          className="flex w-[200px] shrink-0 items-center justify-end gap-2 sm:gap-3"
-          suppressHydrationWarning
-        >
+        <div className="flex shrink-0 items-center justify-end gap-1.5 sm:gap-3" suppressHydrationWarning>
           <LanguageSwitcher tone="light" minimal />
 
           <Link

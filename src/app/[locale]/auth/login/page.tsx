@@ -156,7 +156,7 @@ export default function LoginPage() {
 
   return (
     <div className="relative min-h-[100dvh]" dir={isRTL ? "rtl" : "ltr"}>
-      <div className="absolute end-4 top-4 z-20">
+      <div className="absolute end-4 top-[max(1rem,env(safe-area-inset-top,0px)+0.5rem)] z-20">
         <LanguageSwitcher tone="light" minimal />
       </div>
       <div className="grid min-h-[100dvh] lg:grid-cols-2">

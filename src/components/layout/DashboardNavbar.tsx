@@ -70,7 +70,7 @@ export function DashboardNavbar({ locale }: DashboardNavbarProps): ReactNode {
       )}
       role="banner"
     >
-      <div className="mx-auto flex h-14 w-full max-w-[100vw] items-center gap-4 px-6">
+      <div className="mx-auto flex h-14 w-full max-w-[100vw] items-center gap-2 px-3 safe-top sm:gap-4 sm:px-6">
         <div className="flex min-w-0 shrink-0 items-center gap-2">
           <button
             type="button"
@@ -89,7 +89,7 @@ export function DashboardNavbar({ locale }: DashboardNavbarProps): ReactNode {
           />
         </div>
 
-        <div className="flex min-w-0 flex-1 justify-center px-2 sm:px-4">
+        <div className="hidden min-w-0 flex-1 justify-center px-2 md:flex sm:px-4">
           <label className="relative w-full min-w-0 max-w-full sm:max-w-md md:max-w-lg lg:max-w-2xl">
             <Search
               className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"

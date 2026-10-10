@@ -69,8 +69,8 @@ export function QudratakNavbar({ locale }: QudratakNavbarProps) {
         </div>
       </div>
       <div className="border-b border-white/10">
-      <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4 md:h-[72px] md:px-6 lg:grid lg:grid-cols-[minmax(0,auto)_1fr_minmax(0,auto)] lg:gap-6">
-        <QudratakLogo locale={locale} compact className="lg:min-w-[140px]" />
+      <div className="mx-auto flex h-16 max-w-7xl items-center gap-2 px-3 safe-top sm:gap-3 sm:px-4 md:h-[72px] md:px-6 lg:grid lg:grid-cols-[minmax(0,auto)_1fr_minmax(0,auto)] lg:gap-6">
+        <QudratakLogo locale={locale} compact className="min-w-0 max-w-[140px] sm:max-w-none lg:min-w-[140px]" />
 
         <nav
           className="hidden items-center justify-center gap-x-4 xl:gap-x-5 lg:flex"

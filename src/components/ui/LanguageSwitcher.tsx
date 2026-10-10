@@ -132,7 +132,7 @@ export function LanguageSwitcher({
         <ul
           role="listbox"
           className={[
-            "absolute end-0 z-50 mt-2 min-w-[220px] overflow-hidden rounded-2xl border py-1",
+            "absolute end-0 z-[100] mt-2 max-h-[min(70dvh,22rem)] min-w-[220px] max-w-[min(calc(100vw-1.5rem),280px)] overflow-y-auto rounded-2xl border py-1",
             "origin-top-right animate-in fade-in zoom-in-95 duration-150",
             panelTone,
           ].join(" ")}
