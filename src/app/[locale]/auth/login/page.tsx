@@ -109,6 +109,10 @@ export default function LoginPage() {
           redirect: false,
         });
 
+        if (result?.error === "database_unavailable") {
+          setServerError(t("auth.serviceUnavailable"));
+          return;
+        }
         if (!result?.ok || result.error) {
           setServerError(t("auth.invalidCredentials"));
           return;

@@ -518,6 +518,7 @@
     "loggingIn": "Signing in…",
     "creatingAccount": "Creating account…",
     "invalidCredentials": "Invalid email or password.",
+    "serviceUnavailable": "Our servers are busy or the database is waking up. Please wait a few seconds and try again.",
     "sessionNotReady": "Sign-in succeeded but the session did not start. On localhost use NEXTAUTH_URL=http://localhost:3000 in .env.local; on production set AUTH_SECRET and NEXTAUTH_URL in Vercel, then restart/redeploy.",
     "emailTaken": "This email is already registered.",
     "registerSuccess": "Account created successfully.",

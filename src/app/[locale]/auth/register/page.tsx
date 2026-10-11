@@ -467,6 +467,10 @@ export default function RegisterPage() {
           redirect: false,
         });
 
+        if (result?.error === "database_unavailable") {
+          setServerError(t("auth.serviceUnavailable"));
+          return;
+        }
         if (result?.error) {
           setServerError(t("auth.invalidCredentials"));
           return;
@@ -511,6 +515,12 @@ export default function RegisterPage() {
       } catch (err: unknown) {
         if (axios.isAxiosError(err) && err.response?.status === 409) {
           setServerError(t("auth.emailTaken"));
+        } else if (
+          axios.isAxiosError(err) &&
+          (err.response?.status === 503 ||
+            err.response?.data?.code === "database_unavailable")
+        ) {
+          setServerError(t("auth.serviceUnavailable"));
         } else {
           setServerError(t("common.error"));
         }

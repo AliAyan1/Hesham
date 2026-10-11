@@ -14,11 +14,14 @@ function configured(key: string): string {
 export async function GET() {
   const checks: Record<string, string> = {};
 
+  let dbLatencyMs: number | null = null;
   try {
     const prisma = getPrisma();
+    const started = Date.now();
     await prisma.$connect();
     const userCount = await prisma.user.count();
-    checks.database = `connected (${userCount} users)`;
+    dbLatencyMs = Date.now() - started;
+    checks.database = `connected (${userCount} users, ${dbLatencyMs}ms)`;
   } catch (error) {
     console.error("[health] database:", error);
     checks.database = "FAILED";
@@ -40,6 +43,7 @@ export async function GET() {
     {
       status: allOk ? "healthy" : "degraded",
       timestamp: new Date().toISOString(),
+      dbLatencyMs,
       checks,
     },
     { status: allOk ? 200 : 503 },

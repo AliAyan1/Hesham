@@ -49,7 +49,10 @@ export const loginSchema = z.object({
     .string()
     .email("Invalid email address")
     .transform((s) => s.trim().toLowerCase()),
-  password: z.string().min(1, "Password is required"),
+  password: z
+    .string()
+    .min(1, "Password is required")
+    .transform((s) => s.trim()),
 });
 
 export const profileSchema = z.object({

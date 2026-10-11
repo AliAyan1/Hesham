@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import { getPrisma } from "@/lib/db";
+import { getPrisma, isPrismaConnectionError } from "@/lib/db";
+import { withDbRetry } from "@/lib/db-retry";
 import type { ZodIssue } from "zod";
 import { registerWithPlanSchema } from "@/lib/validations";
 import type { ApiResponse, IUser } from "@/types";
@@ -25,9 +26,9 @@ export async function POST(
     }
 
     const prisma = getPrisma();
-    await prisma.$connect();
+    await withDbRetry(() => prisma.$connect());
 
-    if (!(await getRegistrationOpen())) {
+    if (!(await withDbRetry(() => getRegistrationOpen()))) {
       return NextResponse.json(
         { success: false, error: "Registration is currently closed" },
         { status: 403 },
@@ -48,8 +49,7 @@ export async function POST(
       );
     }
 
-    const { name, email, password, role, plan } = parsed.data;
-    console.error("[register] attempt:", email, "role:", role, "plan:", plan ?? "none");
+    const { name, email, password, role } = parsed.data;
 
     // REVERTED - payment required to upgrade. All new accounts start as FREE.
     // Plan upgrades only AFTER payment success via /api/payments/verify.
@@ -57,9 +57,11 @@ export async function POST(
 
     const normalizedEmail = email.trim().toLowerCase();
 
-    const existing = await prisma.user.findFirst({
-      where: { email: { equals: normalizedEmail, mode: "insensitive" } },
-    });
+    const existing = await withDbRetry(() =>
+      prisma.user.findFirst({
+        where: { email: { equals: normalizedEmail, mode: "insensitive" } },
+      }),
+    );
     if (existing) {
       return NextResponse.json(
         { success: false, error: "Email already registered" },
@@ -69,7 +71,8 @@ export async function POST(
 
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    const user = await prisma.user.create({
+    const user = await withDbRetry(() =>
+      prisma.user.create({
       data: {
         name,
         email: normalizedEmail,
@@ -99,7 +102,8 @@ export async function POST(
             : undefined,
       },
       select: { id: true, email: true, name: true, role: true },
-    });
+    }),
+    );
 
     try {
       if (role === UserRole.JOBSEEKER) {
@@ -127,18 +131,20 @@ export async function POST(
     );
   } catch (err) {
     console.error("[register] error:", err);
-    const message = err instanceof Error ? err.message : String(err);
-    const isDb =
-      message.includes("DATABASE_URL") ||
-      message.includes("connect") ||
-      message.includes("ECONNREFUSED");
+    const isDb = isPrismaConnectionError(err);
     return NextResponse.json(
       {
         success: false,
         error: isDb ? "Database connection failed" : "Registration failed",
-        message: process.env.NODE_ENV === "production" ? undefined : message,
+        code: isDb ? "database_unavailable" : undefined,
+        message:
+          process.env.NODE_ENV === "production"
+            ? undefined
+            : err instanceof Error
+              ? err.message
+              : String(err),
       },
-      { status: 500 },
+      { status: isDb ? 503 : 500 },
     );
   }
 }

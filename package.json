@@ -9,7 +9,9 @@
     "start": "next start",
     "lint": "eslint",
     "db:wipe": "node scripts/wipe-all-user-data.mjs",
-    "db:seed": "npx prisma db seed"
+    "db:seed": "npx prisma db seed",
+    "admin:check": "npx tsx scripts/check-admin.ts",
+    "admin:reset": "npx tsx prisma/seed.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.59.0",

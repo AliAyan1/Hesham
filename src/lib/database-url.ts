@@ -15,7 +15,10 @@ export function getDatabaseUrl(): string {
     params.set("connection_limit", "1");
   }
   if (!params.has("pool_timeout")) {
-    params.set("pool_timeout", "20");
+    params.set("pool_timeout", "30");
+  }
+  if (!params.has("connect_timeout")) {
+    params.set("connect_timeout", "15");
   }
   if (process.env.VERCEL === "1" && !params.has("pgbouncer")) {
     params.set("pgbouncer", "true");

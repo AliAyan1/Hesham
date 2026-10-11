@@ -2,7 +2,9 @@ import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 import Credentials from "next-auth/providers/credentials";
 import type { SubscriptionTier as PrismaSubscriptionTier } from "@prisma/client";
-import { getPrisma } from "@/lib/db";
+import { getPrisma, isPrismaConnectionError } from "@/lib/db";
+import { AuthDatabaseUnavailableError } from "@/lib/auth-errors";
+import { withDbRetry } from "@/lib/db-retry";
 import bcrypt from "bcryptjs";
 import { loginSchema } from "@/lib/validations";
 import { DEFAULT_LOCALE } from "@/lib/constants";
@@ -43,6 +45,27 @@ declare module "next-auth/jwt" {
   }
 }
 
+function sessionUserFromToken(
+  uid: string,
+  token: import("next-auth/jwt").JWT,
+): NonNullable<import("next-auth").Session["user"]> {
+  return {
+    id: uid,
+    name: typeof token.name === "string" ? token.name : null,
+    email:
+      typeof token.email === "string" && token.email.trim().length > 0
+        ? token.email.trim()
+        : null,
+    image:
+      token.picture != null && token.picture !== "" ? String(token.picture) : null,
+    role: (token.role as UserRole) ?? UserRole.JOBSEEKER,
+    subscriptionTier:
+      (token.subscriptionTier as PrismaSubscriptionTier) ?? "FREE",
+    onboardingComplete:
+      token.onboardingComplete == null ? true : Boolean(token.onboardingComplete),
+  };
+}
+
 async function hydrateTokenFromDb(
   userId: string,
 ): Promise<{
@@ -57,16 +80,18 @@ async function hydrateTokenFromDb(
   reachable: boolean;
 }> {
   try {
-    const prisma = getPrisma();
-    const row = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        subscriptionTier: true,
-        role: true,
-        onboardingComplete: true,
-        image: true,
-        email: true,
-      },
+    const row = await withDbRetry(async () => {
+      const prisma = getPrisma();
+      return prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          subscriptionTier: true,
+          role: true,
+          onboardingComplete: true,
+          image: true,
+          email: true,
+        },
+      });
     });
     return { row: row ?? null, reachable: true };
   } catch {
@@ -132,22 +157,24 @@ export const authConfig: NextAuthConfig = {
         const { email, password } = parsed.data;
 
         try {
-          const prisma = getPrisma();
           const normalizedEmail = email.trim().toLowerCase();
-          const user = await prisma.user.findFirst({
-            where: {
-              email: { equals: normalizedEmail, mode: "insensitive" },
-            },
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              image: true,
-              role: true,
-              password: true,
-              subscriptionTier: true,
-              onboardingComplete: true,
-            },
+          const user = await withDbRetry(async () => {
+            const prisma = getPrisma();
+            return prisma.user.findFirst({
+              where: {
+                email: { equals: normalizedEmail, mode: "insensitive" },
+              },
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                image: true,
+                role: true,
+                password: true,
+                subscriptionTier: true,
+                onboardingComplete: true,
+              },
+            });
           });
           if (!user || !user.password) return null;
 
@@ -164,6 +191,10 @@ export const authConfig: NextAuthConfig = {
             onboardingComplete: user.onboardingComplete,
           };
         } catch (err) {
+          if (isPrismaConnectionError(err)) {
+            console.error("[auth] credentials authorize — database unreachable:", err);
+            throw new AuthDatabaseUnavailableError();
+          }
           console.error("[auth] credentials authorize failed:", err);
           return null;
         }
@@ -176,6 +207,9 @@ export const authConfig: NextAuthConfig = {
       if (user) {
         token.id = user.id;
         token.sub = user.id;
+        if ("name" in user && typeof user.name === "string") {
+          token.name = user.name;
+        }
         if ("email" in user && typeof user.email === "string") {
           token.email = user.email;
         }
@@ -240,20 +274,11 @@ export const authConfig: NextAuthConfig = {
 
         if (needsSync) {
           const synced = await forceSyncTokenFromDb(token, uid);
-          if (synced === null) return null;
+          if (synced === null) {
+            /** DB confirmed user deleted — otherwise forceSync keeps token on unreachable DB. */
+            return null;
+          }
           return synced;
-        }
-
-        /** Ghost session after DB wipe — invalidate cookie even between sync windows. */
-        try {
-          const prisma = getPrisma();
-          const exists = await prisma.user.findUnique({
-            where: { id: uid },
-            select: { id: true },
-          });
-          if (!exists) return null;
-        } catch {
-          /* keep token on transient DB errors */
         }
       }
 
@@ -271,60 +296,38 @@ export const authConfig: NextAuthConfig = {
         return { ...session, user: undefined };
       }
 
-      const { row, reachable } = await hydrateTokenFromDb(uid);
-      if (!reachable) {
-        if (session.user) {
-          session.user.id = uid;
-          if (typeof token.email === "string" && token.email.trim().length > 0) {
-            session.user.email = token.email.trim();
-          }
-          session.user.role = (token.role as UserRole) ?? UserRole.JOBSEEKER;
-          session.user.subscriptionTier =
-            (token.subscriptionTier as PrismaSubscriptionTier) ?? "FREE";
-          session.user.onboardingComplete =
-            token.onboardingComplete == null ? true : Boolean(token.onboardingComplete);
-          const pic = token.picture;
-          session.user.image = pic != null && pic !== "" ? String(pic) : null;
-        }
-        return session;
+      /** JWT is source of truth for session reads — avoids a DB round-trip on every `/api/auth/session` poll. */
+      if (!session.user) {
+        session.user = { id: uid } as NonNullable<typeof session.user>;
       }
-
-      if (!row) {
-        return { ...session, user: undefined };
-      }
-
-      if (session.user) {
-        session.user.id = uid;
-        session.user.email = row.email.trim();
-        session.user.role = row.role;
-        session.user.subscriptionTier = row.subscriptionTier;
-        session.user.onboardingComplete = row.onboardingComplete;
-        session.user.image = row.image;
-      }
+      Object.assign(session.user, sessionUserFromToken(uid, token));
       return session;
     },
 
     async signIn({ user, account }) {
       if (account?.provider === "google" && user.email) {
         try {
-          const prisma = getPrisma();
           const email = user.email.trim().toLowerCase();
-          const existing = await prisma.user.findFirst({
-            where: { email: { equals: email, mode: "insensitive" } },
-          });
-          if (!existing) {
-            await prisma.user.create({
-              data: {
-                email,
-                name: user.name,
-                image: user.image,
-                role: UserRole.JOBSEEKER,
-                onboardingComplete: false,
-                profile: { create: { language: "ar" } },
-              },
+          await withDbRetry(async () => {
+            const prisma = getPrisma();
+            const existing = await prisma.user.findFirst({
+              where: { email: { equals: email, mode: "insensitive" } },
             });
-          }
-        } catch {
+            if (!existing) {
+              await prisma.user.create({
+                data: {
+                  email,
+                  name: user.name,
+                  image: user.image,
+                  role: UserRole.JOBSEEKER,
+                  onboardingComplete: false,
+                  profile: { create: { language: "ar" } },
+                },
+              });
+            }
+          });
+        } catch (err) {
+          console.error("[auth] Google signIn database error:", err);
           return false;
         }
       }
