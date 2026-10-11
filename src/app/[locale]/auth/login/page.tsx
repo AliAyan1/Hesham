@@ -18,6 +18,7 @@ import {
   clearStuckSession,
   fetchPostAuthPath,
   hardNavigate,
+  waitForAuthenticatedSession,
 } from "@/lib/auth-redirect";
 import type { LoginFormData } from "@/types";
 import type { ZodIssue } from "zod";
@@ -64,6 +65,15 @@ export default function LoginPage() {
   const isRTL = locale === "ar" || locale === "ur";
   const oauthReturn = searchParams.get("from") === "oauth";
   const urlPlan = searchParams.get("plan");
+
+  useEffect(() => {
+    const authError = searchParams.get("error");
+    if (authError === "CredentialsSignin") {
+      setServerError(t("auth.invalidCredentials"));
+    } else if (authError === "database_unavailable") {
+      setServerError(t("auth.serviceUnavailable"));
+    }
+  }, [searchParams, t]);
 
   useEffect(() => {
     if (!oauthReturn || sessionStatus !== "authenticated") return;
@@ -127,8 +137,14 @@ export default function LoginPage() {
           return;
         }
 
-        /** Full page load reads the new JWT cookie; polling often failed on slow DB / stale cookies. */
-        hardNavigate("/dashboard", locale);
+        void update();
+        const sessionReady = await waitForAuthenticatedSession(16);
+        if (!sessionReady.ok) {
+          setServerError(t("auth.sessionNotReady"));
+          return;
+        }
+        const target = await fetchPostAuthPath().catch(() => "/dashboard");
+        hardNavigate(target, locale);
       } catch {
         setServerError(t("common.error"));
       }

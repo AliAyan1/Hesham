@@ -6,9 +6,8 @@ import {
   type MiddlewareUserRole,
   MIDDLEWARE_DASHBOARD_ROUTES,
 } from "@/lib/middleware-routes";
-import { getToken } from "next-auth/jwt";
 import { isLocale, LOCALE_STORAGE_KEY } from "@/lib/locale-preference";
-import { getAuthSecret } from "@/lib/auth-secret";
+import { getAuthJwtFromRequest } from "@/lib/auth-jwt";
 import { isPublicPath } from "@/lib/middleware-public-paths";
 
 /** next-intl reads this on the server; custom middleware must set it (see getRequestLocale). */
@@ -98,10 +97,7 @@ async function maintenanceGuard(
   const maintenanceOn = await fetchMaintenanceMode(request);
   if (!maintenanceOn) return null;
 
-  const token = await getToken({
-    req: request,
-    secret: getAuthSecret(),
-  });
+  const token = await getAuthJwtFromRequest(request);
   const role = typeof token?.role === "string" ? token.role.toUpperCase() : "";
   if (role === "ADMIN") return null;
   if (pathWithoutLocale.startsWith("/dashboard/admin")) return null;
@@ -175,10 +171,7 @@ export default async function middleware(request: NextRequest) {
     }
 
     if (pathWithoutLocale === "/onboarding") {
-      const tOnboard = await getToken({
-        req: request,
-        secret: getAuthSecret(),
-      });
+      const tOnboard = await getAuthJwtFromRequest(request);
       if (!tOnboard) {
         return NextResponse.redirect(new URL(`/${pathnameLocale}/auth/login`, request.url));
       }
@@ -186,10 +179,7 @@ export default async function middleware(request: NextRequest) {
     }
 
     if (pathWithoutLocale.startsWith("/dashboard")) {
-      const token = await getToken({
-        req: request,
-        secret: getAuthSecret(),
-      });
+      const token = await getAuthJwtFromRequest(request);
 
       if (!token) {
         return NextResponse.redirect(new URL(`/${pathnameLocale}/auth/login`, request.url));

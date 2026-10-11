@@ -1,9 +1,8 @@
 import type { Session } from "next-auth";
 import type { NextRequest } from "next/server";
 import { UserRole } from "@prisma/client";
-import { getToken } from "next-auth/jwt";
 import { getPrisma } from "@/lib/db";
-import { getAuthSecret } from "@/lib/auth-secret";
+import { getAuthJwtFromRequest } from "@/lib/auth-jwt";
 
 /** Normalized emails from Session + optional JWT cookie (some JWTs omit `session.user.email`). */
 async function emailsFromSessionAndCookie(
@@ -20,14 +19,11 @@ async function emailsFromSessionAndCookie(
   add(session?.user?.email);
 
   if (request) {
-    const secret = getAuthSecret();
-    if (secret) {
-      try {
-        const tok = await getToken({ req: request, secret });
-        add(tok?.email);
-      } catch {
-        // ignore
-      }
+    try {
+      const tok = await getAuthJwtFromRequest(request);
+      add(tok?.email);
+    } catch {
+      // ignore
     }
   }
 
