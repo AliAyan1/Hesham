@@ -53,6 +53,15 @@ export async function waitForSessionFlag(
   return false;
 }
 
+function canonicalSiteOrigin(): string | undefined {
+  if (typeof window === "undefined") return undefined;
+  const { protocol, hostname, port } = window.location;
+  if (hostname === "basalim-consulting.com") {
+    return `${protocol}//www.basalim-consulting.com${port ? `:${port}` : ""}`;
+  }
+  return `${protocol}//${hostname}${port ? `:${port}` : ""}`;
+}
+
 /** Full navigation so middleware reads a fresh JWT cookie after sign-in / onboarding. */
 export function hardNavigate(path: string, locale: string): void {
   const normalized = path.startsWith("/") ? path : `/${path}`;
@@ -60,9 +69,10 @@ export function hardNavigate(path: string, locale: string): void {
   const relative = normalized.startsWith(prefix)
     ? normalized
     : `${prefix}${normalized === "/" ? "" : normalized}`;
+  const origin = canonicalSiteOrigin();
   const target =
-    typeof window !== "undefined"
-      ? new URL(relative, window.location.origin).href
+    typeof window !== "undefined" && origin
+      ? new URL(relative, origin).href
       : relative;
   window.location.replace(target);
 }

@@ -14,6 +14,7 @@ import { GoogleIcon } from "@/components/auth/GoogleIcon";
 import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
 import { AuthCanonicalHost } from "@/components/auth/AuthCanonicalHost";
 import {
+  clearStuckSession,
   fetchPostAuthPath,
   hardNavigate,
   waitForAuthenticatedSession,
@@ -119,18 +120,19 @@ export default function LoginPage() {
           return;
         }
 
-        await update();
-        const sessionReady = await waitForAuthenticatedSession(40);
-        if (!sessionReady.ok) {
-          // signIn succeeded — cookie may lag; navigate so middleware reads the JWT
-          const fallback = await fetchPostAuthPath().catch(() => "/dashboard/job-seeker");
-          hardNavigate(fallback, locale);
+        const params = new URLSearchParams(window.location.search);
+        const fromCallback = intlPathFromCallback(params.get("callbackUrl"), locale);
+        if (fromCallback) {
+          hardNavigate(fromCallback, locale);
           return;
         }
 
-        const params = new URLSearchParams(window.location.search);
-        const fromCallback = intlPathFromCallback(params.get("callbackUrl"), locale);
-        const target = fromCallback ?? (await fetchPostAuthPath());
+        /** Full reload — do not wait on session polling (was hanging on slow DB). */
+        void update();
+        const sessionReady = await waitForAuthenticatedSession(8);
+        const target = sessionReady.ok
+          ? await fetchPostAuthPath().catch(() => "/dashboard")
+          : "/dashboard";
         hardNavigate(target, locale);
       } catch {
         setServerError(t("common.error"));
@@ -271,6 +273,17 @@ export default function LoginPage() {
                   {t("auth.loginWithGoogle")}
                 </button>
               </ClientHydrationGate>
+            </div>
+
+            <div className="mt-6 text-center">
+              <button
+                type="button"
+                className="text-xs font-medium text-[#6B7280] underline underline-offset-2 hover:text-[#0F4C75]"
+                onClick={() => void clearStuckSession(locale)}
+              >
+                {t("nav.clearSession")}
+              </button>
+              <p className="mt-1 text-[0.65rem] text-[#9CA3AF]">{t("nav.clearSessionHint")}</p>
             </div>
 
             <div className="mt-8 border-t border-gray-100 pt-6">

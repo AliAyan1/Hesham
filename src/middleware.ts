@@ -170,32 +170,7 @@ export default async function middleware(request: NextRequest) {
     if (maintenanceRedirect) return maintenanceRedirect;
 
     if (isPublicPath(pathWithoutLocale)) {
-      if (pathWithoutLocale.startsWith("/auth/login")) {
-        const loginToken = await getToken({
-          req: request,
-          secret: getAuthSecret(),
-        });
-        if (loginToken?.sub || loginToken?.id) {
-          const rawRole = loginToken.role;
-          const normalized =
-            typeof rawRole === "string" ? rawRole.toUpperCase() : "JOBSEEKER";
-          const role: MiddlewareUserRole =
-            normalized === "EMPLOYER" ||
-            normalized === "MENTOR" ||
-            normalized === "ADMIN"
-              ? normalized
-              : "JOBSEEKER";
-          const dash = MIDDLEWARE_DASHBOARD_ROUTES[role];
-          if (loginToken.onboardingComplete === false && role !== "ADMIN") {
-            return NextResponse.redirect(
-              new URL(`/${pathnameLocale}/onboarding`, request.url),
-            );
-          }
-          return NextResponse.redirect(
-            new URL(`/${pathnameLocale}${dash}`, request.url),
-          );
-        }
-      }
+      /** Do not auto-redirect away from login when a cookie exists — stale JWTs caused login ↔ dashboard loops. */
       return nextWithIntlLocale(request, pathnameLocale);
     }
 
