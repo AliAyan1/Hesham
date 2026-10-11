@@ -13,13 +13,9 @@ import {
 } from "lucide-react";
 import { HeshamFounderPhoto } from "@/components/basalim/HeshamFounderPhoto";
 import { QudrahtechHomeSplitSection } from "@/components/basalim/QudrahtechHomeSplitSection";
-import {
-  BASALIM_CALENDLY_URL,
-  HESHAM_LINKEDIN_URL,
-  qudratakMarketingHref,
-  QUDRAH_PLATFORM_NAME,
-  QUDRAH_PLATFORM_NAME_AR,
-} from "@/lib/basalim-public";
+import { BookConsultationButton } from "@/components/basalim/BookConsultationButton";
+import { JoinQudrahtechButton } from "@/components/basalim/JoinQudrahtechButton";
+import { HESHAM_LINKEDIN_URL, qudratakMarketingHref } from "@/lib/basalim-public";
 
 type BasalimHomePageProps = {
   locale: string;
@@ -189,30 +185,33 @@ export function BasalimHomePage({ locale }: BasalimHomePageProps) {
               ? "استشارات في تطوير رأس المال البشري والتطوير التنظيمي لأعمال أكثر استدامة"
               : "Empowering businesses, teams and future leaders to achieve ambitious outcomes for sustainable growth."}
           </p>
-          <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-            <a
-              href={BASALIM_CALENDLY_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center justify-center rounded-md bg-[#1A6B5A] px-7 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-[#155A4A]"
-            >
-              {isAr ? "احجز استشارة" : "Book a Consultation"}
-            </a>
+          <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-stretch sm:gap-4">
+            <BookConsultationButton className="w-full sm:w-auto" />
+            <JoinQudrahtechButton className="w-full sm:w-auto" />
             <Link
               href="/services"
-              className="inline-flex items-center justify-center rounded-md border-2 border-white px-7 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-white/10"
+              className="inline-flex min-h-[48px] w-full items-center justify-center rounded-md border-2 border-white px-7 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-white/10 sm:w-auto"
             >
               {isAr ? "استكشف خدماتنا" : "Explore Our Services"}
             </Link>
-            <Link
-              href={qudratakHref}
-              className="inline-flex items-center gap-1 px-2 py-3.5 text-sm font-semibold text-[#C9A84C] underline-offset-4 hover:underline"
-            >
-              {isAr
-                ? `اكتشف ${QUDRAH_PLATFORM_NAME_AR} ←`
-                : `Discover ${QUDRAH_PLATFORM_NAME} →`}
-            </Link>
           </div>
+          <p className="mt-4 text-sm text-white/65">
+            {isAr ? (
+              <>
+                تبحث عن المنصة؟{" "}
+                <Link href={qudratakHref} className="font-semibold text-[#C9A84C] underline-offset-2 hover:underline">
+                  تعرّف على Qudrahtech
+                </Link>
+              </>
+            ) : (
+              <>
+                Want the full platform tour?{" "}
+                <Link href={qudratakHref} className="font-semibold text-[#C9A84C] underline-offset-2 hover:underline">
+                  Explore Qudrahtech
+                </Link>
+              </>
+            )}
+          </p>
         </div>
 
         <div className="absolute inset-x-0 bottom-0 border-t border-white/10 bg-[rgba(13,31,45,0.9)]">
@@ -413,18 +412,12 @@ export function BasalimHomePage({ locale }: BasalimHomePageProps) {
               ? "دعنا نتحدث عن تحديات مواردك البشرية"
               : "Let's talk about your people, talent and organization challenges."}
           </p>
-          <div className="mt-10 flex flex-col justify-center gap-3 sm:flex-row">
-            <a
-              href={BASALIM_CALENDLY_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex justify-center rounded-md bg-[#1A6B5A] px-8 py-3.5 text-sm font-semibold text-white hover:bg-[#155A4A]"
-            >
-              {isAr ? "احجز استشارة" : "Book a Consultation"}
-            </a>
+          <div className="mt-10 flex flex-col justify-center gap-3 sm:flex-row sm:flex-wrap">
+            <BookConsultationButton className="w-full sm:w-auto" />
+            <JoinQudrahtechButton className="w-full sm:w-auto" />
             <Link
               href="/services"
-              className="inline-flex justify-center rounded-md border-2 border-[#0D1F2D] px-8 py-3.5 text-sm font-semibold text-[#0D1F2D] hover:bg-white/50"
+              className="inline-flex min-h-[48px] w-full items-center justify-center rounded-md border-2 border-[#0D1F2D] px-8 py-3.5 text-sm font-semibold text-[#0D1F2D] hover:bg-white/50 sm:w-auto"
             >
               {isAr ? "استكشف خدماتنا" : "Explore Our Services"}
             </Link>

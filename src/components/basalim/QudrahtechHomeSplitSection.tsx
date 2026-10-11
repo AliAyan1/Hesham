@@ -7,10 +7,10 @@ import {
   Video,
   type LucideIcon,
 } from "lucide-react";
+import { Link } from "@/i18n/navigation";
 import {
   QUDRAH_PLATFORM_NAME,
   QUDRAH_PLATFORM_NAME_AR,
-  QudrahtechJoinUrl,
 } from "@/lib/basalim-public";
 import { cn } from "@/lib/cn";
 
@@ -59,8 +59,6 @@ const FEATURES: FeatureRow[] = [
 
 export function QudrahtechHomeSplitSection({ locale }: QudrahtechHomeSplitSectionProps) {
   const isAr = locale === "ar";
-  const joinUrl = QudrahtechJoinUrl(locale);
-
   const journey = isAr
     ? ["اكتشف", "قيّم", "طور", "تعلّم", "أرشد", "استعد", "طابق", "احصل على الفرصة"]
     : ["Discover", "Assess", "Develop", "Learn", "Mentor", "Prepare", "Match", "Get Hired"];
@@ -143,16 +141,14 @@ export function QudrahtechHomeSplitSection({ locale }: QudrahtechHomeSplitSectio
               isAr ? "justify-end" : "justify-start",
             )}
           >
-            <a
-              href={joinUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center rounded-lg bg-[#C9A84C] px-6 py-3 text-sm font-semibold text-[#0D1F2D] transition-opacity hover:opacity-90"
+            <Link
+              href="/auth/register"
+              className="inline-flex min-h-[48px] items-center rounded-lg bg-[#C9A84C] px-6 py-3 text-sm font-bold text-[#0D1F2D] transition-opacity hover:opacity-90"
             >
               {isAr
                 ? `انضم إلى ${QUDRAH_PLATFORM_NAME_AR} ←`
                 : `Join ${QUDRAH_PLATFORM_NAME} →`}
-            </a>
+            </Link>
             <a
               href="#qudrahtech-features"
               className="inline-flex items-center rounded-lg border-[1.5px] border-white/30 bg-transparent px-6 py-3 text-sm text-white transition-colors hover:border-white/50 hover:bg-white/5"

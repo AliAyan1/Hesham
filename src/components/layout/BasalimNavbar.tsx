@@ -6,8 +6,9 @@ import { BasalimLogo } from "@/components/layout/BasalimLogo";
 import { Menu, X, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { BasalimEnArToggle } from "@/components/layout/BasalimEnArToggle";
+import { BookConsultationButton } from "@/components/basalim/BookConsultationButton";
+import { JoinQudrahtechButton } from "@/components/basalim/JoinQudrahtechButton";
 import {
-  BASALIM_CALENDLY_URL,
   qudratakMarketingHref,
   QUDRAH_PLATFORM_NAME,
   QUDRAH_PLATFORM_NAME_AR,
@@ -85,7 +86,12 @@ export function BasalimNavbar({ locale }: BasalimNavbarProps) {
   const shadow = useScrollShadow(10);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [servicesOpen, setServicesOpen] = useState(false);
+  const [navReady, setNavReady] = useState(false);
   const servicesRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setNavReady(true);
+  }, []);
 
   const navLinks: NavLink[] = useMemo(
     () => [
@@ -124,7 +130,9 @@ export function BasalimNavbar({ locale }: BasalimNavbarProps) {
     return pathname === href || pathname.startsWith(`${href}/`);
   };
 
-  const servicesActive = pathname.startsWith("/services");
+  const servicesActive = navReady && pathname.startsWith("/services");
+
+  const linkActive = (href: string) => navReady && isActive(href);
 
   const linkClass = (active: boolean) =>
     cn(
@@ -136,7 +144,6 @@ export function BasalimNavbar({ locale }: BasalimNavbarProps) {
     <span className="absolute inset-x-0 -bottom-0.5 h-0.5 rounded-full bg-[#1A6B5A]" aria-hidden />
   );
 
-  const bookLabel = isAr ? "احجز استشارة" : "Book a Consultation";
   const servicesLabel = isAr ? "الخدمات" : "Services";
 
   return (
@@ -155,8 +162,8 @@ export function BasalimNavbar({ locale }: BasalimNavbarProps) {
 
         <nav className="hidden items-center justify-center gap-5 lg:flex" aria-label="Main">
           {navLinks.slice(0, 2).map((item) => (
-            <Link key={item.href} href={item.href} className={linkClass(isActive(item.href))}>
-              {isActive(item.href) ? activeBar : null}
+            <Link key={item.href} href={item.href} className={linkClass(linkActive(item.href))}>
+              {linkActive(item.href) ? activeBar : null}
               {isAr ? item.labelAr : item.labelEn}
             </Link>
           ))}
@@ -214,24 +221,18 @@ export function BasalimNavbar({ locale }: BasalimNavbarProps) {
                 {isAr ? item.labelAr : item.labelEn}
               </a>
             ) : (
-              <Link key={item.href} href={item.href} className={linkClass(isActive(item.href))}>
-                {isActive(item.href) ? activeBar : null}
+              <Link key={item.href} href={item.href} className={linkClass(linkActive(item.href))}>
+                {linkActive(item.href) ? activeBar : null}
                 {isAr ? item.labelAr : item.labelEn}
               </Link>
             ),
           )}
         </nav>
 
-        <div className="hidden items-center justify-end gap-4 lg:flex">
+        <div className="hidden items-center justify-end gap-2 xl:gap-3 lg:flex">
           <BasalimEnArToggle />
-          <a
-            href={BASALIM_CALENDLY_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="rounded-md bg-[#1A6B5A] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#155A4A]"
-          >
-            {bookLabel}
-          </a>
+          <JoinQudrahtechButton variant="header" className="min-h-0 whitespace-nowrap" />
+          <BookConsultationButton variant="header" className="min-h-0 whitespace-nowrap" />
         </div>
 
         <div className="ms-auto flex items-center gap-2 lg:hidden">
@@ -281,7 +282,7 @@ export function BasalimNavbar({ locale }: BasalimNavbarProps) {
                   href={item.href}
                   className={cn(
                     "rounded-lg px-3 py-3 text-base font-medium",
-                    isActive(item.href) ? "bg-[#F5F3EE] text-[#1A6B5A]" : "text-[#0D1F2D]",
+                    linkActive(item.href) ? "bg-[#F5F3EE] text-[#1A6B5A]" : "text-[#0D1F2D]",
                   )}
                   onClick={() => setMobileOpen(false)}
                 >
@@ -302,17 +303,13 @@ export function BasalimNavbar({ locale }: BasalimNavbarProps) {
                 {isAr ? s.labelAr : s.labelEn}
               </Link>
             ))}
-            <div className="mt-6 flex flex-col gap-4 border-t pt-6">
+            <div className="mt-6 flex flex-col gap-3 border-t pt-6">
               <BasalimEnArToggle className="self-start" />
-              <a
-                href={BASALIM_CALENDLY_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="rounded-md bg-[#1A6B5A] px-5 py-3 text-center text-sm font-semibold text-white"
+              <JoinQudrahtechButton
+                className="w-full"
                 onClick={() => setMobileOpen(false)}
-              >
-                {bookLabel}
-              </a>
+              />
+              <BookConsultationButton className="w-full" />
             </div>
           </nav>
         </div>
