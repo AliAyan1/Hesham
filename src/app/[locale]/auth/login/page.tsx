@@ -12,6 +12,7 @@ import { BRAND_COLORS } from "@/lib/constants";
 import { ClientHydrationGate } from "@/components/ui/ClientHydrationGate";
 import { GoogleIcon } from "@/components/auth/GoogleIcon";
 import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
+import { AuthCanonicalHost } from "@/components/auth/AuthCanonicalHost";
 import {
   fetchPostAuthPath,
   hardNavigate,
@@ -160,6 +161,7 @@ export default function LoginPage() {
 
   return (
     <div className="relative min-h-[100dvh]" dir={isRTL ? "rtl" : "ltr"}>
+      <AuthCanonicalHost />
       <div className="absolute end-4 top-[max(1rem,env(safe-area-inset-top,0px)+0.5rem)] z-20">
         <LanguageSwitcher tone="light" minimal />
       </div>

@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { BRAND_COLORS } from "@/lib/constants";
 import { Logo } from "@/components/ui/Logo";
+import { AuthCanonicalHost } from "@/components/auth/AuthCanonicalHost";
 
 type Props = {
   children: ReactNode;
@@ -17,6 +18,7 @@ export function AuthShell({ children, isRtl, slogan }: Props) {
       style={{ backgroundColor: BRAND_COLORS.primary }}
       dir={isRtl ? "rtl" : "ltr"}
     >
+      <AuthCanonicalHost />
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
           <div className="mb-3 flex justify-center">

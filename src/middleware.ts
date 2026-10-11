@@ -109,8 +109,23 @@ async function maintenanceGuard(
   return redirectPreservingSearch(request, `/${pathnameLocale}/maintenance`);
 }
 
+/** Apex → www (307 keeps POST body for Auth.js credentials login). */
+function redirectApexToWww(request: NextRequest): NextResponse | null {
+  const hostHeader =
+    request.headers.get("x-forwarded-host") ?? request.headers.get("host") ?? "";
+  const hostname = hostHeader.split(":")[0]?.toLowerCase() ?? "";
+  if (hostname !== "basalim-consulting.com") return null;
+
+  const destination = request.nextUrl.clone();
+  destination.hostname = "www.basalim-consulting.com";
+  return NextResponse.redirect(destination, 307);
+}
+
 export default async function middleware(request: NextRequest) {
   try {
+    const apexRedirect = redirectApexToWww(request);
+    if (apexRedirect) return apexRedirect;
+
     const { pathname } = request.nextUrl;
 
     if (
