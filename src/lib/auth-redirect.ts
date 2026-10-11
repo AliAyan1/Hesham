@@ -91,17 +91,26 @@ function documentHasAuthSessionCookie(): boolean {
   );
 }
 
+export type HealStaleAuthCookieOptions = {
+  /** Re-check on every visit to login/register (production-safe, no user action). */
+  eachVisit?: boolean;
+};
+
 /**
  * Removes orphan session cookies (wrong secret, apex/www mismatch, old deploy).
- * Runs once per tab on login/register — users should not need "Clear session" manually.
+ * Handled globally in StaleSessionCleaner — not shown on the login UI.
  */
-export async function healStaleAuthCookie(): Promise<boolean> {
+export async function healStaleAuthCookie(
+  options?: HealStaleAuthCookieOptions,
+): Promise<boolean> {
   if (typeof window === "undefined") return false;
-  try {
-    if (sessionStorage.getItem(AUTH_HEAL_STORAGE_KEY)) return false;
-    sessionStorage.setItem(AUTH_HEAL_STORAGE_KEY, "1");
-  } catch {
-    return false;
+  if (!options?.eachVisit) {
+    try {
+      if (sessionStorage.getItem(AUTH_HEAL_STORAGE_KEY)) return false;
+      sessionStorage.setItem(AUTH_HEAL_STORAGE_KEY, "1");
+    } catch {
+      return false;
+    }
   }
 
   try {

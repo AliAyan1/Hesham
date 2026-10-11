@@ -3,27 +3,37 @@
 import { signOut, useSession } from "next-auth/react";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
+import { healStaleAuthCookie } from "@/lib/auth-redirect";
+
+function isAuthEntryPath(pathname: string): boolean {
+  return (
+    pathname.includes("/auth/login") ||
+    pathname.includes("/auth/register") ||
+    pathname.includes("/auth/forgot-password") ||
+    pathname.includes("/auth/reset-password")
+  );
+}
 
 /**
- * After a DB wipe the browser cookie can outlive deleted users.
- * If the server session has no user but the client still thinks we're signed in, sign out once.
- * Grace period avoids signing out during the post-login cookie race.
+ * Production session hygiene (invisible to users):
+ * - Drops orphan JWT cookies before sign-in/sign-up.
+ * - Signs out when the client thinks we're logged in but `/api/auth/session` has no user.
  */
 export function StaleSessionCleaner() {
   const { status } = useSession();
   const pathname = usePathname();
-  const ran = useRef(false);
+  const ranMismatchCleanup = useRef(false);
   const mountedAt = useRef(Date.now());
+
+  useEffect(() => {
+    void healStaleAuthCookie({ eachVisit: isAuthEntryPath(pathname) });
+  }, [pathname]);
 
   useEffect(() => {
     if (status === "loading") return;
 
-    const onAuthPage =
-      pathname.includes("/auth/login") ||
-      pathname.includes("/auth/register") ||
-      pathname.includes("/onboarding");
-
-    if (onAuthPage) return;
+    const onAuthEntry = isAuthEntryPath(pathname);
+    if (onAuthEntry) return;
 
     const graceMs = 8000;
     if (Date.now() - mountedAt.current < graceMs) return;
@@ -38,9 +48,14 @@ export function StaleSessionCleaner() {
         const hasServerUser = Boolean(json.user?.id);
 
         if (status === "authenticated" && !hasServerUser) {
-          if (ran.current) return;
-          ran.current = true;
+          if (ranMismatchCleanup.current) return;
+          ranMismatchCleanup.current = true;
           await signOut({ redirect: false });
+          try {
+            await fetch("/api/auth/signout", { method: "POST", credentials: "include" });
+          } catch {
+            /* ignore */
+          }
           window.location.href = window.location.pathname;
         }
       } catch {

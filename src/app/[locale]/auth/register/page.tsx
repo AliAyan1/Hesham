@@ -471,12 +471,17 @@ export default function RegisterPage() {
           setServerError(t("auth.serviceUnavailable"));
           return;
         }
-        if (result?.error) {
+        if (!result?.ok || result?.error) {
           setServerError(t("auth.invalidCredentials"));
           return;
         }
 
         await update();
+        const sessionReady = await waitForAuthenticatedSession(16);
+        if (!sessionReady.ok) {
+          setServerError(t("auth.sessionNotReady"));
+          return;
+        }
         clearRegisterPlan();
 
         let paymentsConfigured = moyasarConfigured;

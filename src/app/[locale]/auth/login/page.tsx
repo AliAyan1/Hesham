@@ -13,9 +13,7 @@ import { ClientHydrationGate } from "@/components/ui/ClientHydrationGate";
 import { GoogleIcon } from "@/components/auth/GoogleIcon";
 import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
 import { AuthCanonicalHost } from "@/components/auth/AuthCanonicalHost";
-import { AuthStaleSessionHeal } from "@/components/auth/AuthStaleSessionHeal";
 import {
-  clearStuckSession,
   fetchPostAuthPath,
   hardNavigate,
   waitForAuthenticatedSession,
@@ -175,7 +173,6 @@ export default function LoginPage() {
   return (
     <div className="relative min-h-[100dvh]" dir={isRTL ? "rtl" : "ltr"}>
       <AuthCanonicalHost />
-      <AuthStaleSessionHeal />
       <div className="absolute end-4 top-[max(1rem,env(safe-area-inset-top,0px)+0.5rem)] z-20">
         <LanguageSwitcher tone="light" minimal />
       </div>
@@ -233,7 +230,7 @@ export default function LoginPage() {
                       onChange={handleChange}
                       disabled={isPending}
                       autoComplete="email"
-                      className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-[#0D2137] placeholder-gray-400 focus:border-[#0F4C75] focus:outline-none disabled:opacity-50"
+                      className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-base text-[#0D2137] placeholder-gray-400 focus:border-[#0F4C75] focus:outline-none disabled:opacity-50"
                       placeholder={t("auth.placeholderEmail")}
                     />
                     {fieldErrors.email ? <p className="mt-1 text-xs text-red-600">{fieldErrors.email}</p> : null}
@@ -253,7 +250,7 @@ export default function LoginPage() {
                       onChange={handleChange}
                       disabled={isPending}
                       autoComplete="current-password"
-                      className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-[#0D2137] placeholder-gray-400 focus:border-[#0F4C75] focus:outline-none disabled:opacity-50"
+                      className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-base text-[#0D2137] placeholder-gray-400 focus:border-[#0F4C75] focus:outline-none disabled:opacity-50"
                       placeholder={t("auth.placeholderPassword")}
                     />
                     {fieldErrors.password ? <p className="mt-1 text-xs text-red-600">{fieldErrors.password}</p> : null}
@@ -262,7 +259,7 @@ export default function LoginPage() {
                   <button
                     type="submit"
                     disabled={isPending}
-                    className="flex w-full items-center justify-center rounded-xl py-3 font-semibold text-white transition-opacity hover:opacity-95 disabled:opacity-50"
+                    className="flex min-h-[48px] w-full touch-manipulation items-center justify-center rounded-xl py-3 font-semibold text-white transition-opacity hover:opacity-95 disabled:opacity-50"
                     style={{ backgroundColor: BRAND_COLORS.accent }}
                   >
                     {isPending ? tAuth("signingIn") : t("auth.login")}
@@ -279,23 +276,12 @@ export default function LoginPage() {
                   type="button"
                   onClick={() => void handleGoogleSignIn()}
                   disabled={isPending}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white py-3 font-semibold text-[#0D2137] hover:bg-gray-50 disabled:opacity-50"
+                  className="flex min-h-[48px] w-full touch-manipulation items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white py-3 font-semibold text-[#0D2137] hover:bg-gray-50 disabled:opacity-50"
                 >
                   <GoogleIcon />
                   {t("auth.loginWithGoogle")}
                 </button>
               </ClientHydrationGate>
-            </div>
-
-            <div className="mt-6 text-center">
-              <button
-                type="button"
-                className="text-xs font-medium text-[#6B7280] underline underline-offset-2 hover:text-[#0F4C75]"
-                onClick={() => void clearStuckSession(locale)}
-              >
-                {t("nav.clearSession")}
-              </button>
-              <p className="mt-1 text-[0.65rem] text-[#9CA3AF]">{t("nav.clearSessionHint")}</p>
             </div>
 
             <div className="mt-8 border-t border-gray-100 pt-6">
