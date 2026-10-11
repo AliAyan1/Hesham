@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { BRAND_COLORS } from "@/lib/constants";
 import { Logo } from "@/components/ui/Logo";
 import { AuthCanonicalHost } from "@/components/auth/AuthCanonicalHost";
+import { AuthStaleSessionHeal } from "@/components/auth/AuthStaleSessionHeal";
 
 type Props = {
   children: ReactNode;
@@ -19,6 +20,7 @@ export function AuthShell({ children, isRtl, slogan }: Props) {
       dir={isRtl ? "rtl" : "ltr"}
     >
       <AuthCanonicalHost />
+      <AuthStaleSessionHeal />
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
           <div className="mb-3 flex justify-center">

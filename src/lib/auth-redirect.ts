@@ -82,6 +82,54 @@ export function dashboardHrefForRole(role: string, locale: string): string {
   return `/${locale}${dash}`;
 }
 
+const AUTH_HEAL_STORAGE_KEY = "Qudrahtech-auth-heal-v1";
+
+function documentHasAuthSessionCookie(): boolean {
+  if (typeof document === "undefined") return false;
+  return /(?:^|;\s*)(?:__Secure-)?(?:authjs|next-auth)\.session-token=/.test(
+    document.cookie,
+  );
+}
+
+/**
+ * Removes orphan session cookies (wrong secret, apex/www mismatch, old deploy).
+ * Runs once per tab on login/register — users should not need "Clear session" manually.
+ */
+export async function healStaleAuthCookie(): Promise<boolean> {
+  if (typeof window === "undefined") return false;
+  try {
+    if (sessionStorage.getItem(AUTH_HEAL_STORAGE_KEY)) return false;
+    sessionStorage.setItem(AUTH_HEAL_STORAGE_KEY, "1");
+  } catch {
+    return false;
+  }
+
+  try {
+    const res = await fetch("/api/auth/session", {
+      credentials: "include",
+      cache: "no-store",
+    });
+    const json = (await res.json()) as { user?: { id?: string } };
+    if (json.user?.id) return false;
+    if (!documentHasAuthSessionCookie()) return false;
+
+    const { signOut } = await import("next-auth/react");
+    try {
+      await signOut({ redirect: false });
+    } catch {
+      /* ignore */
+    }
+    try {
+      await fetch("/api/auth/signout", { method: "POST", credentials: "include" });
+    } catch {
+      /* ignore */
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * One-click reset: sign out, clear NextAuth cookies, reload home as a guest.
  * Use after DB wipes or when the navbar still shows “Log out” incorrectly.
@@ -99,7 +147,13 @@ export async function clearStuckSession(locale: string): Promise<void> {
     /* ignore */
   }
   if (typeof window !== "undefined") {
-    window.location.href = `/${locale}`;
+    try {
+      window.localStorage.removeItem("Qudrahtech-locale");
+    } catch {
+      /* ignore */
+    }
+    document.cookie = "Qudrahtech-locale=; path=/; max-age=0; SameSite=Lax";
+    hardNavigate("/auth/login", locale);
   }
 }
 

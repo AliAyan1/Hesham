@@ -12,7 +12,7 @@
     "logout": "Log out",
     "clearSession": "Clear session",
     "clearSessionWorking": "Clearing…",
-    "clearSessionHint": "Remove saved login cookie and start fresh (use after testing or DB reset)",
+    "clearSessionHint": "Only if login still fails after trying again — we usually clear bad cookies automatically",
     "profile": "Profile",
     "language": "Language",
     "mainMenuAria": "Open navigation menu",

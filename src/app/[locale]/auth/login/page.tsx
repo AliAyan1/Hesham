@@ -13,11 +13,11 @@ import { ClientHydrationGate } from "@/components/ui/ClientHydrationGate";
 import { GoogleIcon } from "@/components/auth/GoogleIcon";
 import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
 import { AuthCanonicalHost } from "@/components/auth/AuthCanonicalHost";
+import { AuthStaleSessionHeal } from "@/components/auth/AuthStaleSessionHeal";
 import {
   clearStuckSession,
   fetchPostAuthPath,
   hardNavigate,
-  waitForAuthenticatedSession,
 } from "@/lib/auth-redirect";
 import type { LoginFormData } from "@/types";
 import type { ZodIssue } from "zod";
@@ -127,13 +127,8 @@ export default function LoginPage() {
           return;
         }
 
-        /** Full reload — do not wait on session polling (was hanging on slow DB). */
-        void update();
-        const sessionReady = await waitForAuthenticatedSession(8);
-        const target = sessionReady.ok
-          ? await fetchPostAuthPath().catch(() => "/dashboard")
-          : "/dashboard";
-        hardNavigate(target, locale);
+        /** Full page load reads the new JWT cookie; polling often failed on slow DB / stale cookies. */
+        hardNavigate("/dashboard", locale);
       } catch {
         setServerError(t("common.error"));
       }
@@ -164,6 +159,7 @@ export default function LoginPage() {
   return (
     <div className="relative min-h-[100dvh]" dir={isRTL ? "rtl" : "ltr"}>
       <AuthCanonicalHost />
+      <AuthStaleSessionHeal />
       <div className="absolute end-4 top-[max(1rem,env(safe-area-inset-top,0px)+0.5rem)] z-20">
         <LanguageSwitcher tone="light" minimal />
       </div>
