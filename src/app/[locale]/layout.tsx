@@ -11,6 +11,7 @@ import { RTL_LOCALES } from "@/lib/constants";
 import type { Locale } from "@/lib/constants";
 import { routing } from "@/i18n/routing";
 import { cn } from "@/lib/cn";
+import { basalimSiteMetadata } from "@/lib/basalim-seo";
 import "../globals.css";
 
 const cairo = Cairo({
@@ -25,24 +26,7 @@ const plusJakarta = Plus_Jakarta_Sans({
   variable: "--font-jakarta",
 });
 
-export const metadata: Metadata = {
-  title: "Basalim Consulting — Talent & Recruitment Solutions | KSA",
-  description:
-    "Basalim Consulting is a leading talent acquisition and HR consultancy in Saudi Arabia, powered by QudrahTech AI platform.",
-  openGraph: {
-    type: "website",
-    siteName: "Basalim Consulting",
-    title: "Basalim Consulting — Talent & Recruitment Solutions | KSA",
-    description:
-      "Basalim Consulting is a leading talent acquisition and HR consultancy in Saudi Arabia, powered by QudrahTech AI platform.",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Basalim Consulting",
-    description:
-      "Basalim Consulting is a leading talent acquisition and HR consultancy in Saudi Arabia, powered by QudrahTech AI platform.",
-  },
-};
+export const metadata: Metadata = basalimSiteMetadata();
 
 export const viewport: Viewport = {
   width: "device-width",

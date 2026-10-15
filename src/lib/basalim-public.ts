@@ -29,7 +29,7 @@ export const BASALIM_COLORS = {
 export function siteOrigin(): string {
   const fromEnv = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "");
   if (fromEnv) return fromEnv;
-  return "https://basalim-consulting.com";
+  return "https://www.basalim-consulting.com";
 }
 
 /** Qudrahtech platform landing on basalim-consulting.com (nav may still say “Qudratak”). */
