@@ -1,7 +1,14 @@
 import type { ReactNode } from "react";
+import type { Metadata } from "next";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import { DEFAULT_LOCALE, RTL_LOCALES } from "@/lib/constants";
 import "./globals.css";
+
+export const metadata: Metadata = {
+  verification: {
+    google: "5pXsJLIy6nzStRrtSA9HnP1oA29-g75VUPFvtXAaQ70",
+  },
+};
 
 const GA_MEASUREMENT_ID = "G-HT2501LY4G";
 
