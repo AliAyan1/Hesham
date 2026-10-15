@@ -26,30 +26,21 @@ const plusJakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Qudrahtech | قدرتك - AI Career Platform",
+  title: "Basalim Consulting — Talent & Recruitment Solutions | KSA",
   description:
-    "AI-powered career assessments, ATS-optimized CVs, and smart job matching for job seekers and employers.",
-  keywords: [
-    "Qudrahtech",
-    "قدرتك",
-    "AI career platform",
-    "ATS CV builder",
-    "AI assessment",
-    "job matching",
-    "Saudi Arabia",
-  ],
-  robots: { index: true, follow: true },
+    "Basalim Consulting is a leading talent acquisition and HR consultancy in Saudi Arabia, powered by QudrahTech AI platform.",
   openGraph: {
     type: "website",
-    siteName: "Qudrahtech",
-    title: "Qudrahtech | قدرتك - AI Career Platform",
+    siteName: "Basalim Consulting",
+    title: "Basalim Consulting — Talent & Recruitment Solutions | KSA",
     description:
-      "AI-powered career assessments, ATS-optimized CVs, and smart job matching for job seekers and employers.",
+      "Basalim Consulting is a leading talent acquisition and HR consultancy in Saudi Arabia, powered by QudrahTech AI platform.",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Qudrahtech | قدرتك",
-    description: "Know Your Potential. Shape Your Future.",
+    title: "Basalim Consulting",
+    description:
+      "Basalim Consulting is a leading talent acquisition and HR consultancy in Saudi Arabia, powered by QudrahTech AI platform.",
   },
 };
 

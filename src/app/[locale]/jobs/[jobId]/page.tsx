@@ -22,7 +22,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const titleBase = useAr && job.titleAr?.trim() ? job.titleAr : job.title;
   const desc = job.description.replace(/\s+/g, " ").trim().slice(0, 160);
   return {
-    title: `${titleBase} | Qudrahtech`,
+    title: titleBase,
     description: desc || undefined,
     openGraph: { title: titleBase, description: desc },
   };

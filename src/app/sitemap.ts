@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 import { LOCALES } from "@/lib/constants";
 
-const BASE_URL = "https://Qudrahtech.sa";
+const BASE_URL = "https://www.basalim-consulting.com";
 
 const PUBLIC_ROUTES = [
   "",
