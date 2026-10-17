@@ -10,7 +10,8 @@ function isAuthEntryPath(pathname: string): boolean {
     pathname.includes("/auth/login") ||
     pathname.includes("/auth/register") ||
     pathname.includes("/auth/forgot-password") ||
-    pathname.includes("/auth/reset-password")
+    pathname.includes("/auth/reset-password") ||
+    pathname.includes("/auth/verify-email")
   );
 }
 

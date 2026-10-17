@@ -123,6 +123,10 @@ export default function LoginPage() {
           setServerError(t("auth.serviceUnavailable"));
           return;
         }
+        if (result?.error === "email_not_verified" || result?.code === "email_not_verified") {
+          setServerError(t("auth.emailNotVerified"));
+          return;
+        }
         if (!result?.ok || result.error) {
           setServerError(t("auth.invalidCredentials"));
           return;

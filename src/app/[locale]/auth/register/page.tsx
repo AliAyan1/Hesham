@@ -7,7 +7,8 @@ import { RegisterRolePickModal } from "@/components/auth/RegisterRolePickModal";
 import { signIn, useSession } from "next-auth/react";
 import { useLocale, useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
-import { Link } from "@/i18n/navigation";
+import { Link, useRouter } from "@/i18n/navigation";
+import { savePendingSignup } from "@/lib/pending-signup-storage";
 import {
   clearRegisterPlan,
   planFromStorage,
@@ -90,6 +91,7 @@ export default function RegisterPage() {
   const tAuth = useTranslations("auth");
   const tp = useTranslations("payments");
   const locale = useLocale();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const isRTL = locale === "ar" || locale === "ur";
   const { data: session, status: sessionStatus, update } = useSession();
@@ -461,62 +463,18 @@ export default function RegisterPage() {
           plan,
         });
 
-        const result = await signIn("credentials", {
-          email: parsed.data.email,
+        savePendingSignup({
+          email: parsed.data.email.trim().toLowerCase(),
           password: parsed.data.password,
-          redirect: false,
+          role: String(parsed.data.role),
+          plan,
         });
-
-        if (result?.error === "database_unavailable") {
-          setServerError(t("auth.serviceUnavailable"));
-          return;
-        }
-        if (!result?.ok || result?.error) {
-          setServerError(t("auth.invalidCredentials"));
-          return;
-        }
-
-        await update();
-        const sessionReady = await waitForAuthenticatedSession(16);
-        if (!sessionReady.ok) {
-          setServerError(t("auth.sessionNotReady"));
-          return;
-        }
         clearRegisterPlan();
 
-        let paymentsConfigured = moyasarConfigured;
-        try {
-          const cfg = await fetch("/api/payments/config", { cache: "no-store" });
-          const j = (await cfg.json()) as { configured?: boolean };
-          paymentsConfigured = j.configured === true;
-        } catch {
-          /* use cached flag */
-        }
-
-        // Paid plans require Moyasar checkout before onboarding.
-        const needsPayment =
-          paymentsConfigured && (plan === "professional" || plan === "premium");
-
-        if (needsPayment) {
-          savePaymentReturnContext({
-            dashboardRole: String(parsed.data.role).toUpperCase(),
-            locale,
-            finalizeSignup: false,
-          });
-          setSignupPaymentPlan(plan);
-          setSignupRole(parsed.data.role);
-          // Keep the register UI mounted so PaymentModal can render.
-          // Setting postSignupRedirect here hid the page behind "Loading…" forever.
-          setShowSignupPayment(true);
-          return;
-        }
-
-        setPostSignupRedirect(true);
-        const nextPath =
-          parsed.data.role === UserRole.JOBSEEKER
-            ? "/onboarding"
-            : dashboardPathForRole(parsed.data.role);
-        hardNavigate(nextPath, locale);
+        router.push({
+          pathname: "/auth/verify-email",
+          query: { email: parsed.data.email.trim().toLowerCase() },
+        });
       } catch (err: unknown) {
         if (axios.isAxiosError(err) && err.response?.status === 409) {
           setServerError(t("auth.emailTaken"));

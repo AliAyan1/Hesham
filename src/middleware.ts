@@ -89,6 +89,7 @@ async function maintenanceGuard(
     pathWithoutLocale.startsWith("/auth/login") ||
     pathWithoutLocale.startsWith("/auth/forgot-password") ||
     pathWithoutLocale.startsWith("/auth/reset-password") ||
+    pathWithoutLocale.startsWith("/auth/verify-email") ||
     pathWithoutLocale === "/login"
   ) {
     return null;

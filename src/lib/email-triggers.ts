@@ -24,6 +24,7 @@ import { PaymentConfirmed } from "@/emails/PaymentConfirmed";
 import { NewMessage } from "@/emails/NewMessage";
 import { ProfileReminder } from "@/emails/ProfileReminder";
 import { PasswordReset } from "@/emails/PasswordReset";
+import { VerifyEmailCode } from "@/emails/VerifyEmailCode";
 import { appUrl } from "@/lib/email/app-url";
 import { getSettings, getAssessmentPassScore } from "@/lib/settings";
 
@@ -33,6 +34,18 @@ async function safeSend(to: string, subject: string, template: ReactElement): Pr
   } catch {
     /* non-blocking */
   }
+}
+
+export async function sendEmailVerificationCode(params: {
+  email: string;
+  name: string;
+  code: string;
+}): Promise<void> {
+  await safeSend(
+    params.email,
+    "Your verification code | رمز التحقق",
+    VerifyEmailCode({ name: params.name || "there", code: params.code }),
+  );
 }
 
 export async function onJobSeekerRegistered(params: {

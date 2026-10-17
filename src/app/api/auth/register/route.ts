@@ -6,7 +6,11 @@ import type { ZodIssue } from "zod";
 import { registerWithPlanSchema } from "@/lib/validations";
 import type { ApiResponse, IUser } from "@/types";
 import { UserRole } from "@prisma/client";
-import { onEmployerRegistered, onJobSeekerRegistered } from "@/lib/email-triggers";
+import { sendEmailVerificationCode } from "@/lib/email-triggers";
+import {
+  generateVerificationCode,
+  verificationCodeExpiresAt,
+} from "@/lib/email-verification";
 import { isRegistrationOpen as getRegistrationOpen } from "@/lib/settings";
 import { defaultMentorProfileCreate } from "@/lib/mentor/default-mentor-create";
 import { clientIp, rateLimit, rateLimitResponse } from "@/lib/rate-limit";
@@ -70,6 +74,8 @@ export async function POST(
     }
 
     const hashedPassword = await bcrypt.hash(password, 12);
+    const verificationCode = generateVerificationCode();
+    const verificationCodeExpiry = verificationCodeExpiresAt();
 
     const user = await withDbRetry(() =>
       prisma.user.create({
@@ -79,6 +85,9 @@ export async function POST(
         password: hashedPassword,
         role,
         subscriptionTier,
+        emailVerified: null,
+        verificationCode,
+        verificationCodeExpiry,
         /** First-run wizard; middleware sends users to `/onboarding` until completed. */
         onboardingComplete: false,
         subscriptionStart: subscriptionTier === "FREE" ? null : new Date(),
@@ -106,26 +115,28 @@ export async function POST(
     );
 
     try {
-      if (role === UserRole.JOBSEEKER) {
-        await onJobSeekerRegistered({ userId: user.id, email: user.email, name: name || "there" });
-      } else if (role === UserRole.EMPLOYER) {
-        await onEmployerRegistered({ userId: user.id, email: user.email, name: name || "there" });
-      } else if (role === UserRole.MENTOR) {
-        const { notifyAdminsNewMentorApplication } = await import("@/lib/mentor/notifications");
-        await notifyAdminsNewMentorApplication({
-          mentorName: name || user.email,
-          mentorUserId: user.id,
-        });
-      }
+      await sendEmailVerificationCode({
+        email: user.email,
+        name: name || "there",
+        code: verificationCode,
+      });
     } catch (sideEffectErr) {
-      console.error("[register] welcome email failed:", sideEffectErr);
+      console.error("[register] verification email failed:", sideEffectErr);
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Could not send verification email. Please try again.",
+        },
+        { status: 503 },
+      );
     }
 
     return NextResponse.json(
       {
         success: true,
         data: user,
-        message: "Account created successfully",
+        message: "Verification code sent to your email",
+        verifyEmail: true,
       },
       { status: 201 },
     );

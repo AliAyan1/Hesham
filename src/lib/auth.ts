@@ -3,7 +3,8 @@ import Google from "next-auth/providers/google";
 import Credentials from "next-auth/providers/credentials";
 import type { SubscriptionTier as PrismaSubscriptionTier } from "@prisma/client";
 import { getPrisma, isPrismaConnectionError } from "@/lib/db";
-import { AuthDatabaseUnavailableError } from "@/lib/auth-errors";
+import { AuthDatabaseUnavailableError, AuthEmailNotVerifiedError } from "@/lib/auth-errors";
+import { isEmailVerified } from "@/lib/email-verification";
 import { withDbRetry } from "@/lib/db-retry";
 import bcrypt from "bcryptjs";
 import { loginSchema } from "@/lib/validations";
@@ -173,6 +174,7 @@ export const authConfig: NextAuthConfig = {
                 password: true,
                 subscriptionTier: true,
                 onboardingComplete: true,
+                emailVerified: true,
               },
             });
           });
@@ -180,6 +182,10 @@ export const authConfig: NextAuthConfig = {
 
           const isValid = await bcrypt.compare(password, user.password);
           if (!isValid) return null;
+
+          if (!isEmailVerified(user.emailVerified)) {
+            throw new AuthEmailNotVerifiedError();
+          }
 
           return {
             id: user.id,
@@ -321,6 +327,7 @@ export const authConfig: NextAuthConfig = {
                   image: user.image,
                   role: UserRole.JOBSEEKER,
                   onboardingComplete: false,
+                  emailVerified: new Date(),
                   profile: { create: { language: "ar" } },
                 },
               });

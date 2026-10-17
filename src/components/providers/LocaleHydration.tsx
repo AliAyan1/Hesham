@@ -20,7 +20,11 @@ export function LocaleHydration() {
     if (typeof window === "undefined") return;
 
     const pathname = window.location.pathname;
-    if (pathname.includes("/auth/login") || pathname.includes("/auth/register")) {
+    if (
+      pathname.includes("/auth/login") ||
+      pathname.includes("/auth/register") ||
+      pathname.includes("/auth/verify-email")
+    ) {
       applyDocumentDirection(intlLocale);
       persistLocalePreference(intlLocale);
       return;

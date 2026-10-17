@@ -17,6 +17,8 @@ model User {
   subscriptionEnd          DateTime?
   onboardingComplete       Boolean          @default(true)
   emailVerified            DateTime?
+  verificationCode         String?
+  verificationCodeExpiry   DateTime?
   image                    String?
   /// Platform consent before AI assessment (recording / sharing with employers).
   dataConsentAssessmentAt  DateTime?
