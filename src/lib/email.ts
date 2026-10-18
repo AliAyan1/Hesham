@@ -28,6 +28,12 @@ export async function sendEmail({
   const resend = getResend();
   const from = fromAddress();
   if (!resend || !from) {
+    console.error("[email] send skipped — missing config", {
+      to,
+      hasResendKey: Boolean(process.env.RESEND_API_KEY),
+      hasFrom: Boolean(from),
+      nodeEnv: process.env.NODE_ENV,
+    });
     return null;
   }
   try {

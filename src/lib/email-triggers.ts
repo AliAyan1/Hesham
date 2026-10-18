@@ -523,13 +523,22 @@ export async function onJobMatchNotify(params: {
   });
 }
 
+/** Sends password reset link; throws when Resend is misconfigured or the API fails. */
+export async function sendPasswordResetEmail(params: { email: string; token: string }): Promise<void> {
+  const resetUrl = appUrl(`/reset-password?token=${encodeURIComponent(params.token)}`);
+  const result = await sendEmail({
+    to: params.email,
+    subject: "Reset Your Password | إعادة تعيين كلمة المرور",
+    template: PasswordReset({ resetUrl }),
+  });
+  if (!result) {
+    throw new Error("Password reset email was not sent (check RESEND_API_KEY and FROM_EMAIL)");
+  }
+}
+
+/** @deprecated Use sendPasswordResetEmail */
 export async function onPasswordReset(params: { email: string; token: string }): Promise<void> {
-  const resetUrl = appUrl(`/auth/reset-password?token=${encodeURIComponent(params.token)}`);
-  await safeSend(
-    params.email,
-    "Reset Your Password | إعادة تعيين كلمة المرور",
-    PasswordReset({ resetUrl }),
-  );
+  await sendPasswordResetEmail(params);
 }
 
 export async function runProfileReminderCron(): Promise<number> {

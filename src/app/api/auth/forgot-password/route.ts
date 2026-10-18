@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { getPrisma } from "@/lib/db";
 import { createPasswordResetToken } from "@/lib/auth/password-reset-token";
-import { onPasswordReset } from "@/lib/email-triggers";
+import { sendPasswordResetEmail } from "@/lib/email-triggers";
 import { clientIp, rateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
 const bodySchema = z.object({
@@ -30,7 +30,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   if (user?.password) {
     const token = await createPasswordResetToken(user.id);
-    void onPasswordReset({ email: user.email, token });
+    try {
+      await sendPasswordResetEmail({ email: user.email, token });
+    } catch (err) {
+      console.error("[forgot-password] failed to send reset email", {
+        userId: user.id,
+        email: user.email,
+        err,
+      });
+    }
   }
 
   return NextResponse.json({

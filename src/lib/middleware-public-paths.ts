@@ -27,6 +27,7 @@ export const PUBLIC_PATH_PREFIXES = [
   "/auth/reset-password",
   "/auth/verify-email",
   "/forgot-password",
+  "/reset-password",
   "/upgrade",
   "/payments",
   "/maintenance",
