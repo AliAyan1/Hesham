@@ -1,7 +1,26 @@
+import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { PublicLayout } from "@/components/layout/PublicLayout";
 import { BasalimContactPage } from "@/components/basalim/BasalimContactPage";
 import { getContent } from "@/lib/cms";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  const isAr = locale === "ar";
+  const title = isAr ? "تواصل معنا | استشارات بصيلم" : "Contact Us | Basalim Consulting";
+  const description = isAr
+    ? "تواصل مع استشارات بصيلم. نحن هنا لمساعدة عملك على النمو في المملكة العربية السعودية."
+    : "Get in touch with Basalim Consulting. We're here to help your business grow in Saudi Arabia.";
+  return {
+    title,
+    description,
+    openGraph: { title, description },
+  };
+}
 
 export default async function ContactPage({
   params,

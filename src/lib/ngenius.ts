@@ -77,50 +77,60 @@ export async function createPaymentSession(
   const origin = appPublicOrigin();
   const redirectUrl = `${origin}/payment/callback`;
   const cancelUrl = `${origin}/ar/pricing`;
+  const outlet = outletRef();
 
-  const response = await fetch(
-    `${apiBase()}/transactions/outlets/${outletRef()}/payment/card`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/vnd.ni-payment.v2+json",
-        Accept: "application/vnd.ni-payment.v2+json",
-      },
-      body: JSON.stringify({
-        action: "SALE",
-        amount: { currencyCode: "SAR", value: Math.round(amount * 100) },
-        merchantAttributes: {
-          redirectUrl,
-          cancelUrl,
-          merchantOrderReference: orderId,
-        },
-        emailAddress: email,
-      }),
-      cache: "no-store",
+  /** Hosted payment page: create an order (not /payment/card — that API expects card PAN). */
+  const response = await fetch(`${apiBase()}/transactions/outlets/${outlet}/orders`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/vnd.ni-payment.v2+json",
+      Accept: "application/vnd.ni-payment.v2+json",
     },
-  );
+    body: JSON.stringify({
+      action: "PURCHASE",
+      amount: { currencyCode: "SAR", value: Math.round(amount * 100) },
+      emailAddress: email,
+      merchantAttributes: {
+        redirectUrl,
+        cancelUrl,
+        merchantOrderReference: orderId,
+      },
+    }),
+    cache: "no-store",
+  });
 
   if (!response.ok) {
     const body = await response.text().catch(() => "");
-    console.error("[ngenius] create payment session failed:", response.status, body);
+    console.error("[ngenius] create order failed:", {
+      status: response.status,
+      outletSuffix: outlet.slice(-8),
+      apiHost: new URL(apiBase()).host,
+      body,
+    });
     throw new Error("N-Genius payment session creation failed");
   }
 
   const data = (await response.json()) as {
     reference?: string;
     orderReference?: string;
-    _links?: { payment?: { href?: string } };
+    _links?: Record<string, { href?: string } | undefined> & {
+      payment?: { href?: string };
+    };
   };
 
-  const paymentUrl = data._links?.payment?.href;
+  const links = data._links;
+  const paymentUrl =
+    links?.payment?.href ??
+    links?.["cnp:payment-link"]?.href ??
+    null;
+
   if (!paymentUrl) {
     console.error("[ngenius] missing payment href:", data);
     throw new Error("N-Genius payment URL missing");
   }
 
-  const orderReference =
-    data.reference ?? data.orderReference ?? null;
+  const orderReference = data.reference ?? data.orderReference ?? null;
 
   return { paymentUrl, orderReference };
 }

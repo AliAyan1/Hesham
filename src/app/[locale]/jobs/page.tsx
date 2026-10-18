@@ -1,6 +1,25 @@
+import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { PublicLayout } from "@/components/layout/PublicLayout";
 import { JobsClient } from "@/app/[locale]/jobs/JobsClient";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  const isAr = locale === "ar";
+  const title = isAr ? "فرص العمل | قدرة تك" : "Job Opportunities | QudrahTech";
+  const description = isAr
+    ? "تصفح أحدث فرص العمل في المملكة العربية السعودية. ابحث عن وظيفتك القادمة مع قدرة تك."
+    : "Browse the latest job opportunities in Saudi Arabia. Find your next career move with QudrahTech.";
+  return {
+    title,
+    description,
+    openGraph: { title, description },
+  };
+}
 
 export default async function JobsPage({
   params,
