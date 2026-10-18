@@ -9,7 +9,7 @@ import {
   startTabbySession,
 } from "@/lib/payments/bnpl-session";
 import { tabbyConfigured } from "@/lib/payments/provider-config";
-import { PAYMENT_METADATA_STORAGE_KEY } from "@/components/payments/PaymentForm";
+import { PAYMENT_METADATA_STORAGE_KEY } from "@/lib/payments/storage-keys";
 
 const bodySchema = z.object({
   metadata: bnplMetadataSchema,

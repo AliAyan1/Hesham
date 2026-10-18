@@ -7,7 +7,9 @@ import {
   SubscriptionTier,
 } from "@prisma/client";
 import { getPrisma } from "@/lib/db";
-import { calculateVAT, fromHalalas, pollPaidPayment, toHalalas } from "@/lib/moyasar";
+import { calculateVAT, toHalalas } from "@/lib/payments/vat";
+import type { PaymentIntent } from "@prisma/client";
+import { markIntentPaid, parseIntentMetadata } from "@/lib/payments/intent";
 import {
   getSubscriptionPlanPrices,
   subscriptionBaseAmount,
@@ -23,6 +25,8 @@ export type PaymentMetadataInput = {
   plan?: string;
   obligationId?: string;
   sessionId?: string;
+  merchantOrderReference?: string;
+  locale?: string;
 };
 
 async function resolveExpectedTotalHalalas(metadata: PaymentMetadataInput): Promise<number> {
@@ -231,41 +235,35 @@ async function applyPaymentFulfillment(
   }
 }
 
-export async function verifyAndFulfillPayment(
+/** Card checkout via N-Genius (stored under PaymentProvider.MOYASAR until schema adds NGENIUS). */
+export async function fulfillNgeniusCardPayment(
   userId: string,
-  paymentId: string,
-  metadata: PaymentMetadataInput,
+  orderRef: string,
+  intent: PaymentIntent,
 ): Promise<void> {
-  const prisma = getPrisma();
+  if (intent.userId !== userId) throw new Error("intent_forbidden");
+  if (intent.status === PaymentStatus.PAID) return;
 
-  const existing = await prisma.payment.findUnique({
-    where: { moyasarPaymentId: paymentId },
-  });
-  if (existing?.status === PaymentStatus.PAID) {
-    return;
-  }
-
-  const remote = await pollPaidPayment(paymentId);
+  const metadata = parseIntentMetadata(intent.metadataJson);
 
   const expectedHalalas = await resolveExpectedTotalHalalas(metadata);
-  if (Math.abs(remote.amount - expectedHalalas) > 1) {
+  const intentHalalas = toHalalas(intent.totalAmount);
+  if (Math.abs(expectedHalalas - intentHalalas) > 1) {
     throw new Error("amount_mismatch");
   }
-
-  const totalAmount = fromHalalas(remote.amount);
-  const baseAmount = Math.round((totalAmount / 1.15) * 100) / 100;
-  const vatAmount = Math.round((totalAmount - baseAmount) * 100) / 100;
 
   await recordPaymentAndFulfill({
     userId,
     provider: PaymentProvider.MOYASAR,
-    externalPaymentId: paymentId,
+    externalPaymentId: orderRef,
     metadata,
-    baseAmount,
-    vatAmount,
-    totalAmount,
-    moyasarPaymentId: paymentId,
+    baseAmount: intent.baseAmount,
+    vatAmount: intent.vatAmount,
+    totalAmount: intent.totalAmount,
+    moyasarPaymentId: null,
   });
+
+  await markIntentPaid(intent.id);
 }
 
 export async function verifyAndFulfillTabbyPayment(
@@ -360,6 +358,7 @@ export type PaymentHistoryRow = {
   currency: string;
   status: PaymentStatus;
   moyasarPaymentId: string | null;
+  externalPaymentId: string | null;
   paidAt: string | null;
   createdAt: string;
 };
@@ -380,6 +379,7 @@ export async function listPaymentHistory(userId: string): Promise<PaymentHistory
     currency: row.currency,
     status: row.status,
     moyasarPaymentId: row.moyasarPaymentId,
+    externalPaymentId: row.externalPaymentId,
     paidAt: row.paidAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
   }));

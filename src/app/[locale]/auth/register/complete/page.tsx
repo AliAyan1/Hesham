@@ -43,7 +43,7 @@ export default function RegisterCompletePage() {
   const { data: session, status, update } = useSession();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [moyasarConfigured, setMoyasarConfigured] = useState(false);
+  const [cardPaymentsConfigured, setCardPaymentsConfigured] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
   const [pendingRole, setPendingRole] = useState<RoleChoice | null>(null);
   const [finishing, setFinishing] = useState(false);
@@ -77,8 +77,8 @@ export default function RegisterCompletePage() {
   useEffect(() => {
     void fetch("/api/payments/config", { cache: "no-store" })
       .then((r) => r.json() as Promise<{ configured?: boolean }>)
-      .then((j) => setMoyasarConfigured(j.configured === true))
-      .catch(() => setMoyasarConfigured(false));
+      .then((j) => setCardPaymentsConfigured(j.configured === true))
+      .catch(() => setCardPaymentsConfigured(false));
   }, []);
 
   useEffect(() => {
@@ -104,7 +104,7 @@ export default function RegisterCompletePage() {
       try {
         await axios.post("/api/account/role-choice", { role });
 
-        let paymentsConfigured = moyasarConfigured;
+        let paymentsConfigured = cardPaymentsConfigured;
         try {
           const cfg = await fetch("/api/payments/config", { cache: "no-store" });
           const j = (await cfg.json()) as { configured?: boolean };
@@ -113,7 +113,7 @@ export default function RegisterCompletePage() {
           /* use cached flag */
         }
 
-        // Paid plans require Moyasar checkout after Google signup.
+        // Paid plans require N-Genius checkout after Google signup.
         const needsPayment =
           paymentsConfigured && (plan === "professional" || plan === "premium");
 

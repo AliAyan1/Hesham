@@ -1,9 +1,7 @@
 export type PaymentMethodsConfig = {
-  moyasar: boolean;
-  applePay: boolean;
+  ngenius: boolean;
   tabby: boolean;
   tamara: boolean;
-  isTestMode: boolean;
 };
 
 export function tabbyConfigured(): boolean {
@@ -16,10 +14,11 @@ export function tamaraConfigured(): boolean {
   return Boolean(process.env.TAMARA_API_TOKEN?.trim());
 }
 
-export function moyasarConfigured(): boolean {
+export function ngeniusConfigured(): boolean {
   return Boolean(
-    process.env.MOYASAR_SECRET_KEY?.trim() &&
-      process.env.NEXT_PUBLIC_MOYASAR_PUBLISHABLE_KEY?.trim(),
+    process.env.NGENIUS_API_KEY?.trim() &&
+      process.env.NGENIUS_OUTLET_REFERENCE?.trim() &&
+      process.env.NGENIUS_API_URL?.trim(),
   );
 }
 
@@ -40,24 +39,19 @@ export function tamaraApiBase(): string {
 }
 
 export function appOrigin(): string {
-  const raw = process.env.NEXTAUTH_URL ?? process.env.AUTH_URL ?? "http://localhost:3000";
+  const raw =
+    process.env.NEXT_PUBLIC_APP_URL ??
+    process.env.NEXTAUTH_URL ??
+    process.env.AUTH_URL ??
+    "http://localhost:3000";
   return raw.replace(/\/$/, "");
 }
 
 export function getPaymentMethodsConfig(): PaymentMethodsConfig {
-  const publishableKey = process.env.NEXT_PUBLIC_MOYASAR_PUBLISHABLE_KEY?.trim() ?? "";
-  const moyasar = moyasarConfigured();
-  // Apple Pay needs domain verification + Safari. Auto-enabling it with every
-  // Moyasar setup can break the card form on Chrome/Windows — opt in only.
-  const applePay =
-    moyasar &&
-    (process.env.NEXT_PUBLIC_MOYASAR_APPLE_PAY === "true" ||
-      process.env.MOYASAR_APPLE_PAY === "true");
+  const ngenius = ngeniusConfigured();
   return {
-    moyasar,
-    applePay,
+    ngenius,
     tabby: tabbyConfigured(),
     tamara: tamaraConfigured(),
-    isTestMode: publishableKey.startsWith("pk_test_"),
   };
 }

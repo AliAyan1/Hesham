@@ -133,7 +133,6 @@ export default function RegisterPage() {
 
   /** After signup sign-in, skip signed-in gate until hard navigation completes. */
   const [postSignupRedirect, setPostSignupRedirect] = useState(false);
-  const [moyasarConfigured, setMoyasarConfigured] = useState(false);
   const [showSignupPayment, setShowSignupPayment] = useState(false);
   const [signupPaymentPlan, setSignupPaymentPlan] = useState<PlanChoice | null>(null);
   const [signupRole, setSignupRole] = useState<UserRole | null>(null);
@@ -153,13 +152,6 @@ export default function RegisterPage() {
       .catch(() => {
         /* keep defaults */
       });
-  }, []);
-
-  useEffect(() => {
-    void fetch("/api/payments/config", { cache: "no-store" })
-      .then((r) => r.json() as Promise<{ configured?: boolean }>)
-      .then((j) => setMoyasarConfigured(j.configured === true))
-      .catch(() => setMoyasarConfigured(false));
   }, []);
 
   const registerReturnPath = useMemo(() => {

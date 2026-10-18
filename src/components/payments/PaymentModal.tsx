@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { calculateVAT } from "@/lib/moyasar";
-import { PaymentForm } from "./PaymentForm";
+import { calculateVAT } from "@/lib/payments/vat";
+import { PAYMENT_METADATA_STORAGE_KEY } from "@/lib/payments/storage-keys";
 import { BnplPaymentButtons } from "./BnplPaymentButtons";
 
-type ModalStatus = "idle" | "processing" | "success" | "error";
+type ModalStatus = "idle" | "processing" | "error";
 
 type PaymentMethodsAvailability = {
   card: boolean;
@@ -32,16 +32,15 @@ export function PaymentModal({
   baseAmount,
   description,
   metadata,
-  onSuccess,
+  onSuccess: _onSuccess,
 }: PaymentModalProps) {
   const t = useTranslations("payments");
   const locale = useLocale();
   const [status, setStatus] = useState<ModalStatus>("idle");
   const [errorMsg, setErrorMsg] = useState("");
-  const [isTestMode, setIsTestMode] = useState(false);
   const [methods, setMethods] = useState<PaymentMethodsAvailability>({
     card: true,
-    applePay: false,
+    applePay: true,
     tabby: false,
     tamara: false,
   });
@@ -51,16 +50,14 @@ export function PaymentModal({
       .then(
         (r) =>
           r.json() as Promise<{
-            isTestMode?: boolean;
             methods?: PaymentMethodsAvailability;
           }>,
       )
       .then((j) => {
-        setIsTestMode(j.isTestMode === true);
         if (j.methods) setMethods(j.methods);
       })
       .catch(() => {
-        setIsTestMode(false);
+        /* keep defaults */
       });
   }, []);
 
@@ -72,45 +69,44 @@ export function PaymentModal({
   useEffect(() => {
     if (!isOpen) return;
     try {
-      sessionStorage.setItem("qt-moyasar-payment-metadata", JSON.stringify(metadata));
+      sessionStorage.setItem(PAYMENT_METADATA_STORAGE_KEY, JSON.stringify(metadata));
     } catch {
       /* ignore */
     }
   }, [isOpen, metadata]);
 
-  const handleSuccess = useCallback(async (paymentId: string) => {
+  const startCardCheckout = useCallback(async () => {
     setStatus("processing");
-    for (let attempt = 0; attempt < 6; attempt += 1) {
-      try {
-        const res = await fetch("/api/payments/verify", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ paymentId, metadata }),
-        });
-        if (res.ok) {
-          setStatus("success");
-          window.setTimeout(() => {
-            onSuccess();
-            onClose();
-          }, 1500);
-          return;
-        }
-      } catch {
-        /* retry */
+    setErrorMsg("");
+    try {
+      const res = await fetch("/api/payment/create-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          amount: total,
+          planId: metadata.plan,
+          metadata: {
+            type: metadata.type,
+            plan: metadata.plan,
+            obligationId: metadata.obligationId,
+            sessionId: metadata.sessionId,
+          },
+          locale,
+        }),
+      });
+      const json = (await res.json()) as { paymentUrl?: string; error?: string };
+      if (!res.ok || !json.paymentUrl) {
+        setStatus("error");
+        setErrorMsg(json.error ?? t("sessionStartFailed"));
+        return;
       }
-      if (attempt < 5) {
-        await new Promise((r) => setTimeout(r, 1500));
-      }
+      window.location.href = json.paymentUrl;
+    } catch {
+      setStatus("error");
+      setErrorMsg(t("sessionStartFailed"));
     }
-    setStatus("error");
-    setErrorMsg(t("verifyFailed"));
-  }, [metadata, onClose, onSuccess, t]);
-
-  const handleError = useCallback((error: string) => {
-    setStatus("error");
-    setErrorMsg(error);
-  }, []);
+  }, [locale, metadata, t, total]);
 
   if (!isOpen) return null;
 
@@ -136,83 +132,61 @@ export function PaymentModal({
           </button>
         </div>
 
-        {status === "success" ? (
-          <div className="py-8 text-center">
-            <p className="text-4xl" aria-hidden>
-              ✅
-            </p>
-            <p className="mt-3 font-semibold text-[#1D9E75]">{t("successTitle")}</p>
-            <p className="mt-2 text-sm text-[#6B7280]">{t("successSubtitle")}</p>
-          </div>
-        ) : (
-          <>
-            <div className="mb-5 rounded-xl bg-[#F8FAFC] p-4">
-              <div className="mb-1.5 flex justify-between text-sm text-[#6B7280]">
-                <span>{t("subtotal")}</span>
-                <span>
-                  {t("sar")} {baseAmount.toFixed(2)}
-                </span>
-              </div>
-              <div className="mb-1.5 flex justify-between text-sm text-[#6B7280]">
-                <span>{t("vat")}</span>
-                <span>
-                  {t("sar")} {vat.toFixed(2)}
-                </span>
-              </div>
-              <div className="mt-2 flex justify-between border-t border-[#E5E7EB] pt-2 text-base font-bold text-[#0D2137]">
-                <span>{t("total")}</span>
-                <span>
-                  {t("sar")} {total.toFixed(2)}
-                </span>
-              </div>
+        <>
+          <div className="mb-5 rounded-xl bg-[#F8FAFC] p-4">
+            <div className="mb-1.5 flex justify-between text-sm text-[#6B7280]">
+              <span>{t("subtotal")}</span>
+              <span>
+                {t("sar")} {baseAmount.toFixed(2)}
+              </span>
             </div>
+            <div className="mb-1.5 flex justify-between text-sm text-[#6B7280]">
+              <span>{t("vat")}</span>
+              <span>
+                {t("sar")} {vat.toFixed(2)}
+              </span>
+            </div>
+            <div className="mt-2 flex justify-between border-t border-[#E5E7EB] pt-2 text-base font-bold text-[#0D2137]">
+              <span>{t("total")}</span>
+              <span>
+                {t("sar")} {total.toFixed(2)}
+              </span>
+            </div>
+          </div>
 
-            {isTestMode ? (
-              <div className="mb-4 rounded-lg border border-[#FDE68A] bg-[#FEF9C3] px-3 py-2.5 text-xs text-[#854D0E]">
-                {t("testModeBanner")}
-              </div>
-            ) : null}
+          <p className="mb-4 text-center text-xs text-[#6B7280]">{t("secureNoteLive")}</p>
 
-            {errorMsg ? (
-              <div className="mb-4 rounded-lg border border-[#FECACA] bg-[#FEE2E2] px-3 py-2.5 text-sm text-[#991B1B]">
-                {errorMsg}
-              </div>
-            ) : null}
+          {errorMsg ? (
+            <div className="mb-4 rounded-lg border border-[#FECACA] bg-[#FEE2E2] px-3 py-2.5 text-sm text-[#991B1B]">
+              {errorMsg}
+            </div>
+          ) : null}
 
-            {status === "processing" ? (
-              <div className="py-6 text-center">
-                <div
-                  className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-[3px] border-[#EFF6FF] border-t-[#0F4C75]"
-                  aria-hidden
-                />
-                <p className="text-sm text-[#6B7280]">{t("verifying")}</p>
-              </div>
-            ) : (
-              <>
-                <BnplPaymentButtons
-                  enabled={{ tabby: methods.tabby, tamara: methods.tamara }}
-                  baseAmount={baseAmount}
-                  totalAmount={total}
-                  description={description}
-                  metadata={metadata}
-                  onError={handleError}
-                />
-                {methods.card ? (
-                  <PaymentForm
-                    amount={total}
-                    description={description}
-                    metadata={metadata}
-                    locale={locale}
-                    isTestMode={isTestMode}
-                    applePayEnabled={methods.applePay}
-                    onSuccess={handleSuccess}
-                    onError={handleError}
-                  />
-                ) : null}
-              </>
-            )}
-          </>
-        )}
+          <BnplPaymentButtons
+            enabled={{ tabby: methods.tabby, tamara: methods.tamara }}
+            baseAmount={baseAmount}
+            totalAmount={total}
+            description={description}
+            metadata={metadata}
+            onError={(msg) => {
+              setStatus("error");
+              setErrorMsg(msg);
+            }}
+          />
+
+          {methods.card ? (
+            <button
+              type="button"
+              disabled={status === "processing"}
+              onClick={() => void startCardCheckout()}
+              className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-[#0F4C75] px-4 py-3.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+            >
+              {status === "processing" ? t("redirecting") : t("payWithCard")}
+            </button>
+          ) : (
+            <p className="text-center text-sm text-[#991B1B]">{t("missingPaymentConfig")}</p>
+          )}
+        </>
       </div>
     </div>
   );

@@ -11,7 +11,7 @@ export const SUBSCRIPTION_PLAN_PRICES_SAR = {
   PREMIUM: PRICES.PREMIUM,
 } as const;
 
-/** VAT-inclusive totals for Moyasar (halalas). */
+/** VAT-inclusive totals for checkout (minor units). */
 export function calculatePrice(baseAmount: number, vatRate = PRICES.VAT_RATE) {
   const vat = Math.round(baseAmount * vatRate * 100) / 100;
   const total = Math.round((baseAmount + vat) * 100) / 100;

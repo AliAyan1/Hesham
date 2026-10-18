@@ -1,19 +1,16 @@
 import { NextResponse } from "next/server";
 import { getPaymentMethodsConfig } from "@/lib/payments/provider-config";
 
-/** Runtime check — publishable key is safe to expose; secret presence only returns boolean. */
+/** Runtime check — card checkout uses server-side N-Genius session (no client secret). */
 export async function GET(): Promise<NextResponse> {
-  const publishableKey = process.env.NEXT_PUBLIC_MOYASAR_PUBLISHABLE_KEY?.trim() ?? "";
   const methods = getPaymentMethodsConfig();
 
   return NextResponse.json({
-    configured: methods.moyasar,
-    publishableKey: publishableKey.length > 0 ? publishableKey : null,
-    secretConfigured: Boolean(process.env.MOYASAR_SECRET_KEY?.trim()),
-    isTestMode: methods.isTestMode,
+    configured: methods.ngenius,
+    isTestMode: false,
     methods: {
-      card: methods.moyasar,
-      applePay: methods.applePay,
+      card: methods.ngenius,
+      applePay: methods.ngenius,
       tabby: methods.tabby,
       tamara: methods.tamara,
     },

@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useLocale } from "next-intl";
 import { useSession } from "next-auth/react";
 import { useTranslations } from "next-intl";
-import { PAYMENT_METADATA_STORAGE_KEY } from "@/components/payments/PaymentForm";
+import { PAYMENT_METADATA_STORAGE_KEY } from "@/lib/payments/storage-keys";
 import type { PaymentMetadataInput } from "@/lib/payments/fulfill";
 import {
   clearPaymentReturnContext,
@@ -14,26 +14,6 @@ import {
 } from "@/lib/payments/return-context";
 import { dashboardPathForRole } from "@/lib/subscription";
 import { hardNavigate } from "@/lib/auth-redirect";
-
-async function verifyWithRetries(
-  paymentId: string,
-  metadata: PaymentMetadataInput,
-  attempts = 5,
-): Promise<boolean> {
-  for (let i = 0; i < attempts; i += 1) {
-    const res = await fetch("/api/payments/verify", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ paymentId, metadata }),
-    });
-    if (res.ok) return true;
-    if (i < attempts - 1) {
-      await new Promise((r) => setTimeout(r, 1500));
-    }
-  }
-  return false;
-}
 
 async function finishAndRedirect(input: {
   metadata: PaymentMetadataInput;
@@ -94,7 +74,6 @@ export default function PaymentCompleteClient() {
   const searchParams = useSearchParams();
   const { data: session, update } = useSession();
   const provider = searchParams.get("provider");
-  const paymentId = searchParams.get("id") ?? searchParams.get("payment_id");
   const status = searchParams.get("status");
   const [message, setMessage] = useState(t("verifying"));
 
@@ -143,51 +122,8 @@ export default function PaymentCompleteClient() {
       }
     }
 
-    if (!paymentId) {
-      setMessage(t("missingPaymentId"));
-      return;
-    }
-
-    if (status && status !== "paid") {
-      setMessage(t("paymentFailed"));
-      return;
-    }
-
-    let raw: string | null = null;
-    try {
-      raw = sessionStorage.getItem(PAYMENT_METADATA_STORAGE_KEY);
-    } catch {
-      raw = null;
-    }
-
-    if (!raw) {
-      setMessage(t("missingPaymentContext"));
-      return;
-    }
-
-    let metadata: PaymentMetadataInput;
-    try {
-      metadata = JSON.parse(raw) as PaymentMetadataInput;
-    } catch {
-      setMessage(t("missingPaymentContext"));
-      return;
-    }
-
-    void (async () => {
-      const ok = await verifyWithRetries(paymentId, metadata);
-      if (!ok) {
-        setMessage(t("verifyFailed"));
-        return;
-      }
-
-      await finishAndRedirect({
-        metadata,
-        sessionRole: session?.user?.role,
-        locale,
-        update,
-      });
-    })();
-  }, [paymentId, provider, status, session?.user?.role, update, locale, t]);
+    setMessage(t("missingPaymentContext"));
+  }, [provider, status, session?.user?.role, update, locale, t]);
 
   return (
     <main className="mx-auto flex min-h-[50vh] max-w-md flex-col items-center justify-center px-6 py-16 text-center">

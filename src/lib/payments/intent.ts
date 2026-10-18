@@ -47,6 +47,25 @@ export async function findIntentByExternalId(
   });
 }
 
+/** N-Genius merchantOrderReference (e.g. QT-173…) stored in intent metadata. */
+export async function findPendingIntentByMerchantOrderReference(orderId: string) {
+  const prisma = getPrisma();
+  const rows = await prisma.paymentIntent.findMany({
+    where: { status: PaymentStatus.PENDING },
+    orderBy: { createdAt: "desc" },
+    take: 100,
+  });
+  for (const row of rows) {
+    try {
+      const meta = JSON.parse(row.metadataJson) as { merchantOrderReference?: string };
+      if (meta.merchantOrderReference === orderId) return row;
+    } catch {
+      /* skip */
+    }
+  }
+  return null;
+}
+
 export async function markIntentPaid(intentId: string): Promise<void> {
   const prisma = getPrisma();
   await prisma.paymentIntent.update({

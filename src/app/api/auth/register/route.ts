@@ -56,7 +56,7 @@ export async function POST(
     const { name, email, password, role } = parsed.data;
 
     // REVERTED - payment required to upgrade. All new accounts start as FREE.
-    // Plan upgrades only AFTER payment success via /api/payments/verify.
+    // Plan upgrades only AFTER payment success (N-Genius callback / BNPL complete).
     const subscriptionTier = "FREE" as const;
 
     const normalizedEmail = email.trim().toLowerCase();

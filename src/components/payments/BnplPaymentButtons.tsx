@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { PAYMENT_METADATA_STORAGE_KEY } from "./PaymentForm";
+import { PAYMENT_METADATA_STORAGE_KEY } from "@/lib/payments/storage-keys";
 
 type BnplProvider = "tabby" | "tamara";
 

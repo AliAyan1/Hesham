@@ -83,11 +83,13 @@ export function PaymentsHistoryClient() {
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    {row.moyasarPaymentId ? (
+                    {row.externalPaymentId ?? row.moyasarPaymentId ? (
                       <button
                         type="button"
                         className="text-sm font-medium text-[#0F4C75] hover:underline"
-                        onClick={() => setReceiptId(row.moyasarPaymentId)}
+                        onClick={() =>
+                          setReceiptId(row.externalPaymentId ?? row.moyasarPaymentId)
+                        }
                       >
                         {t("viewReceipt")}
                       </button>

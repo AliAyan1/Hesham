@@ -32,7 +32,7 @@ export async function GET() {
   checks.openai = configured("OPENAI_API_KEY");
   checks.anthropic = configured("ANTHROPIC_API_KEY");
   checks.resend = configured("RESEND_API_KEY");
-  checks.moyasar = configured("MOYASAR_SECRET_KEY");
+  checks.ngenius = configured("NGENIUS_API_KEY");
   checks.daily = configured("DAILY_API_KEY");
 
   const allOk = Object.values(checks).every(

@@ -8,7 +8,7 @@ import {
 import { createTabbyCheckoutSession } from "@/lib/payments/tabby";
 import { createTamaraCheckoutSession } from "@/lib/payments/tamara";
 import type { PaymentMetadataInput } from "@/lib/payments/fulfill";
-import { calculateVAT } from "@/lib/moyasar";
+import { calculateVAT } from "@/lib/payments/vat";
 
 export const bnplMetadataSchema = z.object({
   type: z.enum(["SUBSCRIPTION", "RECRUITMENT_FEE", "MENTOR_SESSION"]),
