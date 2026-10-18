@@ -42,8 +42,6 @@ export function MentorSidebar({ locale }: { locale: string }) {
   const t = useTranslations("mentor");
   const tNav = useTranslations("nav");
   const tSide = useTranslations("sidebar");
-  const isRtl = locale === "ar" || locale === "ur";
-
   useEffect(() => {
     setMobileSidebarOpen(false);
   }, [pathname, setMobileSidebarOpen]);
@@ -58,17 +56,17 @@ export function MentorSidebar({ locale }: { locale: string }) {
       {mobileSidebarOpen ? (
         <button
           type="button"
-          className="fixed inset-0 top-14 z-[29] bg-black/40 md:hidden"
+          className="fixed inset-0 top-14 z-[45] bg-black/40 md:hidden"
           aria-label={tNav("closeSidebarAria")}
           onClick={() => setMobileSidebarOpen(false)}
         />
       ) : null}
       <aside
         className={cn(
-          "fixed start-0 top-14 z-30 flex h-[calc(100vh-3.5rem)] w-64 shrink-0 flex-col overflow-y-auto bg-[#0D2137] text-white",
+          "fixed start-0 top-14 flex h-[calc(100vh-3.5rem)] w-64 shrink-0 flex-col overflow-y-auto bg-[#0D2137] text-white",
           "transition-transform duration-200 ease-out",
-          mobileSidebarOpen ? "translate-x-0" : isRtl ? "translate-x-full" : "-translate-x-full",
-          "md:translate-x-0",
+          mobileSidebarOpen ? "z-50 translate-x-0" : "z-30 -translate-x-full rtl:translate-x-full",
+          "md:z-30 md:translate-x-0",
         )}
         style={{ backgroundColor: "#0D2137" }}
       >

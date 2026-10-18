@@ -13,6 +13,7 @@ import {
   QUDRAH_PLATFORM_NAME,
   QUDRAH_PLATFORM_NAME_AR,
 } from "@/lib/basalim-public";
+import { MobileMenuPortal } from "@/components/ui/MobileMenuPortal";
 
 type BasalimNavbarProps = {
   locale: string;
@@ -147,6 +148,7 @@ export function BasalimNavbar({ locale }: BasalimNavbarProps) {
   const servicesLabel = isAr ? "الخدمات" : "Services";
 
   return (
+    <>
     <header
       className={cn(
         "sticky top-0 z-50 w-full border-b border-gray-100 bg-white/95 backdrop-blur-md transition-shadow",
@@ -248,8 +250,10 @@ export function BasalimNavbar({ locale }: BasalimNavbarProps) {
         </div>
       </div>
 
-      {mobileOpen ? (
-        <div className="fixed inset-0 z-[60] flex flex-col bg-white safe-top lg:hidden">
+    </header>
+
+    <MobileMenuPortal open={mobileOpen}>
+        <div className="fixed inset-0 z-[100] flex flex-col bg-white safe-top lg:hidden">
           <div className="flex h-16 shrink-0 items-center justify-between border-b px-4">
             <Link href="/" onClick={() => setMobileOpen(false)}>
               <BasalimLogo compact />
@@ -313,7 +317,7 @@ export function BasalimNavbar({ locale }: BasalimNavbarProps) {
             </div>
           </nav>
         </div>
-      ) : null}
-    </header>
+    </MobileMenuPortal>
+    </>
   );
 }

@@ -1,7 +1,7 @@
 import { PaymentProvider } from "@prisma/client";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { createPaymentSession, ngeniusConfigured } from "@/lib/ngenius";
+import { createPaymentSession, NgeniusApiError, ngeniusConfigured } from "@/lib/ngenius";
 import { getServerSession } from "@/lib/get-server-session";
 import { resolveDbUserIdForSession } from "@/lib/resolve-session-user";
 import { bnplMetadataSchema } from "@/lib/payments/bnpl-session";
@@ -97,6 +97,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ paymentUrl, orderId });
   } catch (err) {
     console.error("[payment/create-session] failed:", err);
+    if (err instanceof NgeniusApiError) {
+      return NextResponse.json(
+        {
+          error: "Could not start payment",
+          code: err.code,
+          ...(process.env.NODE_ENV !== "production" ? { hint: err.hint, status: err.status } : {}),
+        },
+        { status: err.status === 403 ? 503 : 502 },
+      );
+    }
     return NextResponse.json({ error: "Could not start payment" }, { status: 502 });
   }
 }

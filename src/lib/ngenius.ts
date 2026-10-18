@@ -2,6 +2,35 @@ const TOKEN_TTL_MS = 3500 * 1000;
 
 let cachedToken: { accessToken: string; expiresAt: number } | null = null;
 
+export class NgeniusApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly code: string,
+    readonly hint?: string,
+  ) {
+    super(message);
+    this.name = "NgeniusApiError";
+  }
+}
+
+function identityRealm(): string | undefined {
+  const explicit = process.env.NGENIUS_REALM?.trim();
+  if (explicit) return explicit;
+  const base = process.env.NGENIUS_API_URL ?? "";
+  if (base.includes("sandbox")) return "ni";
+  if (base.includes("ngenius-payments.com")) return "networkinternational";
+  return undefined;
+}
+
+function accessTokenBody(): Record<string, string> {
+  const realm = identityRealm();
+  if (realm) {
+    return { grant_type: "client_credentials", realm };
+  }
+  return { grant_type: "client_credentials" };
+}
+
 function apiBase(): string {
   const base = process.env.NGENIUS_API_URL?.trim();
   if (!base) throw new Error("NGENIUS_API_URL is not configured");
@@ -43,14 +72,19 @@ export async function getAccessToken(): Promise<string> {
       "Content-Type": "application/vnd.ni-identity.v1+json",
       Accept: "application/vnd.ni-identity.v1+json",
     },
-    body: JSON.stringify({ grant_type: "client_credentials" }),
+    body: JSON.stringify(accessTokenBody()),
     cache: "no-store",
   });
 
   if (!response.ok) {
     const body = await response.text().catch(() => "");
     console.error("[ngenius] access token failed:", response.status, body);
-    throw new Error("N-Genius authentication failed");
+    throw new NgeniusApiError(
+      "N-Genius authentication failed",
+      response.status,
+      "auth_failed",
+      "Check NGENIUS_API_KEY and NGENIUS_API_URL (sandbox vs live must match the key).",
+    );
   }
 
   const data = (await response.json()) as { access_token?: string; expires_in?: number };
@@ -108,7 +142,16 @@ export async function createPaymentSession(
       apiHost: new URL(apiBase()).host,
       body,
     });
-    throw new Error("N-Genius payment session creation failed");
+    const hint =
+      response.status === 403
+        ? "Your API key can authenticate but cannot create orders for this outlet. In N-Genius Portal → Settings → Integrations → Service Accounts, create a Merchant (not Hosted Session) key, tie it to the same outlet, and update NGENIUS_API_KEY on Vercel."
+        : "Verify NGENIUS_OUTLET_REFERENCE matches the same environment as NGENIUS_API_URL.";
+    throw new NgeniusApiError(
+      "N-Genius payment session creation failed",
+      response.status,
+      response.status === 403 ? "outlet_access_denied" : "order_failed",
+      hint,
+    );
   }
 
   const data = (await response.json()) as {

@@ -13,6 +13,7 @@ import { UserRole } from "@/types";
 import { Logo } from "@/components/ui/Logo";
 import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
 import { Button } from "@/components/ui/Button";
+import { MobileMenuPortal } from "@/components/ui/MobileMenuPortal";
 
 type PublicNavbarProps = {
   locale: string;
@@ -209,9 +210,9 @@ function PublicMobileMenu({
         {open ? <X className="h-5 w-5 text-gray-800" /> : <Menu className="h-5 w-5 text-gray-800" />}
       </button>
 
-      {open ? (
+      <MobileMenuPortal open={open}>
         <div
-          className="fixed inset-0 z-[60] flex flex-col bg-white safe-top lg:hidden"
+          className="fixed inset-0 z-[100] flex flex-col bg-white safe-top lg:hidden"
           role="dialog"
           aria-modal="true"
         >
@@ -302,7 +303,7 @@ function PublicMobileMenu({
             </div>
           </nav>
         </div>
-      ) : null}
+      </MobileMenuPortal>
     </>
   );
 }

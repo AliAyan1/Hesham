@@ -9,6 +9,7 @@ import { QudratakLogo } from "@/components/layout/QudratakLogo";
 import { PlatformCta } from "@/components/qudratak/PlatformCta";
 import { QUDRAHTECH_MARKETING_PATH } from "@/lib/qudrahtech-marketing";
 import { QudrahtechLoginUrl, QudrahtechRegisterUrl } from "@/lib/basalim-public";
+import { MobileMenuPortal } from "@/components/ui/MobileMenuPortal";
 
 type QudratakNavbarProps = {
   locale: string;
@@ -60,6 +61,7 @@ export function QudratakNavbar({ locale }: QudratakNavbarProps) {
     );
 
   return (
+    <>
     <header className="sticky top-0 z-50 bg-[#0D1F2D] text-white">
       <div className="hidden border-b border-white/5 lg:block">
         <div className="mx-auto flex max-w-7xl justify-end px-6 py-1.5">
@@ -113,8 +115,10 @@ export function QudratakNavbar({ locale }: QudratakNavbarProps) {
       </div>
       </div>
 
-      {mobileOpen ? (
-        <div className="fixed inset-0 z-[60] flex flex-col bg-[#0D1F2D] lg:hidden">
+    </header>
+
+    <MobileMenuPortal open={mobileOpen}>
+        <div className="fixed inset-0 z-[100] flex flex-col bg-[#0D1F2D] lg:hidden">
           <div className="flex h-16 items-center justify-between border-b border-white/10 px-4">
             <QudratakLogo locale={locale} compact />
             <button
@@ -166,7 +170,7 @@ export function QudratakNavbar({ locale }: QudratakNavbarProps) {
             </div>
           </nav>
         </div>
-      ) : null}
-    </header>
+    </MobileMenuPortal>
+    </>
   );
 }

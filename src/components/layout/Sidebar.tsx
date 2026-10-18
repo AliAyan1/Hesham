@@ -290,8 +290,6 @@ export function Sidebar({ locale, role }: SidebarProps) {
       ? session.data.user.email
       : null;
 
-  const isRtl = locale === "ar" || locale === "ur";
-
   useEffect(() => {
     setMobileSidebarOpen(false);
   }, [pathname, setMobileSidebarOpen]);
@@ -301,18 +299,19 @@ export function Sidebar({ locale, role }: SidebarProps) {
       {mobileSidebarOpen ? (
         <button
           type="button"
-          className="fixed inset-0 top-14 z-[29] bg-black/40 md:hidden"
+          className="fixed inset-0 top-14 z-[45] bg-black/40 md:hidden"
           aria-label={tNav("closeSidebarAria")}
           onClick={() => setMobileSidebarOpen(false)}
         />
       ) : null}
       <aside
         aria-label={t("regionAria")}
+        aria-hidden={!mobileSidebarOpen ? true : undefined}
         className={cn(
-          "sidebar-gradient fixed start-0 top-14 z-30 flex h-[calc(100vh-3.5rem)] w-64 shrink-0 flex-col overflow-y-auto",
+          "sidebar-gradient fixed start-0 top-14 flex h-[calc(100vh-3.5rem)] w-64 shrink-0 flex-col overflow-y-auto",
           "transition-transform duration-200 ease-out",
-          mobileSidebarOpen ? "translate-x-0" : isRtl ? "translate-x-full" : "-translate-x-full",
-          "md:translate-x-0",
+          mobileSidebarOpen ? "z-50 translate-x-0" : "z-30 -translate-x-full rtl:translate-x-full",
+          "md:z-30 md:translate-x-0",
         )}
       >
       <nav className="flex flex-1 flex-col p-4 pt-5" role="navigation">

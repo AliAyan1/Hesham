@@ -24,7 +24,7 @@ export function DashboardLayout({
   return (
     <DashboardUIProvider>
       <DashboardHydrationGate>
-        <div className="min-h-screen w-full min-w-0 overflow-x-hidden bg-[#F8FAFC] text-gray-900">
+        <div className="min-h-screen w-full min-w-0 bg-[#F8FAFC] text-gray-900">
           <DashboardNavbar locale={locale} />
           {role === UserRole.MENTOR ? (
             <MentorSidebar locale={locale} />
