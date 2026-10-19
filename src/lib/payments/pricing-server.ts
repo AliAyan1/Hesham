@@ -4,13 +4,11 @@ import type { SubscriptionPlanKey } from "@/lib/payments/pricing";
 export async function getSubscriptionPlanPrices(): Promise<{
   PROFESSIONAL: number;
   PREMIUM: number;
-  vatPercentage: number;
 }> {
   const settings = await getSettings();
   return {
     PROFESSIONAL: settings.proPlanPrice,
     PREMIUM: settings.premiumPlanPrice,
-    vatPercentage: settings.vatPercentage,
   };
 }
 

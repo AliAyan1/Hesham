@@ -655,7 +655,7 @@ model PlatformSettings {
   supportEmail           String   @default("support@basalim-consulting.com")
   proPlanPrice           Float    @default(99)
   premiumPlanPrice       Float    @default(299)
-  vatPercentage          Float    @default(15)
+  vatPercentage          Float    @default(0)
   mentorCommission       Float    @default(25)
   mentorPayout           Float    @default(75)
   assessmentPassScore    Int      @default(50)

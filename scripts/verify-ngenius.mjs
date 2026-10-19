@@ -76,12 +76,16 @@ async function main() {
     if (orderRes.status === 403) {
       console.error(`
 → 403 Access Denied: your key is NOT allowed to create orders on this outlet.
-  Fix in N-Genius Portal:
-  1. Settings → Integrations → Service Accounts → Add
-  2. Type: Merchant (hosted pay page) — NOT "Hosted Session" only
-  3. Copy the new API key → Vercel NGENIUS_API_KEY
-  4. Settings → Organizational Hierarchy → pick SAR outlet → copy Outlet Reference
-     → Vercel NGENIUS_OUTLET_REFERENCE (must be from the SAME merchant account)
+  Use a Merchant service account (not Hosted Session only) and match outlet + API key to the same merchant.
+`);
+    }
+    if (orderRes.status === 422 && orderText.includes("configFetchError")) {
+      console.error(`
+→ 422 Outlet configuration error: N-Genius cannot load payment settings for outlet ...${outlet.slice(-8)}.
+  1. Portal → Settings → Organizational Hierarchy → select your LIVE SAR outlet (square icon)
+  2. Copy Outlet Reference again → NGENIUS_OUTLET_REFERENCE (Vercel + .env.local)
+  3. Ensure hosted payment page / SAR is enabled on that outlet
+  4. Contact Network International support with error "configFetchError" if the outlet looks active but orders still fail
 `);
     }
     process.exit(1);

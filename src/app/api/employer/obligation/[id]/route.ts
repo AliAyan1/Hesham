@@ -28,13 +28,11 @@ export async function GET(
     },
   });
   if (!row) return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
-  const vat = row.recruitmentFee * 0.15;
   return NextResponse.json({
     success: true,
     data: {
       ...row,
-      vatAmount: vat,
-      totalAmount: row.recruitmentFee + vat,
+      totalAmount: row.recruitmentFee,
     },
   });
 }
@@ -64,8 +62,7 @@ export async function POST(
   });
   if (!row) return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
 
-  const vat = row.recruitmentFee * 0.15;
-  const total = row.recruitmentFee + vat;
+  const total = row.recruitmentFee;
 
   await prisma.obligationLetter.update({
     where: { id },
@@ -81,13 +78,13 @@ export async function POST(
       obligationId: id,
       employerId: session.user.id,
       amount: row.recruitmentFee,
-      vatAmount: vat,
+      vatAmount: 0,
       totalAmount: total,
       status: PaymentStatus.PENDING,
     },
     update: {
       amount: row.recruitmentFee,
-      vatAmount: vat,
+      vatAmount: 0,
       totalAmount: total,
     },
   });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { PlatformSettingsDto } from "@/lib/settings-types";
 
 type TabId = "general" | "pricing" | "features" | "emails" | "limits" | "maintenance";
@@ -133,13 +133,6 @@ export default function AdminSettingsClient() {
     },
     [draft, persist, settings],
   );
-
-  const pricingWithVat = useMemo(() => {
-    if (!draft) return null;
-    const proVat = draft.proPlanPrice * (1 + draft.vatPercentage / 100);
-    const premiumVat = draft.premiumPlanPrice * (1 + draft.vatPercentage / 100);
-    return { proVat, premiumVat };
-  }, [draft]);
 
   async function clearCache() {
     await fetch("/api/admin/settings/clear-cache", { method: "POST", credentials: "include" });
@@ -308,9 +301,7 @@ export default function AdminSettingsClient() {
         <div className="grid gap-6 lg:grid-cols-2">
           <SectionCard
             title="Subscription Pricing"
-            onSave={() =>
-              void saveSection(["proPlanPrice", "premiumPlanPrice", "vatPercentage"])
-            }
+            onSave={() => void saveSection(["proPlanPrice", "premiumPlanPrice"])}
           >
             <NumberField
               label="Professional Plan Price"
@@ -328,19 +319,6 @@ export default function AdminSettingsClient() {
               onChange={(v) => updateField("premiumPlanPrice", v)}
               onBlur={() => void saveFieldOnBlur("premiumPlanPrice")}
             />
-            <NumberField
-              label="VAT Percentage"
-              suffix="%"
-              value={draft.vatPercentage}
-              onChange={(v) => updateField("vatPercentage", v)}
-              onBlur={() => void saveFieldOnBlur("vatPercentage")}
-            />
-            {pricingWithVat ? (
-              <div className="rounded-xl bg-[#F8FAFC] p-4 text-sm text-[#374151]">
-                <p>Pro + VAT: SAR {pricingWithVat.proVat.toFixed(2)}/mo</p>
-                <p className="mt-1">Premium + VAT: SAR {pricingWithVat.premiumVat.toFixed(2)}/mo</p>
-              </div>
-            ) : null}
             <WarningBox text="Changing prices will NOT affect existing active subscriptions — only new subscribers." />
           </SectionCard>
 

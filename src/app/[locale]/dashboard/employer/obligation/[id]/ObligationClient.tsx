@@ -14,7 +14,6 @@ type ObligationDto = {
   status: string;
   candidate: { name: string | null };
   job: { title: string };
-  vatAmount?: number;
   totalAmount?: number;
 };
 
@@ -71,8 +70,7 @@ export default function ObligationClient() {
 
   if (!row) return <p className="text-sm text-[#6B7280]">{t("loading")}</p>;
 
-  const vat = row.vatAmount ?? row.recruitmentFee * 0.15;
-  const total = row.totalAmount ?? row.recruitmentFee + vat;
+  const total = row.totalAmount ?? row.recruitmentFee;
   const candidateName = row.candidate.name ?? t("candidate");
   const jobTitle = row.job.title;
   const feeAmount = signedFee ?? row.recruitmentFee;
@@ -85,12 +83,6 @@ export default function ObligationClient() {
           {candidateName} — {jobTitle}
         </p>
         <ul className="text-sm text-[#374151]">
-          <li>
-            {t("recruitmentFee")}: {row.recruitmentFee} {row.currency}
-          </li>
-          <li>
-            {t("vat")}: {vat.toFixed(2)} {row.currency}
-          </li>
           <li className="font-semibold">
             {t("total")}: {total.toFixed(2)} {row.currency}
           </li>

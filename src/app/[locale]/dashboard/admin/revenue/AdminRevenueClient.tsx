@@ -35,11 +35,11 @@ export default function AdminRevenueClient({ title }: { title: string }) {
 
   function exportCsv() {
     if (!data) return;
-    const header = "date,type,party,amount,vat,total,status\n";
+    const header = "date,type,party,amount,total,status\n";
     const rows = data.transactions
       .map(
         (r) =>
-          `${r.date},${r.type},${r.partyName},${r.amount},${r.vat},${r.total},${r.status}`,
+          `${r.date},${r.type},${r.partyName},${r.amount},${r.total},${r.status}`,
       )
       .join("\n");
     const blob = new Blob([header + rows], { type: "text/csv" });
@@ -95,7 +95,6 @@ export default function AdminRevenueClient({ title }: { title: string }) {
               <th className="px-3 py-2">{t("colType")}</th>
               <th className="px-3 py-2">{t("colParty")}</th>
               <th className="px-3 py-2">{t("colAmount")}</th>
-              <th className="px-3 py-2">{t("colVat")}</th>
               <th className="px-3 py-2">{t("colTotal")}</th>
               <th className="px-3 py-2">{t("colStatus")}</th>
             </tr>
@@ -107,7 +106,6 @@ export default function AdminRevenueClient({ title }: { title: string }) {
                 <td className="px-3 py-2">{r.type}</td>
                 <td className="px-3 py-2">{r.partyName}</td>
                 <td className="px-3 py-2">{r.amount}</td>
-                <td className="px-3 py-2">{r.vat}</td>
                 <td className="px-3 py-2 font-semibold">{r.total}</td>
                 <td className="px-3 py-2">{r.status}</td>
               </tr>

@@ -142,14 +142,23 @@ export async function createPaymentSession(
       apiHost: new URL(apiBase()).host,
       body,
     });
-    const hint =
-      response.status === 403
-        ? "Your API key can authenticate but cannot create orders for this outlet. In N-Genius Portal → Settings → Integrations → Service Accounts, create a Merchant (not Hosted Session) key, tie it to the same outlet, and update NGENIUS_API_KEY on Vercel."
-        : "Verify NGENIUS_OUTLET_REFERENCE matches the same environment as NGENIUS_API_URL.";
+    const configError = body.includes("configFetchError") || body.includes("Failed to get configuration");
+    let code = "order_failed";
+    let hint =
+      "Verify NGENIUS_OUTLET_REFERENCE matches the same environment as NGENIUS_API_URL.";
+    if (response.status === 403) {
+      code = "outlet_access_denied";
+      hint =
+        "Your API key cannot create orders on this outlet. Use a Merchant service account key from N-Genius Portal (Settings → Integrations → Service Accounts).";
+    } else if (response.status === 422 && configError) {
+      code = "outlet_not_configured";
+      hint =
+        "N-Genius cannot load payment config for this outlet. In the portal, confirm the outlet is fully activated (SAR, hosted pay page). Copy a fresh Outlet Reference from Settings → Organizational Hierarchy for the same merchant as your API key. If it still fails, ask Network International to fix outlet configuration (configFetchError).";
+    }
     throw new NgeniusApiError(
       "N-Genius payment session creation failed",
       response.status,
-      response.status === 403 ? "outlet_access_denied" : "order_failed",
+      code,
       hint,
     );
   }

@@ -10,7 +10,6 @@ import {
   attachExternalIdToIntent,
   createPaymentIntent,
 } from "@/lib/payments/intent";
-import { calculateVAT } from "@/lib/payments/vat";
 import { clientIp, rateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
 const bodySchema = z.object({
@@ -63,9 +62,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     metadataInput.plan = parsed.data.planId;
   }
 
-  const totalAmount = parsed.data.amount;
-  const baseAmount = Math.round((totalAmount / 1.15) * 100) / 100;
-  const { vat: vatAmount } = calculateVAT(baseAmount);
+  const baseAmount = Math.round(parsed.data.amount * 100) / 100;
+  const totalAmount = baseAmount;
+  const vatAmount = 0;
 
   const orderId = `QT-${Date.now()}`;
   const locale = parsed.data.locale ?? "ar";

@@ -655,7 +655,6 @@ export async function fetchAdminRevenuePayload(): Promise<
       type: "RECRUITMENT" as const,
       partyName: p.employer.name ?? p.employer.email,
       amount: p.amount,
-      vat: p.vatAmount,
       total: p.totalAmount,
       status: p.status,
     })),
@@ -665,7 +664,6 @@ export async function fetchAdminRevenuePayload(): Promise<
       type: "SESSION" as const,
       partyName: s.mentor.user.name ?? s.mentee.name ?? "Session",
       amount: s.price,
-      vat: 0,
       total: s.price,
       status: "PAID",
     })),
@@ -675,10 +673,7 @@ export async function fetchAdminRevenuePayload(): Promise<
       type: "SUBSCRIPTION" as const,
       partyName: u.name ?? u.email,
       amount: subscriptionAmountForTier(u.subscriptionTier),
-      vat: Math.round(subscriptionAmountForTier(u.subscriptionTier) * 0.15),
-      total:
-        subscriptionAmountForTier(u.subscriptionTier) +
-        Math.round(subscriptionAmountForTier(u.subscriptionTier) * 0.15),
+      total: subscriptionAmountForTier(u.subscriptionTier),
       status: "PAID",
     })),
   ]

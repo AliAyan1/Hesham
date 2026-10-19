@@ -8,7 +8,6 @@ import {
 import { createTabbyCheckoutSession } from "@/lib/payments/tabby";
 import { createTamaraCheckoutSession } from "@/lib/payments/tamara";
 import type { PaymentMetadataInput } from "@/lib/payments/fulfill";
-import { calculateVAT } from "@/lib/payments/vat";
 
 export const bnplMetadataSchema = z.object({
   type: z.enum(["SUBSCRIPTION", "RECRUITMENT_FEE", "MENTOR_SESSION"]),
@@ -32,13 +31,12 @@ export async function startTabbySession(input: {
   description: string;
   locale: string;
 }): Promise<{ redirectUrl: string }> {
-  const { vat } = calculateVAT(input.baseAmount);
   const intent = await createPaymentIntent({
     userId: input.userId,
     provider: PaymentProvider.TABBY,
     metadata: input.metadata,
     baseAmount: input.baseAmount,
-    vatAmount: vat,
+    vatAmount: 0,
     totalAmount: input.totalAmount,
   });
 
@@ -76,13 +74,12 @@ export async function startTamaraSession(input: {
   description: string;
   locale: string;
 }): Promise<{ redirectUrl: string }> {
-  const { vat } = calculateVAT(input.baseAmount);
   const intent = await createPaymentIntent({
     userId: input.userId,
     provider: PaymentProvider.TAMARA,
     metadata: input.metadata,
     baseAmount: input.baseAmount,
-    vatAmount: vat,
+    vatAmount: 0,
     totalAmount: input.totalAmount,
   });
 
@@ -96,7 +93,7 @@ export async function startTamaraSession(input: {
     orderReferenceId: intent.id,
     description: input.description,
     totalAmount: input.totalAmount,
-    taxAmount: vat,
+    taxAmount: 0,
     currency: "SAR",
     consumerEmail: input.buyer.email,
     consumerFirstName: firstName,

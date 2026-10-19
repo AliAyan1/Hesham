@@ -1,8 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { calculateVAT } from "@/lib/payments/vat";
 import { PAYMENT_METADATA_STORAGE_KEY } from "@/lib/payments/storage-keys";
 import { BnplPaymentButtons } from "./BnplPaymentButtons";
 
@@ -61,11 +60,6 @@ export function PaymentModal({
       });
   }, []);
 
-  const { vat, total } = useMemo(() => {
-    const breakdown = calculateVAT(baseAmount);
-    return { vat: breakdown.vat, total: breakdown.total };
-  }, [baseAmount]);
-
   useEffect(() => {
     if (!isOpen) return;
     try {
@@ -84,7 +78,7 @@ export function PaymentModal({
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          amount: total,
+          amount: baseAmount,
           planId: metadata.plan,
           metadata: {
             type: metadata.type,
@@ -106,7 +100,7 @@ export function PaymentModal({
       setStatus("error");
       setErrorMsg(t("sessionStartFailed"));
     }
-  }, [locale, metadata, t, total]);
+  }, [baseAmount, locale, metadata, t]);
 
   if (!isOpen) return null;
 
@@ -134,22 +128,10 @@ export function PaymentModal({
 
         <>
           <div className="mb-5 rounded-xl bg-[#F8FAFC] p-4">
-            <div className="mb-1.5 flex justify-between text-sm text-[#6B7280]">
-              <span>{t("subtotal")}</span>
-              <span>
-                {t("sar")} {baseAmount.toFixed(2)}
-              </span>
-            </div>
-            <div className="mb-1.5 flex justify-between text-sm text-[#6B7280]">
-              <span>{t("vat")}</span>
-              <span>
-                {t("sar")} {vat.toFixed(2)}
-              </span>
-            </div>
-            <div className="mt-2 flex justify-between border-t border-[#E5E7EB] pt-2 text-base font-bold text-[#0D2137]">
+            <div className="flex justify-between text-base font-bold text-[#0D2137]">
               <span>{t("total")}</span>
               <span>
-                {t("sar")} {total.toFixed(2)}
+                {t("sar")} {baseAmount.toFixed(2)}
               </span>
             </div>
           </div>
@@ -165,7 +147,7 @@ export function PaymentModal({
           <BnplPaymentButtons
             enabled={{ tabby: methods.tabby, tamara: methods.tamara }}
             baseAmount={baseAmount}
-            totalAmount={total}
+            totalAmount={baseAmount}
             description={description}
             metadata={metadata}
             onError={(msg) => {

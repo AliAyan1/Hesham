@@ -161,7 +161,6 @@ export type AdminTransactionRow = {
   type: "SUBSCRIPTION" | "RECRUITMENT" | "SESSION";
   partyName: string;
   amount: number;
-  vat: number;
   total: number;
   status: string;
 };

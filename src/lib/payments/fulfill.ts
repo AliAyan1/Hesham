@@ -7,7 +7,7 @@ import {
   SubscriptionTier,
 } from "@prisma/client";
 import { getPrisma } from "@/lib/db";
-import { calculateVAT, toHalalas } from "@/lib/payments/vat";
+import { toHalalas } from "@/lib/payments/vat";
 import type { PaymentIntent } from "@prisma/client";
 import { markIntentPaid, parseIntentMetadata } from "@/lib/payments/intent";
 import {
@@ -37,8 +37,7 @@ async function resolveExpectedTotalHalalas(metadata: PaymentMetadataInput): Prom
       throw new Error("invalid_plan");
     }
     const base = await subscriptionBaseAmount(plan);
-    const { total } = calculateVAT(base, prices.vatPercentage);
-    return toHalalas(total);
+    return toHalalas(base);
   }
 
   const prisma = getPrisma();
@@ -50,8 +49,7 @@ async function resolveExpectedTotalHalalas(metadata: PaymentMetadataInput): Prom
       select: { recruitmentFee: true },
     });
     if (!row) throw new Error("obligation_not_found");
-    const { total } = calculateVAT(row.recruitmentFee);
-    return toHalalas(total);
+    return toHalalas(row.recruitmentFee);
   }
 
   if (metadata.type === "MENTOR_SESSION") {
@@ -61,8 +59,7 @@ async function resolveExpectedTotalHalalas(metadata: PaymentMetadataInput): Prom
       select: { price: true },
     });
     if (!row) throw new Error("session_not_found");
-    const { total } = calculateVAT(row.price);
-    return toHalalas(total);
+    return toHalalas(row.price);
   }
 
   throw new Error("invalid_type");
@@ -169,7 +166,7 @@ async function applyPaymentFulfillment(
         obligationId: metadata.obligationId,
         employerId: userId,
         amount: amounts.baseAmount,
-        vatAmount: Math.round((amounts.totalAmount - amounts.baseAmount) * 100) / 100,
+        vatAmount: 0,
         totalAmount: amounts.totalAmount,
         status: PaymentStatus.PAID,
         paidAt: new Date(),
@@ -180,7 +177,7 @@ async function applyPaymentFulfillment(
         paidAt: new Date(),
         receiptNumber: amounts.externalPaymentId,
         amount: amounts.baseAmount,
-        vatAmount: Math.round((amounts.totalAmount - amounts.baseAmount) * 100) / 100,
+        vatAmount: 0,
         totalAmount: amounts.totalAmount,
       },
     });

@@ -248,7 +248,7 @@ export const QUDRATAK_PRICING: QudratakPricingPlan[] = [
     id: "professional",
     nameEn: "Pro",
     nameAr: "برو",
-    priceEn: "SAR 99 / month + VAT",
+    priceEn: "SAR 99 / month",
     priceAr: "99 ر.س / شهرياً + ض.ق.م",
     featured: true,
     featuresEn: [
@@ -272,7 +272,7 @@ export const QUDRATAK_PRICING: QudratakPricingPlan[] = [
     id: "premium",
     nameEn: "Premium",
     nameAr: "بريميوم",
-    priceEn: "SAR 299 / month + VAT",
+    priceEn: "SAR 299 / month",
     priceAr: "299 ر.س / شهرياً + ض.ق.م",
     premiumStyle: true,
     featuresEn: [

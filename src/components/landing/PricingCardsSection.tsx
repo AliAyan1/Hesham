@@ -28,7 +28,6 @@ export async function PricingCardsSection({
 
   const proPrice = `SAR ${formatPrice(prices.professional)}`;
   const premiumPrice = `SAR ${formatPrice(prices.premium)}`;
-  const vatNote = t("pricingNew.vat");
   const gridCols = settings.isMentorMarketOpen ? "lg:grid-cols-4" : "lg:grid-cols-3";
 
   return (
@@ -59,7 +58,6 @@ export async function PricingCardsSection({
           badge={t("pricingNew.pro.badge")}
           title={t("pricingNew.pro.title")}
           price={proPrice}
-          vatNote={vatNote}
           features={pricingFeatures(t, "pricingNew.pro.features")}
           ctaLabel={t("pricingNew.pro.cta")}
           ctaHref={{ pathname: "/auth/register", query: { plan: "professional" } }}
@@ -69,7 +67,6 @@ export async function PricingCardsSection({
           badge={t("pricingNew.premium.badge")}
           title={t("pricingNew.premium.title")}
           price={premiumPrice}
-          vatNote={vatNote}
           features={pricingFeatures(t, "pricingNew.premium.features")}
           ctaLabel={t("pricingNew.premium.cta")}
           ctaHref={{ pathname: "/auth/register", query: { plan: "premium" } }}
@@ -111,7 +108,6 @@ function NewPriceCard({
   title,
   subtitle,
   price,
-  vatNote,
   features,
   ctaLabel,
   ctaHref,
@@ -122,7 +118,6 @@ function NewPriceCard({
   title: string;
   subtitle?: string;
   price: string;
-  vatNote?: string;
   features: string[];
   ctaLabel: string;
   ctaHref: AppLinkHref;
@@ -186,11 +181,6 @@ function NewPriceCard({
       </div>
 
       <p className="mt-3 text-[28px] font-black">{price}</p>
-      {vatNote ? (
-        <p className={`mt-1 text-[10px] ${variant === "pro" ? "text-white/60" : "text-gray-500"}`}>
-          {vatNote}
-        </p>
-      ) : null}
 
       <ul className={`mt-6 grid gap-[14px] text-[13px] leading-snug ${listText}`}>
         {features.map((f, idx) => (

@@ -12,7 +12,7 @@ export const DEFAULT_PLATFORM_SETTINGS: PlatformSettingsInput = {
   supportEmail: "support@basalim-consulting.com",
   proPlanPrice: 99,
   premiumPlanPrice: 299,
-  vatPercentage: 15,
+  vatPercentage: 0,
   mentorCommission: 25,
   mentorPayout: 75,
   assessmentPassScore: 50,
