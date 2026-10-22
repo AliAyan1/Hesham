@@ -37,6 +37,8 @@ export function useInterviewAutoAnswer({
   const chunksRef = useRef<BlobPart[]>([]);
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const finalizingRef = useRef(false);
+  /** When true, recognition.onend must not schedule finalize (question transition stop). */
+  const intentionalStopRef = useRef(false);
   const transcriptRef = useRef("");
 
   const clearSilenceTimer = useCallback(() => {
@@ -48,6 +50,7 @@ export function useInterviewAutoAnswer({
 
   const stopCapture = useCallback(() => {
     clearSilenceTimer();
+    intentionalStopRef.current = true;
     try {
       recognitionRef.current?.stop();
     } catch {
@@ -107,6 +110,7 @@ export function useInterviewAutoAnswer({
   const startCapture = useCallback(() => {
     if (muted || !micStream || finalizingRef.current) return;
     stopCapture();
+    intentionalStopRef.current = false;
     finalizingRef.current = false;
     transcriptRef.current = "";
     onTranscriptUpdate("");
@@ -134,9 +138,11 @@ export function useInterviewAutoAnswer({
           scheduleFinalize();
         }
       };
-      recognition.onerror = () => scheduleFinalize();
+      recognition.onerror = () => {
+        if (!intentionalStopRef.current) scheduleFinalize();
+      };
       recognition.onend = () => {
-        if (!finalizingRef.current) scheduleFinalize();
+        if (!finalizingRef.current && !intentionalStopRef.current) scheduleFinalize();
       };
       recognitionRef.current = recognition;
       try {

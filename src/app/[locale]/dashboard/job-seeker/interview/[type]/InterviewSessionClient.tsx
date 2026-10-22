@@ -409,6 +409,8 @@ export default function InterviewSessionClient({
 
   const autoAnswerStopRef = useRef<() => void>(() => {});
   const autoAnswerStartRef = useRef<() => void>(() => {});
+  const questionsRef = useRef(questions);
+  questionsRef.current = questions;
 
   async function nextQuestionInner(finalTextOverride?: string) {
     if (!q || !interviewId) return;
@@ -486,9 +488,16 @@ export default function InterviewSessionClient({
     autoAnswerStartRef.current = autoAnswer.startCapture;
   }, [autoAnswer.stopCapture, autoAnswer.startCapture]);
 
+  const startMicForAnswer = useCallback(() => {
+    if (muted || !micStreamRef.current) return;
+    setIsListening(true);
+    autoAnswerStartRef.current();
+  }, [muted]);
+
   const speakQuestionWithAutoListen = useCallback(
-    async (questionIndex: number, list: QuestionItem[]) => {
-      const item = list[questionIndex];
+    async (questionIndex: number, list?: QuestionItem[]) => {
+      const qList = list ?? questionsRef.current;
+      const item = qList[questionIndex];
       if (!item) return;
       setAnswerRecorded(false);
       setIsListening(false);
@@ -496,18 +505,18 @@ export default function InterviewSessionClient({
       const text = pickQuestionText(item, locale);
       setVoiceUnavailable(false);
       setVoiceNeedsTap(false);
+      await unlockAudio();
       const ok = await laraSpeak(text);
       if (!ok) {
         setVoiceUnavailable(true);
         setVoiceNeedsTap(true);
+        // Still listen — user can read the question on screen if audio is blocked.
+        startMicForAnswer();
         return;
       }
-      if (!muted && micStreamRef.current) {
-        setIsListening(true);
-        autoAnswerStartRef.current();
-      }
+      startMicForAnswer();
     },
-    [locale, laraSpeak, muted],
+    [locale, laraSpeak, startMicForAnswer, unlockAudio],
   );
 
   useEffect(() => {
@@ -520,29 +529,35 @@ export default function InterviewSessionClient({
   const currentQuestionId = questions[idx]?.id ?? "";
 
   useEffect(() => {
-    if (phase !== "run" || idx === 0 || !questions[idx]) return;
+    if (phase !== "run" || idx === 0 || !questionsRef.current[idx]) return;
     let cancelled = false;
 
     void (async () => {
-      if (!cancelled) await speakQuestionWithAutoListen(idx, questions);
+      if (!cancelled) await speakQuestionWithAutoListen(idx);
     })();
 
     return () => {
       cancelled = true;
       laraStop();
     };
-  }, [phase, idx, currentQuestionId, laraStop, speakQuestionWithAutoListen, questions]);
+  }, [phase, idx, currentQuestionId, laraStop, speakQuestionWithAutoListen]);
 
   async function replayQuestionAudio() {
     if (!qText.trim() || laraTtsStatus === "preparing" || laraTtsStatus === "speaking") return;
     setVoiceUnavailable(false);
     setVoiceNeedsTap(false);
+    autoAnswerStopRef.current();
+    setIsListening(false);
     await unlockAudio();
     const ok = await laraSpeak(qText);
     if (!ok) {
       setVoiceUnavailable(true);
       setVoiceNeedsTap(true);
+      startMicForAnswer();
+      return;
     }
+    setVoiceNeedsTap(false);
+    startMicForAnswer();
   }
 
   async function playIntroAndFirstQuestion(list: QuestionItem[]) {
@@ -1101,17 +1116,6 @@ export default function InterviewSessionClient({
 
     return (
       <div className="-mx-4 -my-6 sm:-mx-6">
-        {voiceNeedsTap ? (
-          <div className="px-4 pt-4">
-            <button
-              type="button"
-              className="w-full rounded-lg border border-brand-teal bg-[#ECFDF5] px-4 py-3 text-sm font-semibold text-brand-teal"
-              onClick={() => void replayQuestionAudio()}
-            >
-              {t("playQuestion")}
-            </button>
-          </div>
-        ) : null}
         {recordError ? (
           <p className="px-4 pt-2 text-center text-sm text-red-300">{recordError}</p>
         ) : null}
@@ -1142,6 +1146,9 @@ export default function InterviewSessionClient({
           onEndInterview={() => void finalizeInterview()}
           endDisabled={loading || Boolean(proctoring.isFlagged)}
           labels={runLabels}
+          voiceNeedsTap={voiceNeedsTap}
+          onPlayQuestion={() => void replayQuestionAudio()}
+          playQuestionLabel={t("playQuestion")}
         />
       </div>
     );

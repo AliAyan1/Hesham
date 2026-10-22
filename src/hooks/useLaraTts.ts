@@ -71,12 +71,20 @@ export function useLaraTts(locale: string) {
         let objectUrl = blobCacheRef.current.get(key);
 
         if (!objectUrl) {
-          const res = await fetch("/api/interview/text-to-speech", {
-            method: "POST",
-            credentials: "include",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ text: trimmed.slice(0, 8000), locale }),
-          });
+          const controller = new AbortController();
+          const timeout = window.setTimeout(() => controller.abort(), 25_000);
+          let res: Response;
+          try {
+            res = await fetch("/api/interview/text-to-speech", {
+              method: "POST",
+              credentials: "include",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ text: trimmed.slice(0, 8000), locale }),
+              signal: controller.signal,
+            });
+          } finally {
+            window.clearTimeout(timeout);
+          }
           if (!res.ok) {
             setStatus("error");
             return false;
@@ -98,7 +106,10 @@ export function useLaraTts(locale: string) {
           audio.volume = 1;
           audioRef.current = audio;
 
+          let settled = false;
           const finish = (ok: boolean) => {
+            if (settled) return;
+            settled = true;
             audioRef.current = null;
             setStatus(ok ? "idle" : "error");
             resolve(ok);
@@ -107,7 +118,16 @@ export function useLaraTts(locale: string) {
           audio.onended = () => finish(true);
           audio.onerror = () => finish(false);
 
-          void audio.play().then(() => {}).catch(() => finish(false));
+          const tryPlay = () => {
+            void audio.play().then(() => {}).catch(() => finish(false));
+          };
+
+          if (audio.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
+            tryPlay();
+          } else {
+            audio.oncanplaythrough = () => tryPlay();
+            audio.load();
+          }
         });
       } catch {
         setStatus("error");

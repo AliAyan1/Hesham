@@ -36,6 +36,9 @@ export type InterviewRunScreenProps = {
   onToggleMute: () => void;
   onEndInterview: () => void;
   endDisabled?: boolean;
+  voiceNeedsTap?: boolean;
+  onPlayQuestion?: () => void;
+  playQuestionLabel?: string;
 };
 
 function formatElapsed(sec: number): string {
@@ -63,6 +66,9 @@ export function InterviewRunScreen({
   onToggleMute,
   onEndInterview,
   endDisabled,
+  voiceNeedsTap,
+  onPlayQuestion,
+  playQuestionLabel,
 }: InterviewRunScreenProps) {
   const laraSpeaking = laraTtsStatus === "speaking" || laraTtsStatus === "preparing";
 
@@ -96,6 +102,16 @@ export function InterviewRunScreen({
               style={{ width: `${progressPct}%` }}
             />
           </div>
+
+          {voiceNeedsTap && onPlayQuestion && playQuestionLabel ? (
+            <button
+              type="button"
+              onClick={onPlayQuestion}
+              className="w-full rounded-xl border border-[#1D9E75]/50 bg-[#1D9E75]/15 px-4 py-3 text-sm font-semibold text-[#A7F3D0] hover:bg-[#1D9E75]/25"
+            >
+              {playQuestionLabel}
+            </button>
+          ) : null}
 
           <div className="rounded-2xl bg-white/95 p-6 shadow-xl">
             <p className="text-center text-lg font-semibold leading-relaxed text-[#0D2137]">
